@@ -1,0 +1,28 @@
+# YouTube 1080p — Optimized for YouTube upload
+name: "YouTube 1080p"
+description: "H.264 1080p + AAC 192kbps — YouTube recommended settings"
+
+audio:
+  codec: "aac"
+  profile: "lc"
+  bitrate_kbps: 192
+  sample_rate: 48000
+  channels: 2
+
+video:
+  codec: "h264"
+  profile: "high"
+  level: "4.1"
+  bitrate_kbps: 8000
+  resolution: [1920, 1080]
+  framerate: 30.0
+  pixel_format: "yuv420p"
+  preset: "medium"
+  crf: 18
+  keyframe_interval: 60
+
+container: "mp4"
+
+metadata:
+  write_mp4_atoms: true
+  faststart: true

@@ -1,0 +1,58 @@
+Source: mcaster1dawcast
+Section: sound
+Priority: optional
+Maintainer: David St. John <davestj@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               autoconf,
+               automake,
+               autoconf-archive,
+               qt6-base-dev (>= 6.5),
+               qt6-multimedia-dev (>= 6.5),
+               libqt6svg6-dev,
+               libportaudio2,
+               portaudio19-dev,
+               libavformat-dev,
+               libavcodec-dev,
+               libswresample-dev,
+               libswscale-dev,
+               libavutil-dev,
+               libtag1-dev (>= 1.11),
+               libsqlite3-dev (>= 3.24),
+               libyaml-dev,
+               libmp3lame-dev,
+               libmpg123-dev,
+               libvorbis-dev,
+               libflac-dev,
+               libopus-dev,
+               libopusenc-dev,
+               libfdk-aac-dev,
+               libx264-dev,
+               libvpx-dev,
+               libtheora-dev,
+               libass-dev,
+               libfreetype-dev,
+               pkg-config
+Standards-Version: 4.6.2
+Homepage: https://mcaster1.com
+
+Package: mcaster1dawcast
+Architecture: amd64
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         libqt6widgets6 (>= 6.5),
+         libqt6multimedia6 (>= 6.5),
+         libportaudio2,
+         libavformat60 | libavformat-extra60,
+         libavcodec60 | libavcodec-extra60,
+         libtag1v5,
+         libsqlite3-0,
+         libyaml-0-2
+Description: Multi-Channel DAW for Broadcasting, Webcasting, Podcasting & Video Editing
+ Mcaster1DAWCast is a full-featured digital audio workstation designed
+ specifically for broadcasters, webcasters, and podcasters. It combines
+ multi-track audio recording and editing with video editing capabilities,
+ live broadcasting, podcast production tools, and broadcast graphics.
+ .
+ Features include 32-strip mixer, 10 DSP effects, 10 video transitions,
+ chapter markers, RSS feed generation, loudness metering, lower thirds,
+ ticker crawl, chroma key, and theme engine.

@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mcaster1DAWCast &mdash; Development Roadmap &amp; Phase Tracking</title>
+  <style>
+    /* -- CSS Variables -- */
+    :root {
+      --bg:          #0f172a;
+      --bg-card:     #1e293b;
+      --bg-sidebar:  #0d1a2e;
+      --border:      #1e3a5f;
+      --teal:        #14b8a6;
+      --teal-dark:   #0d9488;
+      --cyan:        #0891b2;
+      --cyan-light:  #22d3ee;
+      --text:        #e2e8f0;
+      --text-muted:  #94a3b8;
+      --text-dim:    #64748b;
+      --green:       #22c55e;
+      --yellow:      #f59e0b;
+      --red:         #ef4444;
+      --purple:      #a855f7;
+      --sidebar-w:   280px;
+      --header-h:    60px;
+    }
+
+    /* -- Reset + Base -- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { color: var(--cyan-light); text-decoration: underline; }
+    code {
+      font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.875rem;
+      background: rgba(20,184,166,0.12);
+      color: var(--cyan-light);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+    h1, h2, h3, h4 { line-height: 1.3; font-weight: 600; }
+    h2 { font-size: 1.6rem; }
+    h3 { font-size: 1.2rem; }
+    h4 { font-size: 1rem; }
+    p { margin: 0.75rem 0; }
+    ul, ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+    li { margin: 0.3rem 0; }
+
+    /* -- Top header bar -- */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; padding: 0 1.5rem; z-index: 100; gap: 1rem;
+    }
+    .top-bar .logo { font-size: 1rem; font-weight: 700; color: var(--teal); letter-spacing: -0.02em; }
+    .top-bar .logo span { color: var(--text-muted); font-weight: 400; }
+    .top-bar .version-pill {
+      background: rgba(20,184,166,0.12); color: var(--teal);
+      border: 1px solid rgba(20,184,166,0.25); border-radius: 9999px;
+      padding: 0.15em 0.75em; font-size: 0.75rem; font-weight: 600;
+    }
+    .top-bar-right { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
+    .top-bar-right a {
+      color: var(--text-muted); font-size: 0.8rem; padding: 0.3em 0.75em;
+      border: 1px solid var(--border); border-radius: 6px; transition: color 0.15s, border-color 0.15s;
+    }
+    .top-bar-right a:hover { color: var(--teal); border-color: var(--teal); text-decoration: none; }
+
+    /* -- Sidebar -- */
+    .sidebar {
+      position: fixed; top: var(--header-h); left: 0; width: var(--sidebar-w); bottom: 0;
+      background: var(--bg-sidebar); border-right: 1px solid var(--border);
+      overflow-y: auto; padding: 1.25rem 0 2rem;
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .nav-section {
+      padding: 0.6rem 1rem 0.2rem; font-size: 0.65rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+    }
+    .nav-item {
+      display: block; padding: 0.4rem 1.25rem; font-size: 0.82rem;
+      color: var(--text-muted); border-left: 2px solid transparent; transition: all 0.12s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .nav-item:hover, .nav-item.active {
+      color: var(--teal); border-left-color: var(--teal);
+      background: rgba(20,184,166,0.06); text-decoration: none;
+    }
+    .nav-sub {
+      padding: 0.3rem 1.25rem 0.3rem 2rem; font-size: 0.78rem;
+      color: var(--text-dim); display: block; border-left: 2px solid transparent; transition: all 0.12s;
+    }
+    .nav-sub:hover {
+      color: var(--cyan-light); border-left-color: var(--cyan);
+      background: rgba(8,145,178,0.05); text-decoration: none;
+    }
+
+    /* -- Main content -- */
+    .main {
+      margin-left: var(--sidebar-w); margin-top: var(--header-h);
+      padding: 2.5rem 3rem 4rem; max-width: 1100px;
+    }
+
+    /* -- Hero header -- */
+    .hero { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border); }
+    .hero h1 { font-size: 2.2rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
+    .hero h1 .accent { color: var(--teal); }
+    .hero .subtitle { font-size: 1.1rem; color: var(--text-muted); font-weight: 400; }
+
+    /* -- Progress summary -- */
+    .progress-summary {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.75rem 2rem; margin-bottom: 3rem;
+    }
+    .progress-summary h3 { color: var(--text); margin-bottom: 1rem; font-size: 1.1rem; }
+    .progress-bar-track {
+      width: 100%; height: 14px; background: rgba(100,116,139,0.2);
+      border-radius: 7px; overflow: hidden; margin-bottom: 1rem;
+      border: 1px solid rgba(100,116,139,0.15);
+    }
+    .progress-bar-fill {
+      height: 100%; background: linear-gradient(90deg, var(--teal), var(--cyan));
+      border-radius: 7px; transition: width 0.5s ease; min-width: 0;
+    }
+    .progress-stats { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .progress-stat { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+    .progress-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .progress-dot.complete { background: var(--green); }
+    .progress-dot.in-progress { background: var(--yellow); }
+    .progress-dot.planned { background: var(--text-dim); }
+    .progress-stat .count { font-weight: 700; color: var(--text); font-family: 'Fira Code', monospace; }
+    .progress-stat .label { color: var(--text-muted); }
+
+    /* -- Status badges -- */
+    .badge {
+      display: inline-block; padding: 0.2em 0.7em; border-radius: 9999px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em;
+      text-transform: uppercase; white-space: nowrap;
+    }
+    .badge-complete  { background: rgba(34,197,94,0.15);  color: var(--green);   border: 1px solid rgba(34,197,94,0.3);  }
+    .badge-planned   { background: rgba(100,116,139,0.2); color: var(--text-dim); border: 1px solid rgba(100,116,139,0.3); }
+    .badge-progress  { background: rgba(245,158,11,0.15); color: var(--yellow);  border: 1px solid rgba(245,158,11,0.3); }
+
+    /* -- Phase cards -- */
+    .phase-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 2rem; overflow: hidden; transition: border-color 0.2s;
+    }
+    .phase-card:hover { border-color: rgba(20,184,166,0.4); }
+    .phase-card-header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .phase-number {
+      display: flex; align-items: center; justify-content: center;
+      min-width: 2.5rem; height: 2.5rem;
+      background: rgba(20,184,166,0.12); border: 1px solid rgba(20,184,166,0.3);
+      border-radius: 8px; color: var(--teal); font-size: 0.85rem; font-weight: 700;
+      flex-shrink: 0; padding: 0 0.5rem;
+    }
+    .phase-title-group { flex: 1; min-width: 200px; }
+    .phase-title {
+      font-size: 1.15rem; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    }
+    .version-badge {
+      background: rgba(8,145,178,0.12); color: var(--cyan);
+      border: 1px solid rgba(8,145,178,0.3); border-radius: 6px;
+      padding: 0.1em 0.55em; font-size: 0.72rem; font-weight: 600;
+      font-family: 'Fira Code', monospace;
+    }
+    .phase-goal { font-size: 0.88rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .phase-card-body { padding: 1.5rem 1.75rem; }
+
+    /* -- Sub-sections within phase cards -- */
+    .phase-section { margin-bottom: 1.5rem; }
+    .phase-section:last-child { margin-bottom: 0; }
+    .phase-section-title {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem; border-bottom: 1px solid rgba(30,58,95,0.5);
+    }
+
+    /* -- Feature checklist -- */
+    .feature-list { list-style: none; padding: 0; margin: 0; columns: 1; }
+    .feature-item {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      padding: 0.35rem 0; font-size: 0.88rem; color: var(--text-muted); margin: 0;
+    }
+    .feature-check {
+      width: 16px; height: 16px; border: 1.5px solid var(--text-dim);
+      border-radius: 3px; flex-shrink: 0; margin-top: 2px;
+      display: flex; align-items: center; justify-content: center; font-size: 0.65rem;
+    }
+    .feature-check.done {
+      background: rgba(34,197,94,0.2); border-color: var(--green); color: var(--green);
+    }
+    .feature-check.wip {
+      background: rgba(245,158,11,0.2); border-color: var(--yellow); color: var(--yellow);
+    }
+
+    /* -- Files list -- */
+    .files-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+    .file-tag {
+      background: rgba(20,184,166,0.08); border: 1px solid rgba(20,184,166,0.2);
+      color: var(--cyan-light); font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.75rem; padding: 0.2em 0.6em; border-radius: 4px; white-space: nowrap;
+    }
+
+    /* -- Verification + Effort -- */
+    .meta-row { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .meta-block { flex: 1; min-width: 220px; }
+    .meta-block .meta-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 0.3rem;
+    }
+    .meta-block .meta-value { font-size: 0.88rem; color: var(--text-muted); }
+    .effort-badge {
+      display: inline-block; background: rgba(168,85,247,0.12);
+      border: 1px solid rgba(168,85,247,0.3); color: var(--purple);
+      border-radius: 6px; padding: 0.15em 0.6em; font-size: 0.78rem; font-weight: 600;
+    }
+
+    /* -- Ecosystem diagram -- */
+    .ecosystem-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.75rem 2rem; margin-bottom: 2rem;
+    }
+    .ecosystem-card h3 { color: var(--text); margin-bottom: 1rem; }
+    .ecosystem-flow {
+      font-family: 'Fira Code', monospace; font-size: 0.85rem;
+      color: var(--cyan-light); line-height: 1.8;
+      background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: 8px;
+      overflow-x: auto; white-space: pre;
+    }
+
+    /* -- Future considerations -- */
+    .future-section {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.75rem 2rem; margin-top: 3rem;
+    }
+    .future-section h2 { color: var(--text); margin-bottom: 1rem; font-size: 1.3rem; }
+    .future-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;
+    }
+    .future-item {
+      background: rgba(100,116,139,0.08); border: 1px solid rgba(100,116,139,0.15);
+      border-radius: 8px; padding: 0.9rem 1.1rem;
+    }
+    .future-item h4 { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .future-item p { color: var(--text-dim); font-size: 0.82rem; margin: 0; }
+
+    /* -- Footer -- */
+    .page-footer {
+      margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+      text-align: center; color: var(--text-dim); font-size: 0.82rem;
+    }
+
+    /* -- Responsive -- */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 2rem 1.25rem 3rem; }
+      .phase-card-header { padding: 1rem 1.25rem; }
+      .phase-card-body { padding: 1.25rem; }
+      .progress-stats { gap: 1rem; }
+      .meta-row { gap: 1rem; }
+    }
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 1.6rem; }
+      .phase-title { font-size: 1rem; }
+      .future-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- -- Top Bar -- -->
+<div class="top-bar">
+  <div class="logo">Mcaster1DAWCast <span>Development Roadmap</span></div>
+  <div class="version-pill">v1.0.0-alpha</div>
+  <div class="top-bar-right">
+    <a href="index.html">Docs</a>
+    <a href="../README.md">README</a>
+  </div>
+</div>
+
+<!-- -- Sidebar -- -->
+<nav class="sidebar">
+  <div class="nav-section">Overview</div>
+  <a class="nav-item" href="#top">Roadmap</a>
+  <a class="nav-item" href="#progress">Progress Summary</a>
+  <a class="nav-item" href="#ecosystem">Ecosystem Position</a>
+
+  <div class="nav-section">Phases</div>
+  <a class="nav-item" href="#dc1">DC1 &mdash; Foundation &amp; Project Skeleton</a>
+  <a class="nav-sub" href="#dc1">v0.1.0 &middot; IN PROGRESS</a>
+  <a class="nav-item" href="#dc2">DC2 &mdash; Audio Engine &amp; Playback</a>
+  <a class="nav-sub" href="#dc2">v0.2.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc3">DC3 &mdash; Multi-Channel Recording</a>
+  <a class="nav-sub" href="#dc3">v0.3.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc4">DC4 &mdash; Non-Destructive Editing</a>
+  <a class="nav-sub" href="#dc4">v0.4.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc5">DC5 &mdash; Mixing Console &amp; Bus Routing</a>
+  <a class="nav-sub" href="#dc5">v0.5.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc6">DC6 &mdash; Effects &amp; Plugin Hosting</a>
+  <a class="nav-sub" href="#dc6">v0.6.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc7">DC7 &mdash; Video Tracks &amp; Compositing</a>
+  <a class="nav-sub" href="#dc7">v0.7.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc8">DC8 &mdash; Live Broadcasting</a>
+  <a class="nav-sub" href="#dc8">v0.8.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc9">DC9 &mdash; Podcasting &amp; Publishing</a>
+  <a class="nav-sub" href="#dc9">v0.9.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc10">DC10 &mdash; Broadcast Graphics</a>
+  <a class="nav-sub" href="#dc10">v0.10.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc11">DC11 &mdash; Polish &amp; Workflow</a>
+  <a class="nav-sub" href="#dc11">v0.11.0 &middot; PLANNED</a>
+  <a class="nav-item" href="#dc12">DC12 &mdash; Release &amp; Distribution</a>
+  <a class="nav-sub" href="#dc12">v1.0.0 &middot; PLANNED</a>
+
+  <div class="nav-section">Appendix</div>
+  <a class="nav-item" href="#future">Future Considerations</a>
+</nav>
+
+<!-- -- Main Content -- -->
+<div class="main" id="top">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1><span class="accent">Mcaster1DAWCast</span> Development Roadmap</h1>
+    <div class="subtitle">Broadcast-Grade Digital Audio Workstation &mdash; Audio + Video + Live Streaming + Podcasting</div>
+  </div>
+
+  <!-- -- Progress Summary -- -->
+  <div class="progress-summary" id="progress">
+    <h3>Overall Progress</h3>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" style="width: 4%;"></div>
+    </div>
+    <div class="progress-stats">
+      <div class="progress-stat">
+        <div class="progress-dot complete"></div>
+        <span class="count">0</span>
+        <span class="label">Complete</span>
+      </div>
+      <div class="progress-stat">
+        <div class="progress-dot in-progress"></div>
+        <span class="count">1</span>
+        <span class="label">In Progress</span>
+      </div>
+      <div class="progress-stat">
+        <div class="progress-dot planned"></div>
+        <span class="count">11</span>
+        <span class="label">Planned</span>
+      </div>
+      <div class="progress-stat" style="margin-left: auto;">
+        <span class="label" style="color: var(--text-dim);">0 / 12 phases complete &mdash; DC1 foundation in progress</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- -- Ecosystem Diagram -- -->
+  <div class="ecosystem-card" id="ecosystem">
+    <h3>Mcaster1 Broadcast Ecosystem &mdash; DAWCast Position</h3>
+    <div class="ecosystem-flow">                         Mcaster1 Broadcast Ecosystem
+    ================================================================
+
+    Mcaster1AMP (Media Player)
+        |  Library playback, A/B decks
+        |  Outputs to AudioPipe devices
+        v
+    Mcaster1AudioPipe (Virtual Audio Routing)
+        |  Zero-latency ring buffer pipes
+        |  Named devices with patch bay
+        v
+    Mcaster1DSPEncoder (Broadcast Encoder)
+        |  Captures pipe audio, applies DSP
+        |  Encodes MP3/AAC/Opus
+        v
+    Mcaster1DNAS / Icecast2 / RTMP
+        |  Streaming server distribution
+        v
+    Listeners &amp; Viewers
+
+    ================================================================
+
+    Mcaster1DAWCast (THIS PROJECT)
+        |  Multi-track audio/video editing
+        |  Recording, mixing, effects
+        |  Live broadcast output
+        |  Podcast production &amp; publishing
+        |
+        +--&gt; Routes audio via AudioPipe
+        +--&gt; Encodes streams via DSPEncoder
+        +--&gt; Distributes via DNAS / Icecast
+        +--&gt; Publishes podcasts via RSS</div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC1 -- Foundation & Project Skeleton                             -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc1">
+    <div class="phase-card-header">
+      <div class="phase-number">DC1</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Foundation &amp; Project Skeleton
+          <span class="version-badge">v0.1.0</span>
+          <span class="badge badge-progress">In Progress</span>
+        </div>
+        <div class="phase-goal">Qt6 application skeleton with autotools build system, main window layout, project file format, and theme engine.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check wip">~</span> Autotools build system (configure.ac, Makefile.am) with Qt6 integration</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Qt6 MainWindow with menu bar, toolbar, status bar, dock panels</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Timeline widget &mdash; horizontal scrolling track view with ruler</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Transport bar &mdash; play, stop, record, rewind, fast-forward controls</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Project file format (.dawcast JSON) &mdash; save/load project state</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Theme engine with YAML-driven QSS style packs</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Default, DarkStudio, and BroadcastPro theme packs</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> AppConfig &mdash; YAML-based application configuration</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Debug logger with file and console output</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Module registry and plugin architecture interfaces</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Undo/redo manager with command pattern</li>
+          <li class="feature-item"><span class="feature-check wip">~</span> Platform compatibility layer (macOS, Windows, Linux)</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">configure.ac</li>
+          <li class="file-tag">Makefile.am</li>
+          <li class="file-tag">src/DAWCast/main.cpp</li>
+          <li class="file-tag">src/DAWCast/app.h</li>
+          <li class="file-tag">src/DAWCast/app.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/MainWindow.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/TimelineWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/TransportBar.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/ThemeEngine.cpp</li>
+          <li class="file-tag">src/DAWCast/core/ProjectManager.cpp</li>
+          <li class="file-tag">src/DAWCast/core/UndoManager.cpp</li>
+          <li class="file-tag">src/DAWCast/core/ModuleRegistry.cpp</li>
+          <li class="file-tag">src/DAWCast/config/AppConfig.cpp</li>
+          <li class="file-tag">themes/Default/theme.yaml</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">autogen.sh &rarr; configure &rarr; make &rarr; app launches &rarr; main window with timeline, transport bar, dock panels &rarr; create/save/load project &rarr; theme switching works &rarr; undo/redo functional</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC2 -- Audio Engine & Playback                                   -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc2">
+    <div class="phase-card-header">
+      <div class="phase-number">DC2</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Audio Engine &amp; Multi-Track Playback
+          <span class="version-badge">v0.2.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">PortAudio-based audio engine with multi-track playback, SPSC ring buffer mixing, transport controls, and waveform rendering.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> PortAudio callback-driven audio engine (real-time thread)</li>
+          <li class="feature-item"><span class="feature-check"></span> Lock-free SPSC ring buffer for audio thread &harr; UI decoupling</li>
+          <li class="feature-item"><span class="feature-check"></span> Multi-track simultaneous playback (up to 64 tracks)</li>
+          <li class="feature-item"><span class="feature-check"></span> Audio mixing &mdash; summing bus with per-track gain and pan</li>
+          <li class="feature-item"><span class="feature-check"></span> Transport control &mdash; play, pause, stop, seek, loop region</li>
+          <li class="feature-item"><span class="feature-check"></span> Audio file import (WAV, FLAC, MP3, AAC, Ogg Vorbis, Opus)</li>
+          <li class="feature-item"><span class="feature-check"></span> Waveform rendering &mdash; peak/RMS display in timeline clips</li>
+          <li class="feature-item"><span class="feature-check"></span> Audio resampler &mdash; SRC for mismatched sample rates</li>
+          <li class="feature-item"><span class="feature-check"></span> Audio device selection (input/output via PortAudio)</li>
+          <li class="feature-item"><span class="feature-check"></span> Sample-accurate timeline cursor with smooth scrolling</li>
+          <li class="feature-item"><span class="feature-check"></span> VU meter widget &mdash; real-time peak + RMS level display</li>
+          <li class="feature-item"><span class="feature-check"></span> Codec registry &mdash; pluggable encoder/decoder framework</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/audio_engine/AudioEngine.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/AudioMixer.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/AudioWorker.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/AudioResampler.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/RingBuffer.h</li>
+          <li class="file-tag">src/DAWCast/codec/CodecRegistry.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/WaveformView.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/VUMeterWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/AudioTrack.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Import audio files &rarr; drag to timeline &rarr; press play &rarr; multi-track mix plays through selected output device &rarr; waveforms visible &rarr; VU meters animate &rarr; seek/loop works &rarr; no glitches at buffer boundaries</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">6&ndash;8 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC3 -- Multi-Channel Recording                                   -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc3">
+    <div class="phase-card-header">
+      <div class="phase-number">DC3</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Multi-Channel Recording
+          <span class="version-badge">v0.3.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Record audio from multiple input channels simultaneously with punch-in/out, monitoring, and takes management.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Multi-channel recording from PortAudio input devices</li>
+          <li class="feature-item"><span class="feature-check"></span> Record-arm per track with input source selection</li>
+          <li class="feature-item"><span class="feature-check"></span> Punch-in / punch-out recording (pre-defined region)</li>
+          <li class="feature-item"><span class="feature-check"></span> Auto-punch with count-in (metronome click)</li>
+          <li class="feature-item"><span class="feature-check"></span> Input monitoring (software through with latency compensation)</li>
+          <li class="feature-item"><span class="feature-check"></span> Takes / comp lanes &mdash; multiple recordings on same track</li>
+          <li class="feature-item"><span class="feature-check"></span> Record to WAV (16/24/32-bit) or FLAC (lossless compressed)</li>
+          <li class="feature-item"><span class="feature-check"></span> Overdub mode &mdash; record new material while playing existing tracks</li>
+          <li class="feature-item"><span class="feature-check"></span> Pre-record buffer &mdash; capture audio before record button pressed</li>
+          <li class="feature-item"><span class="feature-check"></span> Recording file management (auto-naming, project media folder)</li>
+          <li class="feature-item"><span class="feature-check"></span> AudioPipe device input support (record from virtual pipes)</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/audio_engine/AudioEngine.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/AudioWorker.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/AudioTrack.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/Clip.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/WavCodec.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/FlacCodec.cpp</li>
+          <li class="file-tag">src/DAWCast/platform/device_discovery.h</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Arm track &rarr; select mic input &rarr; press record &rarr; audio captured to clip &rarr; punch-in overwrites region &rarr; overdub mixes with existing &rarr; takes appear in comp lanes &rarr; WAV/FLAC files saved in project media folder</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC4 -- Non-Destructive Editing                                   -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc4">
+    <div class="phase-card-header">
+      <div class="phase-number">DC4</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Non-Destructive Editing
+          <span class="version-badge">v0.4.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Full non-destructive audio editing with split, trim, fade, crossfade, and region-based operations on the timeline.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Non-destructive clip editing &mdash; source files never modified</li>
+          <li class="feature-item"><span class="feature-check"></span> Split clip at cursor (razor tool)</li>
+          <li class="feature-item"><span class="feature-check"></span> Trim clip edges (drag start/end handles)</li>
+          <li class="feature-item"><span class="feature-check"></span> Fade-in / fade-out with adjustable curves (linear, exponential, S-curve)</li>
+          <li class="feature-item"><span class="feature-check"></span> Crossfade between adjacent clips (auto or manual)</li>
+          <li class="feature-item"><span class="feature-check"></span> Clip move and copy (drag-and-drop between tracks)</li>
+          <li class="feature-item"><span class="feature-check"></span> Ripple edit mode &mdash; subsequent clips shift automatically</li>
+          <li class="feature-item"><span class="feature-check"></span> Region selection with time-range operations</li>
+          <li class="feature-item"><span class="feature-check"></span> Snap-to-grid (bar/beat, seconds, frames, markers)</li>
+          <li class="feature-item"><span class="feature-check"></span> Markers and regions on timeline ruler</li>
+          <li class="feature-item"><span class="feature-check"></span> Automation lanes &mdash; volume, pan, mute with envelope curves</li>
+          <li class="feature-item"><span class="feature-check"></span> Timeline commands &mdash; all edits undoable via UndoManager</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/timeline/Timeline.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/Clip.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/Region.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/Marker.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/Automation.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/CrossfadeCalc.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/TimelineCommands.cpp</li>
+          <li class="file-tag">src/DAWCast/core/UndoManager.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Split clip &rarr; trim edges &rarr; apply crossfade &rarr; move clips between tracks &rarr; undo all operations &rarr; automation curve modifies playback volume &rarr; snap works at all grid resolutions &rarr; source files untouched on disk</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">6&ndash;8 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC5 -- Mixing Console & Bus Routing                              -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc5">
+    <div class="phase-card-header">
+      <div class="phase-number">DC5</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Mixing Console &amp; Bus Routing
+          <span class="version-badge">v0.5.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Full mixing console with channel strips, bus routing, sends/returns, master bus, and spectrum analyzer.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Mixer widget &mdash; horizontal console with vertical channel strips</li>
+          <li class="feature-item"><span class="feature-check"></span> Channel strip: fader, pan knob, mute, solo, record-arm, VU meter</li>
+          <li class="feature-item"><span class="feature-check"></span> Master bus with fader, VU, and limiter insert</li>
+          <li class="feature-item"><span class="feature-check"></span> Auxiliary buses (up to 8) for sends/returns</li>
+          <li class="feature-item"><span class="feature-check"></span> Pre-fader and post-fader send routing</li>
+          <li class="feature-item"><span class="feature-check"></span> Group/VCA fader linking (selected tracks move together)</li>
+          <li class="feature-item"><span class="feature-check"></span> Embossed knob widget with 3D appearance</li>
+          <li class="feature-item"><span class="feature-check"></span> Bevel button widget for professional control surface feel</li>
+          <li class="feature-item"><span class="feature-check"></span> Spectrum analyzer widget (FFT-based real-time display)</li>
+          <li class="feature-item"><span class="feature-check"></span> Track header widget &mdash; name, color, I/O routing</li>
+          <li class="feature-item"><span class="feature-check"></span> Mixer &harr; timeline synchronization (select track highlights strip)</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/widgets/MixerWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/EmbossedKnob.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/BevelButton.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/SpectrumWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/TrackHeaderWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/VUMeterWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/audio_engine/AudioMixer.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Open mixer view &rarr; all tracks have channel strips &rarr; faders control gain &rarr; sends route to aux buses &rarr; master bus sums all &rarr; spectrum shows real-time analysis &rarr; solo/mute isolate tracks correctly</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC6 -- Effects & Plugin Hosting                                  -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc6">
+    <div class="phase-card-header">
+      <div class="phase-number">DC6</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Effects &amp; Plugin Hosting
+          <span class="version-badge">v0.6.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">10 built-in DSP audio effects, effect chain processing, effects rack UI, and external plugin hosting framework.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Built-in DSP Effects (10)</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> ParametricEQ &mdash; 10-band parametric equalizer (RBJ biquad filters)</li>
+          <li class="feature-item"><span class="feature-check"></span> GraphicEQ31 &mdash; 31-band graphic equalizer (ISO 1/3-octave centers)</li>
+          <li class="feature-item"><span class="feature-check"></span> Compressor &mdash; dynamics processor with threshold, ratio, attack, release, knee</li>
+          <li class="feature-item"><span class="feature-check"></span> Limiter &mdash; look-ahead brick-wall limiter for true peak prevention</li>
+          <li class="feature-item"><span class="feature-check"></span> NoiseGate &mdash; gate with threshold, hold time, and range control</li>
+          <li class="feature-item"><span class="feature-check"></span> DeEsser &mdash; sibilance reduction with frequency-selective compression</li>
+          <li class="feature-item"><span class="feature-check"></span> AGC &mdash; automatic gain control for broadcast-consistent levels</li>
+          <li class="feature-item"><span class="feature-check"></span> Reverb &mdash; algorithmic reverb with room size, damping, wet/dry</li>
+          <li class="feature-item"><span class="feature-check"></span> SonicEnhancer &mdash; BBE-style psychoacoustic enhancement (3-band LR4)</li>
+          <li class="feature-item"><span class="feature-check"></span> Normalizer &mdash; peak and LUFS normalization with target level</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Plugin Architecture</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> DSP chain &mdash; ordered effect inserts per track with bypass toggle</li>
+          <li class="feature-item"><span class="feature-check"></span> Effects rack widget &mdash; drag-and-drop reorder, enable/disable</li>
+          <li class="feature-item"><span class="feature-check"></span> IEffectUnit interface &mdash; process(), reset(), parameterCount(), etc.</li>
+          <li class="feature-item"><span class="feature-check"></span> IPlugin interface &mdash; dynamic library loading framework</li>
+          <li class="feature-item"><span class="feature-check"></span> Float64 internal processing for maximum precision</li>
+          <li class="feature-item"><span class="feature-check"></span> Latency compensation &mdash; automatic delay across effect chains</li>
+          <li class="feature-item"><span class="feature-check"></span> YAML preset save/load for all effect parameters</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/dsp/DspChain.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/ParametricEQ.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/GraphicEQ31.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/Compressor.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/Limiter.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/NoiseGate.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/DeEsser.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/AGC.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/Reverb.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/SonicEnhancer.cpp</li>
+          <li class="file-tag">src/DAWCast/dsp/Normalizer.cpp</li>
+          <li class="file-tag">src/DAWCast/core/IEffectUnit.h</li>
+          <li class="file-tag">src/DAWCast/core/IPlugin.h</li>
+          <li class="file-tag">src/DAWCast/widgets/EffectsRackWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/config/YamlPresets.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Insert EQ on track &rarr; adjust bands &rarr; real-time audible change &rarr; chain 3 effects &rarr; reorder via drag &rarr; bypass toggles &rarr; save preset &rarr; load preset on different track &rarr; latency compensation keeps tracks aligned</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">7&ndash;10 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC7 -- Video Tracks & Compositing                                -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc7">
+    <div class="phase-card-header">
+      <div class="phase-number">DC7</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Video Tracks &amp; Compositing
+          <span class="version-badge">v0.7.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Video track support via FFmpeg, 10 video transitions, compositing layers, subtitle rendering, and real-time preview.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Video Engine</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> FFmpeg-based video decoder &mdash; hardware-accelerated (VideoToolbox / VAAPI / DXVA2)</li>
+          <li class="feature-item"><span class="feature-check"></span> Video tracks on timeline alongside audio tracks</li>
+          <li class="feature-item"><span class="feature-check"></span> Video preview widget &mdash; real-time composite output</li>
+          <li class="feature-item"><span class="feature-check"></span> Video mixer &mdash; layer compositing with opacity and blend modes</li>
+          <li class="feature-item"><span class="feature-check"></span> Subtitle renderer (SRT, ASS/SSA, VTT) with styling</li>
+          <li class="feature-item"><span class="feature-check"></span> Video encoder &mdash; H.264, H.265, VP9, AV1 export via FFmpeg</li>
+          <li class="feature-item"><span class="feature-check"></span> Muxer/demuxer &mdash; container handling (MP4, MKV, WebM, MOV)</li>
+          <li class="feature-item"><span class="feature-check"></span> Audio/video synchronization with PTS/DTS alignment</li>
+          <li class="feature-item"><span class="feature-check"></span> Thumbnail strip rendering in timeline clips</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Video Transitions (10)</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> CrossDissolve &mdash; smooth opacity blend between clips</li>
+          <li class="feature-item"><span class="feature-check"></span> DipToBlack &mdash; fade out to black, then fade in</li>
+          <li class="feature-item"><span class="feature-check"></span> DipToWhite &mdash; fade out to white, then fade in</li>
+          <li class="feature-item"><span class="feature-check"></span> WipeLeft &mdash; horizontal wipe reveal from right to left</li>
+          <li class="feature-item"><span class="feature-check"></span> PushSlide &mdash; new clip pushes old clip off screen</li>
+          <li class="feature-item"><span class="feature-check"></span> ZoomThrough &mdash; zoom into clip A, emerge from clip B</li>
+          <li class="feature-item"><span class="feature-check"></span> ChromaKey &mdash; green/blue screen removal with spill suppression</li>
+          <li class="feature-item"><span class="feature-check"></span> LumaKey &mdash; luminance-based transparency keying</li>
+          <li class="feature-item"><span class="feature-check"></span> GlitchCut &mdash; digital glitch effect with block displacement</li>
+          <li class="feature-item"><span class="feature-check"></span> StingerOverlay &mdash; animated overlay transition (broadcast stinger)</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/video_engine/VideoDecoder.cpp</li>
+          <li class="file-tag">src/DAWCast/video_engine/VideoEncoder.cpp</li>
+          <li class="file-tag">src/DAWCast/video_engine/VideoMixer.cpp</li>
+          <li class="file-tag">src/DAWCast/video_engine/VideoRenderer.cpp</li>
+          <li class="file-tag">src/DAWCast/video_engine/SubtitleRenderer.cpp</li>
+          <li class="file-tag">src/DAWCast/video_engine/MuxerDemuxer.cpp</li>
+          <li class="file-tag">src/DAWCast/vfx/VideoEffectChain.cpp</li>
+          <li class="file-tag">src/DAWCast/vfx/CrossDissolve.cpp</li>
+          <li class="file-tag">src/DAWCast/vfx/ChromaKey.cpp</li>
+          <li class="file-tag">src/DAWCast/timeline/VideoTrack.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/VideoPreview.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Import video &rarr; appears on video track with thumbnails &rarr; plays in preview window &rarr; apply CrossDissolve transition &rarr; composite two layers &rarr; ChromaKey removes green screen &rarr; subtitles render on video &rarr; export to MP4 with A/V sync</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">8&ndash;12 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC8 -- Live Broadcasting                                         -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc8">
+    <div class="phase-card-header">
+      <div class="phase-number">DC8</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Live Broadcasting
+          <span class="version-badge">v0.8.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Live broadcast output to Icecast, Mcaster1DNAS, and RTMP servers with ICY metadata, tally light, and broadcast clock.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Stream encoder &mdash; real-time encode to MP3, AAC, Opus, Vorbis</li>
+          <li class="feature-item"><span class="feature-check"></span> Icecast2 output &mdash; HTTP source client with authentication</li>
+          <li class="feature-item"><span class="feature-check"></span> Mcaster1DNAS output &mdash; native protocol integration</li>
+          <li class="feature-item"><span class="feature-check"></span> RTMP output &mdash; live video streaming (YouTube, Twitch, etc.)</li>
+          <li class="feature-item"><span class="feature-check"></span> ICY metadata push &mdash; track title, artist, album to stream</li>
+          <li class="feature-item"><span class="feature-check"></span> Multi-server simultaneous broadcast (up to 4 destinations)</li>
+          <li class="feature-item"><span class="feature-check"></span> Broadcast clock widget &mdash; elapsed time, segment timers</li>
+          <li class="feature-item"><span class="feature-check"></span> Tally light widget &mdash; ON AIR / STANDBY / OFF status indicators</li>
+          <li class="feature-item"><span class="feature-check"></span> Live recorder &mdash; archive broadcast to local file simultaneously</li>
+          <li class="feature-item"><span class="feature-check"></span> AudioPipe integration &mdash; route DAWCast master bus to pipe devices</li>
+          <li class="feature-item"><span class="feature-check"></span> Connection monitoring &mdash; auto-reconnect on network failure</li>
+          <li class="feature-item"><span class="feature-check"></span> Bitrate and listener count display</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/broadcast/StreamEncoder.cpp</li>
+          <li class="file-tag">src/DAWCast/broadcast/BroadcastClock.cpp</li>
+          <li class="file-tag">src/DAWCast/broadcast/TallyLight.cpp</li>
+          <li class="file-tag">src/DAWCast/broadcast/LiveRecorder.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/Mp3Codec.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/AacCodec.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/OpusCodec.cpp</li>
+          <li class="file-tag">src/DAWCast/codec/VorbisCodec.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Configure Icecast server &rarr; press Go Live &rarr; tally light shows ON AIR &rarr; audio streams to server &rarr; ICY metadata updates with track changes &rarr; live recorder archives broadcast &rarr; disconnect &rarr; auto-reconnect restores stream</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">6&ndash;8 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC9 -- Podcasting & Publishing                                   -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc9">
+    <div class="phase-card-header">
+      <div class="phase-number">DC9</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Podcasting &amp; Publishing
+          <span class="version-badge">v0.9.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Complete podcast production workflow with chapters, RSS generation, show notes, loudness metering, and one-click publishing.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Chapter editor &mdash; add/edit/delete chapter markers with titles and URLs</li>
+          <li class="feature-item"><span class="feature-check"></span> Chapter marker embedding in MP3 (ID3v2 CHAP/CTOC) and M4A</li>
+          <li class="feature-item"><span class="feature-check"></span> RSS feed generator &mdash; iTunes/Apple Podcasts compatible XML</li>
+          <li class="feature-item"><span class="feature-check"></span> Metadata editor &mdash; title, description, author, artwork, categories</li>
+          <li class="feature-item"><span class="feature-check"></span> Show notes editor &mdash; rich text with HTML export</li>
+          <li class="feature-item"><span class="feature-check"></span> Loudness metering &mdash; LUFS (ITU-R BS.1770-4) integrated and momentary</li>
+          <li class="feature-item"><span class="feature-check"></span> Loudness normalization &mdash; target -16 LUFS (Apple) or -14 LUFS (Spotify)</li>
+          <li class="feature-item"><span class="feature-check"></span> Podcast exporter &mdash; render to MP3/AAC/Opus with chapters and metadata</li>
+          <li class="feature-item"><span class="feature-check"></span> Chapter widget in timeline view &mdash; visual markers with names</li>
+          <li class="feature-item"><span class="feature-check"></span> Episode template system &mdash; reusable intro/outro/bumper configurations</li>
+          <li class="feature-item"><span class="feature-check"></span> Publishing workflow &mdash; upload to hosting provider or S3-compatible storage</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/podcast/ChapterEditor.cpp</li>
+          <li class="file-tag">src/DAWCast/podcast/RSSGenerator.cpp</li>
+          <li class="file-tag">src/DAWCast/podcast/MetadataEditor.cpp</li>
+          <li class="file-tag">src/DAWCast/podcast/ShowNotesEditor.cpp</li>
+          <li class="file-tag">src/DAWCast/podcast/PodcastExporter.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/ChapterWidget.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/MetadataPanel.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Add chapter markers &rarr; edit metadata &rarr; write show notes &rarr; LUFS meter shows -16 after normalization &rarr; export MP3 with chapters embedded &rarr; RSS feed validates &rarr; publish episode &rarr; appears in podcast directory</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC10 -- Broadcast Graphics                                       -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc10">
+    <div class="phase-card-header">
+      <div class="phase-number">DC10</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Broadcast Graphics
+          <span class="version-badge">v0.10.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Lower thirds, ticker crawl, overlays, watermarks, and callout graphics for broadcast video production.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Graphics renderer &mdash; GPU-accelerated overlay compositing layer</li>
+          <li class="feature-item"><span class="feature-check"></span> Lower third &mdash; animated name/title graphics with custom fonts</li>
+          <li class="feature-item"><span class="feature-check"></span> Ticker crawl &mdash; scrolling news/info bar with configurable speed</li>
+          <li class="feature-item"><span class="feature-check"></span> Overlay engine &mdash; PNG/SVG image overlays with positioning</li>
+          <li class="feature-item"><span class="feature-check"></span> Watermark &mdash; persistent branding with opacity control</li>
+          <li class="feature-item"><span class="feature-check"></span> Callout graphics &mdash; speech bubbles, arrows, highlight boxes</li>
+          <li class="feature-item"><span class="feature-check"></span> Animated transitions for graphic show/hide (slide, fade, scale)</li>
+          <li class="feature-item"><span class="feature-check"></span> Template system &mdash; reusable graphic layouts with variable substitution</li>
+          <li class="feature-item"><span class="feature-check"></span> Real-time preview of all graphics in video preview widget</li>
+          <li class="feature-item"><span class="feature-check"></span> Timeline integration &mdash; graphic clips on overlay tracks</li>
+          <li class="feature-item"><span class="feature-check"></span> ICY metadata-driven &mdash; auto-update lower thirds from stream info</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/graphics/GraphicsRenderer.cpp</li>
+          <li class="file-tag">src/DAWCast/graphics/LowerThird.cpp</li>
+          <li class="file-tag">src/DAWCast/graphics/TickerCrawl.cpp</li>
+          <li class="file-tag">src/DAWCast/graphics/OverlayEngine.cpp</li>
+          <li class="file-tag">src/DAWCast/graphics/Watermark.cpp</li>
+          <li class="file-tag">src/DAWCast/graphics/Callout.cpp</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Add lower third &rarr; animates into video preview &rarr; ticker scrolls text &rarr; watermark shows at configured position &rarr; export includes all graphics &rarr; live broadcast renders overlays in real-time &rarr; metadata auto-updates graphics</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC11 -- Polish & Workflow                                        -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc11">
+    <div class="phase-card-header">
+      <div class="phase-number">DC11</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Polish &amp; Workflow
+          <span class="version-badge">v0.11.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Theme refinement, keyboard shortcuts, project templates, preferences, performance optimization, and user experience polish.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> Theme engine polish &mdash; variable substitution, runtime switching</li>
+          <li class="feature-item"><span class="feature-check"></span> Default + DarkStudio + BroadcastPro themes fully styled</li>
+          <li class="feature-item"><span class="feature-check"></span> Custom theme pack creation documentation and tooling</li>
+          <li class="feature-item"><span class="feature-check"></span> Comprehensive keyboard shortcuts (industry-standard DAW bindings)</li>
+          <li class="feature-item"><span class="feature-check"></span> Configurable key bindings via preferences</li>
+          <li class="feature-item"><span class="feature-check"></span> Project templates &mdash; podcast, music, broadcast, video presets</li>
+          <li class="feature-item"><span class="feature-check"></span> Preferences dialog &mdash; audio, video, appearance, shortcuts, paths</li>
+          <li class="feature-item"><span class="feature-check"></span> Project settings dialog &mdash; sample rate, bit depth, frame rate</li>
+          <li class="feature-item"><span class="feature-check"></span> About dialog with version, credits, license</li>
+          <li class="feature-item"><span class="feature-check"></span> Undo/redo for all operations (full command history)</li>
+          <li class="feature-item"><span class="feature-check"></span> Performance optimization pass &mdash; profiling, memory, CPU</li>
+          <li class="feature-item"><span class="feature-check"></span> Export dialog &mdash; render project to audio, video, or podcast format</li>
+          <li class="feature-item"><span class="feature-check"></span> Media browser &mdash; import panel with preview and drag-to-timeline</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">src/DAWCast/widgets/ThemeEngine.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/PreferencesDialog.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/ProjectSettingsDialog.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/AboutDialog.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/ExportDialog.cpp</li>
+          <li class="file-tag">src/DAWCast/widgets/MediaBrowser.cpp</li>
+          <li class="file-tag">themes/Default/theme.yaml</li>
+          <li class="file-tag">themes/DarkStudio/theme.yaml</li>
+          <li class="file-tag">themes/BroadcastPro/theme.yaml</li>
+          <li class="file-tag">configs/default_project.json</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">Switch themes at runtime &rarr; all widgets re-style &rarr; keyboard shortcuts match expected DAW behavior &rarr; create project from template &rarr; undo 50+ operations &rarr; export renders correctly &rarr; memory/CPU stable over 1-hour session</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">5&ndash;7 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!--  DC12 -- Release & Distribution                                   -->
+  <!-- ================================================================ -->
+  <div class="phase-card" id="dc12">
+    <div class="phase-card-header">
+      <div class="phase-number">DC12</div>
+      <div class="phase-title-group">
+        <div class="phase-title">
+          Release &amp; Distribution
+          <span class="version-badge">v1.0.0</span>
+          <span class="badge badge-planned">Planned</span>
+        </div>
+        <div class="phase-goal">Platform installers, CI/CD pipeline, code signing, notarization, documentation, and official v1.0.0 release.</div>
+      </div>
+    </div>
+    <div class="phase-card-body">
+      <div class="phase-section">
+        <div class="phase-section-title">Checklist</div>
+        <ul class="feature-list">
+          <li class="feature-item"><span class="feature-check"></span> macOS DMG installer &mdash; macdeployqt + code signing + notarization</li>
+          <li class="feature-item"><span class="feature-check"></span> macOS PKG installer &mdash; component package for managed installs</li>
+          <li class="feature-item"><span class="feature-check"></span> Windows NSIS installer &mdash; MSYS2/MinGW-w64 build + windeployqt</li>
+          <li class="feature-item"><span class="feature-check"></span> Linux AppImage &mdash; portable single-file distribution</li>
+          <li class="feature-item"><span class="feature-check"></span> Linux DEB + RPM packages via CPack</li>
+          <li class="feature-item"><span class="feature-check"></span> CI/CD pipeline &mdash; GitHub Actions for macOS, Windows, Linux builds</li>
+          <li class="feature-item"><span class="feature-check"></span> Universal binary (macOS arm64 + x86_64)</li>
+          <li class="feature-item"><span class="feature-check"></span> Developer ID code signing (Apple) and Authenticode (Windows)</li>
+          <li class="feature-item"><span class="feature-check"></span> Apple notarization for Gatekeeper approval</li>
+          <li class="feature-item"><span class="feature-check"></span> Technical documentation (this docs/ site)</li>
+          <li class="feature-item"><span class="feature-check"></span> User manual and getting started guide</li>
+          <li class="feature-item"><span class="feature-check"></span> GPL-2.0-or-later license and third-party attribution</li>
+          <li class="feature-item"><span class="feature-check"></span> Ansible deployment playbooks for mcaster1.com product page</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="phase-section-title">Key Files</div>
+        <ul class="files-list">
+          <li class="file-tag">installer/macos/create_dmg.sh</li>
+          <li class="file-tag">installer/macos/create_pkg.sh</li>
+          <li class="file-tag">installer/windows/dawcast.nsi</li>
+          <li class="file-tag">installer/linux/dawcast.appdata.xml</li>
+          <li class="file-tag">autogen.sh</li>
+          <li class="file-tag">configure.ac</li>
+          <li class="file-tag">docs/index.html</li>
+          <li class="file-tag">docs/PLANNING.html</li>
+        </ul>
+      </div>
+      <div class="phase-section">
+        <div class="meta-row">
+          <div class="meta-block">
+            <div class="meta-label">Verification</div>
+            <div class="meta-value">CI builds green on all 3 platforms &rarr; DMG installs on clean macOS &rarr; NSIS installs on Windows &rarr; AppImage runs on Ubuntu &rarr; notarization passes &rarr; product page live on mcaster1.com &rarr; version 1.0.0 tagged</div>
+          </div>
+          <div class="meta-block">
+            <div class="meta-label">Effort</div>
+            <div class="meta-value"><span class="effort-badge">4&ndash;6 sessions</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- -- Future Considerations -- -->
+  <div class="future-section" id="future">
+    <h2>Future Considerations</h2>
+    <div class="future-grid">
+      <div class="future-item">
+        <h4>Surround Sound (5.1 / 7.1)</h4>
+        <p>Multi-channel surround sound mixing with speaker configuration presets and surround panning control.</p>
+      </div>
+      <div class="future-item">
+        <h4>ARA2 Plugin Integration</h4>
+        <p>Audio Random Access protocol for tight integration with Melodyne, SpectraLayers, and other ARA2-enabled plugins.</p>
+      </div>
+      <div class="future-item">
+        <h4>Collaborative Editing</h4>
+        <p>Real-time multi-user editing over network with conflict resolution, presence indicators, and session management.</p>
+      </div>
+      <div class="future-item">
+        <h4>AI-Assisted Mixing</h4>
+        <p>Machine learning-based auto-mix, stem separation, noise reduction, and mastering assistance.</p>
+      </div>
+      <div class="future-item">
+        <h4>Cloud Storage Integration</h4>
+        <p>Project sync to S3, Google Drive, or Dropbox with media asset management and version control.</p>
+      </div>
+      <div class="future-item">
+        <h4>MIDI &amp; Virtual Instruments</h4>
+        <p>MIDI track support with virtual instrument plugins, piano roll editor, and MIDI controller mapping.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- -- Footer -- -->
+  <div class="page-footer">
+    Mcaster1DAWCast &mdash; Broadcast-Grade Digital Audio Workstation &mdash; &copy; 2026 David St. John / Mcaster1
+  </div>
+
+</div>
+
+</body>
+</html>

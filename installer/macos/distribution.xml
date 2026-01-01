@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Mcaster1DAWCast INSTALLER_VERSION_FULL — Multi-Channel DAW</title>
+    <organization>com.mcaster1</organization>
+    <domains enable_localSystem="true"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <os-version min="13.0"/>
+
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <readme file="readme.html" mime-type="text/html"/>
+    <license file="license.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.mcaster1.Mcaster1DAWCast.pkg"/>
+        </line>
+    </choices-outline>
+
+    <choice id="default"/>
+    <choice id="com.mcaster1.Mcaster1DAWCast.pkg" visible="false">
+        <pkg-ref id="com.mcaster1.Mcaster1DAWCast"/>
+    </choice>
+
+    <pkg-ref id="com.mcaster1.Mcaster1DAWCast"
+             version="INSTALLER_VERSION"
+             onConclusion="none">Mcaster1DAWCast-component.pkg</pkg-ref>
+</installer-gui-script>

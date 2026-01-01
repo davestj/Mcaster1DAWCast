@@ -1,0 +1,20 @@
+# Podcast MP3 — Standard podcast distribution format
+name: "Podcast MP3"
+description: "128kbps Joint Stereo MP3 — compatible with all podcast platforms"
+
+audio:
+  codec: "mp3"
+  bitrate_kbps: 128
+  sample_rate: 44100
+  channels: 2
+  channel_mode: "joint_stereo"
+
+video:
+  enabled: false
+
+container: "mp3"
+
+metadata:
+  write_id3v2: true
+  write_chapters: true
+  write_artwork: true

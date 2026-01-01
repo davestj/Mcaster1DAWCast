@@ -1,0 +1,26 @@
+# WebM VP9 — Open format for web distribution
+name: "WebM VP9"
+description: "VP9 + Opus in WebM — royalty-free, high quality web video"
+
+audio:
+  codec: "opus"
+  bitrate_kbps: 128
+  sample_rate: 48000
+  channels: 2
+
+video:
+  codec: "vp9"
+  bitrate_kbps: 4000
+  resolution: [1920, 1080]
+  framerate: 30.0
+  pixel_format: "yuv420p"
+  quality: "good"
+  cpu_used: 2
+  tile_columns: 2
+  tile_rows: 1
+  keyframe_interval: 120
+
+container: "webm"
+
+metadata:
+  write_webm_tags: true

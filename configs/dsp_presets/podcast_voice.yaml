@@ -1,0 +1,48 @@
+# Podcast Voice — Optimized for close-mic podcast recording
+# Removes proximity effect, controls dynamics, targets -16 LUFS.
+
+name: "Podcast Voice"
+description: "Podcast vocal chain: gate → de-esser → EQ → compressor → normalizer"
+author: "Mcaster1"
+
+effects:
+  - id: "com.mcaster1.dawcast.fx.noise_gate"
+    bypass: false
+    params:
+      threshold_db: -45.0
+      attack_ms: 0.5
+      hold_ms: 150.0
+      release_ms: 300.0
+      range_db: -40.0
+
+  - id: "com.mcaster1.dawcast.fx.deesser"
+    bypass: false
+    params:
+      frequency_hz: 6000.0
+      bandwidth: 2.0
+      threshold_db: -25.0
+      reduction_db: -6.0
+
+  - id: "com.mcaster1.dawcast.fx.parametric_eq"
+    bypass: false
+    params:
+      band_0: { type: "high_pass", freq: 60, q: 0.707, gain_db: 0 }
+      band_1: { type: "peaking", freq: 200, q: 1.5, gain_db: -4.0 }
+      band_2: { type: "peaking", freq: 3500, q: 1.2, gain_db: 2.0 }
+      band_3: { type: "peaking", freq: 8000, q: 2.0, gain_db: 1.0 }
+
+  - id: "com.mcaster1.dawcast.fx.compressor"
+    bypass: false
+    params:
+      threshold_db: -24.0
+      ratio: 3.0
+      attack_ms: 10.0
+      release_ms: 200.0
+      makeup_db: 6.0
+      knee_db: 6.0
+
+  - id: "com.mcaster1.dawcast.fx.normalizer"
+    bypass: false
+    params:
+      target_lufs: -16.0
+      standard: "ebu_r128"

@@ -1,0 +1,39 @@
+# Music Master — Light mastering chain for music beds and intros
+# Subtle enhancement without heavy processing.
+
+name: "Music Master"
+description: "Light mastering chain: EQ → compressor → enhancer → limiter"
+author: "Mcaster1"
+
+effects:
+  - id: "com.mcaster1.dawcast.fx.parametric_eq"
+    bypass: false
+    params:
+      band_0: { type: "high_pass", freq: 30, q: 0.707, gain_db: 0 }
+      band_1: { type: "low_shelf", freq: 80, q: 0.707, gain_db: 1.5 }
+      band_2: { type: "peaking", freq: 400, q: 1.0, gain_db: -1.0 }
+      band_3: { type: "high_shelf", freq: 12000, q: 0.707, gain_db: 1.0 }
+
+  - id: "com.mcaster1.dawcast.fx.compressor"
+    bypass: false
+    params:
+      threshold_db: -16.0
+      ratio: 2.0
+      attack_ms: 20.0
+      release_ms: 250.0
+      makeup_db: 3.0
+      knee_db: 10.0
+
+  - id: "com.mcaster1.dawcast.fx.sonic_enhancer"
+    bypass: false
+    params:
+      low_contour: 0.3
+      process_amount: 0.3
+      presence: 0.2
+
+  - id: "com.mcaster1.dawcast.fx.limiter"
+    bypass: false
+    params:
+      ceiling_db: -0.3
+      release_ms: 100.0
+      lookahead_ms: 1.5

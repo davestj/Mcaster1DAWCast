@@ -1,0 +1,696 @@
+# Makefile.am — Mcaster1DAWCast Qt 6 DAW / NLE build
+#
+# Podcast & broadcast DAW with timeline, DSP, video engine, and graphics overlay.
+# Build: make -C src/DAWCast -j$(sysctl -n hw.ncpu)
+# Output: mcaster1dawcast (Mach-O ARM64)
+
+bin_PROGRAMS = mcaster1dawcast
+
+# ── Common flags ─────────────────────────────────────────────────────────────
+AM_CPPFLAGS = \
+    -Wno-implicit-function-declaration \
+    -I$(srcdir) \
+    -I$(srcdir)/core \
+    -I$(srcdir)/audio_engine \
+    -I$(srcdir)/video_engine \
+    -I$(srcdir)/timeline \
+    -I$(srcdir)/dsp \
+    -I$(srcdir)/vfx \
+    -I$(srcdir)/podcast \
+    -I$(srcdir)/broadcast \
+    -I$(srcdir)/codec \
+    -I$(srcdir)/graphics \
+    -I$(srcdir)/widgets \
+    -I$(srcdir)/platform \
+    -I$(srcdir)/config \
+    -std=c++17 \
+    -DHAVE_PORTAUDIO \
+    -DHAVE_TAGLIB \
+    -DHAVE_SQLITE3 \
+    $(QT6CORE_CFLAGS) \
+    $(QT6GUI_CFLAGS) \
+    $(QT6WIDGETS_CFLAGS) \
+    $(QT6NETWORK_CFLAGS) \
+    $(QT6CONCURRENT_CFLAGS) \
+    $(PORTAUDIO_CFLAGS) \
+    $(AVFORMAT_CFLAGS) \
+    $(TAGLIB_CFLAGS) \
+    $(SQLITE3_CFLAGS) \
+    $(LIBYAML_CFLAGS)
+
+AM_OBJCXXFLAGS = $(AM_CPPFLAGS)
+
+mcaster1dawcast_LDADD = \
+    $(QT6WIDGETS_LIBS) \
+    $(QT6CORE_LIBS) \
+    $(QT6GUI_LIBS) \
+    $(QT6NETWORK_LIBS) \
+    $(QT6CONCURRENT_LIBS) \
+    $(PORTAUDIO_LIBS) \
+    $(AVFORMAT_LIBS) \
+    $(TAGLIB_LIBS) \
+    $(SQLITE3_LIBS) \
+    $(LIBYAML_LIBS) \
+    $(MACOS_FRAMEWORKS)
+
+# ── Codec flags (optional, added per-codec) ──────────────────────────────────
+if HAVE_MPG123
+AM_CPPFLAGS += $(MPG123_CFLAGS) -DHAVE_MPG123
+mcaster1dawcast_LDADD += $(MPG123_LIBS)
+endif
+
+if HAVE_AVFORMAT
+AM_CPPFLAGS += -DHAVE_AVFORMAT
+endif
+
+if HAVE_LAME
+AM_CPPFLAGS += $(LAME_CFLAGS) -DHAVE_LAME
+mcaster1dawcast_LDADD += $(LAME_LIBS)
+endif
+
+if HAVE_VORBIS
+AM_CPPFLAGS += $(VORBIS_CFLAGS) -DHAVE_VORBIS
+mcaster1dawcast_LDADD += $(VORBIS_LIBS)
+endif
+
+if HAVE_FLAC
+AM_CPPFLAGS += $(FLAC_CFLAGS) -DHAVE_FLAC
+mcaster1dawcast_LDADD += $(FLAC_LIBS)
+endif
+
+if HAVE_OPUS
+AM_CPPFLAGS += $(OPUS_CFLAGS) -DHAVE_OPUS
+mcaster1dawcast_LDADD += $(OPUS_LIBS)
+endif
+
+if HAVE_FDKAAC
+AM_CPPFLAGS += $(FDKAAC_CFLAGS) -DHAVE_FDKAAC
+mcaster1dawcast_LDADD += $(FDKAAC_LIBS)
+endif
+
+if HAVE_OPENSSL
+AM_CPPFLAGS += $(OPENSSL_CFLAGS) -DHAVE_OPENSSL
+mcaster1dawcast_LDADD += $(OPENSSL_LIBS)
+endif
+
+if HAVE_QT6MULTIMEDIA
+AM_CPPFLAGS += $(QT6MULTIMEDIA_CFLAGS) -DHAVE_QT6MULTIMEDIA
+mcaster1dawcast_LDADD += $(QT6MULTIMEDIA_LIBS)
+endif
+
+# ── Objective-C++ (.mm) compilation rule ─────────────────────────────────────
+SUFFIXES = .mm
+.mm.o:
+	$(OBJCXX) $(AM_OBJCXXFLAGS) $(OBJCXXFLAGS) -fobjc-arc -c -o $@ $<
+
+# ── MOC rules (Qt Meta-Object Compiler) ──────────────────────────────────────
+MOC = $(QT6_MOC)
+MOCFLAGS = $(QT6CORE_CFLAGS) $(QT6WIDGETS_CFLAGS) $(QT6GUI_CFLAGS)
+# Strip -f flags from MOCFLAGS (MOC misinterprets -f as force-include)
+MOCFLAGS_CLEAN = $(filter-out -f%,$(MOCFLAGS))
+
+# -- app --
+moc_app.cpp: $(srcdir)/app.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- core --
+moc_ModuleRegistry.cpp: $(srcdir)/core/ModuleRegistry.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_UndoManager.cpp: $(srcdir)/core/UndoManager.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ProjectManager.cpp: $(srcdir)/core/ProjectManager.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- audio_engine --
+moc_AudioEngine.cpp: $(srcdir)/audio_engine/AudioEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AudioMixer.cpp: $(srcdir)/audio_engine/AudioMixer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AudioWorker.cpp: $(srcdir)/audio_engine/AudioWorker.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- video_engine --
+moc_VideoDecoder.cpp: $(srcdir)/video_engine/VideoDecoder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VideoEncoder.cpp: $(srcdir)/video_engine/VideoEncoder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VideoMixer.cpp: $(srcdir)/video_engine/VideoMixer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VideoRenderer.cpp: $(srcdir)/video_engine/VideoRenderer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_SubtitleRenderer.cpp: $(srcdir)/video_engine/SubtitleRenderer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MuxerDemuxer.cpp: $(srcdir)/video_engine/MuxerDemuxer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- timeline --
+moc_Timeline.cpp: $(srcdir)/timeline/Timeline.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AudioTrack.cpp: $(srcdir)/timeline/AudioTrack.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VideoTrack.cpp: $(srcdir)/timeline/VideoTrack.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_Clip.cpp: $(srcdir)/timeline/Clip.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_Automation.cpp: $(srcdir)/timeline/Automation.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- dsp --
+moc_DspChain.cpp: $(srcdir)/dsp/DspChain.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- vfx --
+moc_VideoEffectChain.cpp: $(srcdir)/vfx/VideoEffectChain.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- podcast --
+moc_ChapterEditor.cpp: $(srcdir)/podcast/ChapterEditor.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MetadataEditor.cpp: $(srcdir)/podcast/MetadataEditor.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_RSSGenerator.cpp: $(srcdir)/podcast/RSSGenerator.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_PodcastExporter.cpp: $(srcdir)/podcast/PodcastExporter.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ShowNotesEditor.cpp: $(srcdir)/podcast/ShowNotesEditor.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- broadcast --
+moc_LiveRecorder.cpp: $(srcdir)/broadcast/LiveRecorder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_StreamEncoder.cpp: $(srcdir)/broadcast/StreamEncoder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_BroadcastClock.cpp: $(srcdir)/broadcast/BroadcastClock.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TallyLight.cpp: $(srcdir)/broadcast/TallyLight.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- codec --
+moc_CodecRegistry.cpp: $(srcdir)/codec/CodecRegistry.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- graphics --
+moc_OverlayEngine.cpp: $(srcdir)/graphics/OverlayEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_LowerThird.cpp: $(srcdir)/graphics/LowerThird.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TickerCrawl.cpp: $(srcdir)/graphics/TickerCrawl.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_Callout.cpp: $(srcdir)/graphics/Callout.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_Watermark.cpp: $(srcdir)/graphics/Watermark.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_GraphicsRenderer.cpp: $(srcdir)/graphics/GraphicsRenderer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- widgets --
+moc_MainWindow.cpp: $(srcdir)/widgets/MainWindow.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TimelineWidget.cpp: $(srcdir)/widgets/TimelineWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TrackHeaderWidget.cpp: $(srcdir)/widgets/TrackHeaderWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_WaveformView.cpp: $(srcdir)/widgets/WaveformView.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VideoPreview.cpp: $(srcdir)/widgets/VideoPreview.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MixerWidget.cpp: $(srcdir)/widgets/MixerWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_VUMeterWidget.cpp: $(srcdir)/widgets/VUMeterWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TransportBar.cpp: $(srcdir)/widgets/TransportBar.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_EffectsRackWidget.cpp: $(srcdir)/widgets/EffectsRackWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MediaBrowser.cpp: $(srcdir)/widgets/MediaBrowser.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ChapterWidget.cpp: $(srcdir)/widgets/ChapterWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MetadataPanel.cpp: $(srcdir)/widgets/MetadataPanel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ExportDialog.cpp: $(srcdir)/widgets/ExportDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_PreferencesDialog.cpp: $(srcdir)/widgets/PreferencesDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ProjectSettingsDialog.cpp: $(srcdir)/widgets/ProjectSettingsDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_SpectrumWidget.cpp: $(srcdir)/widgets/SpectrumWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_BevelButton.cpp: $(srcdir)/widgets/BevelButton.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_EmbossedKnob.cpp: $(srcdir)/widgets/EmbossedKnob.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ThemeEngine.cpp: $(srcdir)/widgets/ThemeEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AboutDialog.cpp: $(srcdir)/widgets/AboutDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- config --
+moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# ── RCC rules (Qt Resource Compiler) ─────────────────────────────────────────
+RCC = $(QT6_RCC)
+
+qrc_mcaster1dawcast.cpp: $(srcdir)/resources/mcaster1dawcast.qrc
+	$(RCC) $< -o $@ --name mcaster1dawcast
+
+# ── Source files ─────────────────────────────────────────────────────────────
+mcaster1dawcast_SOURCES = \
+    main.cpp \
+    app.h \
+    app.cpp \
+    core/IModule.h \
+    core/IEffectUnit.h \
+    core/IVideoEffect.h \
+    core/IPlugin.h \
+    core/AudioBuffer.h \
+    core/VideoFrame.h \
+    core/MediaItem.h \
+    core/ModuleRegistry.h \
+    core/ModuleRegistry.cpp \
+    core/UndoManager.h \
+    core/UndoManager.cpp \
+    core/ProjectManager.h \
+    core/ProjectManager.cpp \
+    audio_engine/AudioEngine.h \
+    audio_engine/AudioEngine.cpp \
+    audio_engine/AudioMixer.h \
+    audio_engine/AudioMixer.cpp \
+    audio_engine/AudioResampler.h \
+    audio_engine/AudioResampler.cpp \
+    audio_engine/RingBuffer.h \
+    audio_engine/AudioWorker.h \
+    audio_engine/AudioWorker.cpp \
+    video_engine/VideoDecoder.h \
+    video_engine/VideoDecoder.cpp \
+    video_engine/VideoEncoder.h \
+    video_engine/VideoEncoder.cpp \
+    video_engine/VideoMixer.h \
+    video_engine/VideoMixer.cpp \
+    video_engine/VideoRenderer.h \
+    video_engine/VideoRenderer.cpp \
+    video_engine/SubtitleRenderer.h \
+    video_engine/SubtitleRenderer.cpp \
+    video_engine/VideoFrame.cpp \
+    video_engine/MuxerDemuxer.h \
+    video_engine/MuxerDemuxer.cpp \
+    timeline/Timeline.h \
+    timeline/Timeline.cpp \
+    timeline/AudioTrack.h \
+    timeline/AudioTrack.cpp \
+    timeline/VideoTrack.h \
+    timeline/VideoTrack.cpp \
+    timeline/Clip.h \
+    timeline/Clip.cpp \
+    timeline/Region.h \
+    timeline/Region.cpp \
+    timeline/Marker.h \
+    timeline/Marker.cpp \
+    timeline/Automation.h \
+    timeline/Automation.cpp \
+    timeline/CrossfadeCalc.h \
+    timeline/CrossfadeCalc.cpp \
+    timeline/TimelineCommands.h \
+    timeline/TimelineCommands.cpp \
+    dsp/DspChain.h \
+    dsp/DspChain.cpp \
+    dsp/Biquad.h \
+    dsp/ParametricEQ.h \
+    dsp/ParametricEQ.cpp \
+    dsp/GraphicEQ31.h \
+    dsp/GraphicEQ31.cpp \
+    dsp/Compressor.h \
+    dsp/Compressor.cpp \
+    dsp/Limiter.h \
+    dsp/Limiter.cpp \
+    dsp/NoiseGate.h \
+    dsp/NoiseGate.cpp \
+    dsp/DeEsser.h \
+    dsp/DeEsser.cpp \
+    dsp/SonicEnhancer.h \
+    dsp/SonicEnhancer.cpp \
+    dsp/Reverb.h \
+    dsp/Reverb.cpp \
+    dsp/AGC.h \
+    dsp/AGC.cpp \
+    dsp/Normalizer.h \
+    dsp/Normalizer.cpp \
+    vfx/VideoEffectChain.h \
+    vfx/VideoEffectChain.cpp \
+    vfx/CrossDissolve.h \
+    vfx/CrossDissolve.cpp \
+    vfx/DipToBlack.h \
+    vfx/DipToBlack.cpp \
+    vfx/DipToWhite.h \
+    vfx/DipToWhite.cpp \
+    vfx/WipeLeft.h \
+    vfx/WipeLeft.cpp \
+    vfx/PushSlide.h \
+    vfx/PushSlide.cpp \
+    vfx/ZoomThrough.h \
+    vfx/ZoomThrough.cpp \
+    vfx/LumaKey.h \
+    vfx/LumaKey.cpp \
+    vfx/ChromaKey.h \
+    vfx/ChromaKey.cpp \
+    vfx/GlitchCut.h \
+    vfx/GlitchCut.cpp \
+    vfx/StingerOverlay.h \
+    vfx/StingerOverlay.cpp \
+    podcast/ChapterEditor.h \
+    podcast/ChapterEditor.cpp \
+    podcast/MetadataEditor.h \
+    podcast/MetadataEditor.cpp \
+    podcast/RSSGenerator.h \
+    podcast/RSSGenerator.cpp \
+    podcast/PodcastExporter.h \
+    podcast/PodcastExporter.cpp \
+    podcast/ShowNotesEditor.h \
+    podcast/ShowNotesEditor.cpp \
+    broadcast/LiveRecorder.h \
+    broadcast/LiveRecorder.cpp \
+    broadcast/StreamEncoder.h \
+    broadcast/StreamEncoder.cpp \
+    broadcast/BroadcastClock.h \
+    broadcast/BroadcastClock.cpp \
+    broadcast/TallyLight.h \
+    broadcast/TallyLight.cpp \
+    codec/CodecRegistry.h \
+    codec/CodecRegistry.cpp \
+    codec/WavCodec.h \
+    codec/WavCodec.cpp \
+    codec/FlacCodec.h \
+    codec/FlacCodec.cpp \
+    codec/Mp3Codec.h \
+    codec/Mp3Codec.cpp \
+    codec/AacCodec.h \
+    codec/AacCodec.cpp \
+    codec/OpusCodec.h \
+    codec/OpusCodec.cpp \
+    codec/VorbisCodec.h \
+    codec/VorbisCodec.cpp \
+    codec/FFmpegCodec.h \
+    codec/FFmpegCodec.cpp \
+    graphics/OverlayEngine.h \
+    graphics/OverlayEngine.cpp \
+    graphics/LowerThird.h \
+    graphics/LowerThird.cpp \
+    graphics/TickerCrawl.h \
+    graphics/TickerCrawl.cpp \
+    graphics/Callout.h \
+    graphics/Callout.cpp \
+    graphics/Watermark.h \
+    graphics/Watermark.cpp \
+    graphics/GraphicsRenderer.h \
+    graphics/GraphicsRenderer.cpp \
+    widgets/MainWindow.h \
+    widgets/MainWindow.cpp \
+    widgets/TimelineWidget.h \
+    widgets/TimelineWidget.cpp \
+    widgets/TrackHeaderWidget.h \
+    widgets/TrackHeaderWidget.cpp \
+    widgets/WaveformView.h \
+    widgets/WaveformView.cpp \
+    widgets/VideoPreview.h \
+    widgets/VideoPreview.cpp \
+    widgets/MixerWidget.h \
+    widgets/MixerWidget.cpp \
+    widgets/VUMeterWidget.h \
+    widgets/VUMeterWidget.cpp \
+    widgets/TransportBar.h \
+    widgets/TransportBar.cpp \
+    widgets/EffectsRackWidget.h \
+    widgets/EffectsRackWidget.cpp \
+    widgets/MediaBrowser.h \
+    widgets/MediaBrowser.cpp \
+    widgets/ChapterWidget.h \
+    widgets/ChapterWidget.cpp \
+    widgets/MetadataPanel.h \
+    widgets/MetadataPanel.cpp \
+    widgets/ExportDialog.h \
+    widgets/ExportDialog.cpp \
+    widgets/PreferencesDialog.h \
+    widgets/PreferencesDialog.cpp \
+    widgets/ProjectSettingsDialog.h \
+    widgets/ProjectSettingsDialog.cpp \
+    widgets/SpectrumWidget.h \
+    widgets/SpectrumWidget.cpp \
+    widgets/BevelButton.h \
+    widgets/BevelButton.cpp \
+    widgets/EmbossedKnob.h \
+    widgets/EmbossedKnob.cpp \
+    widgets/ThemeEngine.h \
+    widgets/ThemeEngine.cpp \
+    widgets/AboutDialog.h \
+    widgets/AboutDialog.cpp \
+    platform/compat.h \
+    platform/worker_pool.h \
+    platform/worker_pool.cpp \
+    config/AppConfig.h \
+    config/AppConfig.cpp \
+    config/YamlPresets.h \
+    config/YamlPresets.cpp \
+    config/DebugLogger.h \
+    config/DebugLogger.cpp
+
+# ── Conditional macOS platform sources ──────────────────────────────────────
+if ENABLE_MACOS_GUI
+mcaster1dawcast_SOURCES += \
+    platform/macos_audio.h \
+    platform/macos_audio.mm \
+    platform/macos_video.h \
+    platform/macos_video.mm \
+    platform/device_discovery.h \
+    platform/device_discovery.mm
+endif
+
+# ── MOC-generated sources ────────────────────────────────────────────────────
+nodist_mcaster1dawcast_SOURCES = \
+    moc_app.cpp \
+    moc_ModuleRegistry.cpp \
+    moc_UndoManager.cpp \
+    moc_ProjectManager.cpp \
+    moc_AudioEngine.cpp \
+    moc_AudioMixer.cpp \
+    moc_AudioWorker.cpp \
+    moc_VideoDecoder.cpp \
+    moc_VideoEncoder.cpp \
+    moc_VideoMixer.cpp \
+    moc_VideoRenderer.cpp \
+    moc_SubtitleRenderer.cpp \
+    moc_MuxerDemuxer.cpp \
+    moc_Timeline.cpp \
+    moc_AudioTrack.cpp \
+    moc_VideoTrack.cpp \
+    moc_Clip.cpp \
+    moc_Automation.cpp \
+    moc_DspChain.cpp \
+    moc_VideoEffectChain.cpp \
+    moc_ChapterEditor.cpp \
+    moc_MetadataEditor.cpp \
+    moc_RSSGenerator.cpp \
+    moc_PodcastExporter.cpp \
+    moc_ShowNotesEditor.cpp \
+    moc_LiveRecorder.cpp \
+    moc_StreamEncoder.cpp \
+    moc_BroadcastClock.cpp \
+    moc_TallyLight.cpp \
+    moc_CodecRegistry.cpp \
+    moc_OverlayEngine.cpp \
+    moc_LowerThird.cpp \
+    moc_TickerCrawl.cpp \
+    moc_Callout.cpp \
+    moc_Watermark.cpp \
+    moc_GraphicsRenderer.cpp \
+    moc_MainWindow.cpp \
+    moc_TimelineWidget.cpp \
+    moc_TrackHeaderWidget.cpp \
+    moc_WaveformView.cpp \
+    moc_VideoPreview.cpp \
+    moc_MixerWidget.cpp \
+    moc_VUMeterWidget.cpp \
+    moc_TransportBar.cpp \
+    moc_EffectsRackWidget.cpp \
+    moc_MediaBrowser.cpp \
+    moc_ChapterWidget.cpp \
+    moc_MetadataPanel.cpp \
+    moc_ExportDialog.cpp \
+    moc_PreferencesDialog.cpp \
+    moc_ProjectSettingsDialog.cpp \
+    moc_SpectrumWidget.cpp \
+    moc_BevelButton.cpp \
+    moc_EmbossedKnob.cpp \
+    moc_ThemeEngine.cpp \
+    moc_AboutDialog.cpp \
+    moc_AppConfig.cpp \
+    qrc_mcaster1dawcast.cpp
+
+# ── Build ordering ───────────────────────────────────────────────────────────
+BUILT_SOURCES = \
+    moc_app.cpp \
+    moc_ModuleRegistry.cpp \
+    moc_UndoManager.cpp \
+    moc_ProjectManager.cpp \
+    moc_AudioEngine.cpp \
+    moc_AudioMixer.cpp \
+    moc_AudioWorker.cpp \
+    moc_VideoDecoder.cpp \
+    moc_VideoEncoder.cpp \
+    moc_VideoMixer.cpp \
+    moc_VideoRenderer.cpp \
+    moc_SubtitleRenderer.cpp \
+    moc_MuxerDemuxer.cpp \
+    moc_Timeline.cpp \
+    moc_AudioTrack.cpp \
+    moc_VideoTrack.cpp \
+    moc_Clip.cpp \
+    moc_Automation.cpp \
+    moc_DspChain.cpp \
+    moc_VideoEffectChain.cpp \
+    moc_ChapterEditor.cpp \
+    moc_MetadataEditor.cpp \
+    moc_RSSGenerator.cpp \
+    moc_PodcastExporter.cpp \
+    moc_ShowNotesEditor.cpp \
+    moc_LiveRecorder.cpp \
+    moc_StreamEncoder.cpp \
+    moc_BroadcastClock.cpp \
+    moc_TallyLight.cpp \
+    moc_CodecRegistry.cpp \
+    moc_OverlayEngine.cpp \
+    moc_LowerThird.cpp \
+    moc_TickerCrawl.cpp \
+    moc_Callout.cpp \
+    moc_Watermark.cpp \
+    moc_GraphicsRenderer.cpp \
+    moc_MainWindow.cpp \
+    moc_TimelineWidget.cpp \
+    moc_TrackHeaderWidget.cpp \
+    moc_WaveformView.cpp \
+    moc_VideoPreview.cpp \
+    moc_MixerWidget.cpp \
+    moc_VUMeterWidget.cpp \
+    moc_TransportBar.cpp \
+    moc_EffectsRackWidget.cpp \
+    moc_MediaBrowser.cpp \
+    moc_ChapterWidget.cpp \
+    moc_MetadataPanel.cpp \
+    moc_ExportDialog.cpp \
+    moc_PreferencesDialog.cpp \
+    moc_ProjectSettingsDialog.cpp \
+    moc_SpectrumWidget.cpp \
+    moc_BevelButton.cpp \
+    moc_EmbossedKnob.cpp \
+    moc_ThemeEngine.cpp \
+    moc_AboutDialog.cpp \
+    moc_AppConfig.cpp \
+    qrc_mcaster1dawcast.cpp
+
+# ── Clean generated files ────────────────────────────────────────────────────
+CLEANFILES = moc_*.cpp qrc_*.cpp
+
+# ── macOS Packaging Targets ──────────────────────────────────────────────────
+SIGN_ID ?=
+APP_SIGN_ID ?= $(SIGN_ID)
+PKG_SIGN_ID ?= $(SIGN_ID)
+NOTARIZE_PROFILE ?= Mcaster1
+APP_BUNDLE = $(abs_top_builddir)/build/Mcaster1DAWCast.app
+VERSION_STR = $(shell cat $(abs_top_srcdir)/VERSION.txt 2>/dev/null || echo "0.1.0")
+DMG_PATH = $(abs_top_builddir)/build/Mcaster1DAWCast-$(VERSION_STR)-macOS.dmg
+PKG_PATH = $(abs_top_builddir)/build/Mcaster1DAWCast-$(VERSION_STR)-macOS.pkg
+
+app-bundle: mcaster1dawcast
+	@if test -n "$(APP_SIGN_ID)"; then \
+	    $(abs_top_srcdir)/scripts/make-app-bundle.sh --sign "$(APP_SIGN_ID)"; \
+	else \
+	    $(abs_top_srcdir)/scripts/make-app-bundle.sh; \
+	fi
+
+dmg: app-bundle
+	$(abs_top_srcdir)/scripts/make-dmg.sh
+
+pkg: app-bundle
+	@if test -n "$(PKG_SIGN_ID)"; then \
+	    $(abs_top_srcdir)/scripts/make-pkg.sh --sign "$(PKG_SIGN_ID)"; \
+	else \
+	    $(abs_top_srcdir)/scripts/make-pkg.sh; \
+	fi
+
+codesign:
+	codesign --force --deep --sign "$(APP_SIGN_ID)" --timestamp --options runtime "$(APP_BUNDLE)"
+	codesign --verify --deep --strict "$(APP_BUNDLE)"
+
+notarize:
+	@echo "── Notarizing PKG..."
+	xcrun notarytool submit "$(PKG_PATH)" --keychain-profile "$(NOTARIZE_PROFILE)" --wait
+	@echo "── Notarizing DMG..."
+	xcrun notarytool submit "$(DMG_PATH)" --keychain-profile "$(NOTARIZE_PROFILE)" --wait
+
+staple:
+	@echo "── Stapling PKG..."
+	xcrun stapler staple "$(PKG_PATH)"
+	@echo "── Stapling DMG..."
+	xcrun stapler staple "$(DMG_PATH)"
+	@echo "── Done. Installers ready for distribution."
+
+release: mcaster1dawcast
+	$(abs_top_srcdir)/scripts/make-app-bundle.sh --sign "$(APP_SIGN_ID)"
+	$(abs_top_srcdir)/scripts/make-pkg.sh --sign "$(PKG_SIGN_ID)"
+	$(abs_top_srcdir)/scripts/make-dmg.sh
+	@echo "── Submitting PKG for notarization..."
+	xcrun notarytool submit "$(PKG_PATH)" --keychain-profile "$(NOTARIZE_PROFILE)" --wait
+	@echo "── Submitting DMG for notarization..."
+	xcrun notarytool submit "$(DMG_PATH)" --keychain-profile "$(NOTARIZE_PROFILE)" --wait
+	@echo "── Stapling tickets..."
+	xcrun stapler staple "$(PKG_PATH)"
+	xcrun stapler staple "$(DMG_PATH)"
+	@echo "── Release build complete. Signed + notarized installers:"
+	@echo "  PKG: $(PKG_PATH)"
+	@echo "  DMG: $(DMG_PATH)"
+
+.PHONY: app-bundle codesign dmg pkg notarize staple release

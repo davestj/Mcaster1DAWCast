@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	./autogen.sh
+	./configure --prefix=/usr --enable-macos-gui=no
+
+override_dh_auto_build:
+	$(MAKE) -j$(shell nproc)
+
+override_dh_auto_install:
+	$(MAKE) DESTDIR=$(CURDIR)/debian/mcaster1dawcast install

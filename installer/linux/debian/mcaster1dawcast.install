@@ -1,0 +1,4 @@
+usr/bin/mcaster1dawcast
+themes/* usr/share/mcaster1dawcast/themes/
+configs/* usr/share/mcaster1dawcast/configs/
+docs/* usr/share/doc/mcaster1dawcast/

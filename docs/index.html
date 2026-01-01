@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mcaster1DAWCast &mdash; Technical Documentation</title>
+  <style>
+    /* -- CSS Variables -- */
+    :root {
+      --bg:          #0f172a;
+      --bg-card:     #1e293b;
+      --bg-sidebar:  #0d1a2e;
+      --border:      #1e3a5f;
+      --teal:        #14b8a6;
+      --teal-dark:   #0d9488;
+      --cyan:        #0891b2;
+      --cyan-light:  #22d3ee;
+      --text:        #e2e8f0;
+      --text-muted:  #94a3b8;
+      --text-dim:    #64748b;
+      --green:       #22c55e;
+      --yellow:      #f59e0b;
+      --red:         #ef4444;
+      --purple:      #a855f7;
+      --sidebar-w:   280px;
+      --header-h:    60px;
+    }
+
+    /* -- Reset + Base -- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { color: var(--cyan-light); text-decoration: underline; }
+    code, pre {
+      font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.875rem;
+    }
+    pre {
+      background: #0a0f1e;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--teal);
+      border-radius: 6px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    code {
+      background: rgba(20,184,166,0.12);
+      color: var(--cyan-light);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+    pre code {
+      background: none;
+      color: #c9d1d9;
+      padding: 0;
+      border-radius: 0;
+    }
+    h1, h2, h3, h4 {
+      line-height: 1.3;
+      font-weight: 600;
+    }
+    h2 { font-size: 1.6rem; }
+    h3 { font-size: 1.2rem; }
+    h4 { font-size: 1rem; }
+    p { margin: 0.75rem 0; }
+    ul, ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+    li { margin: 0.3rem 0; }
+
+    /* -- Tables -- */
+    .table-wrap { overflow-x: auto; margin: 1rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    th {
+      background: rgba(20,184,166,0.15);
+      color: var(--teal);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.55rem 1rem;
+      border-bottom: 1px solid rgba(30,58,95,0.5);
+      vertical-align: top;
+    }
+    tr:hover td { background: rgba(20,184,166,0.04); }
+
+    /* -- Status badges -- */
+    .badge {
+      display: inline-block;
+      padding: 0.15em 0.6em;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-complete { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+    .badge-planned  { background: rgba(100,116,139,0.2); color: var(--text-dim); border: 1px solid rgba(100,116,139,0.3); }
+    .badge-active   { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-new      { background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+
+    /* -- Top header bar -- */
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      z-index: 100;
+      gap: 1rem;
+    }
+    .top-bar .logo {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--teal);
+      letter-spacing: -0.02em;
+    }
+    .top-bar .logo span { color: var(--text-muted); font-weight: 400; }
+    .top-bar .version-pill {
+      background: rgba(20,184,166,0.12);
+      color: var(--teal);
+      border: 1px solid rgba(20,184,166,0.25);
+      border-radius: 9999px;
+      padding: 0.15em 0.75em;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .top-bar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .top-bar-right a {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 0.3em 0.75em;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .top-bar-right a:hover { color: var(--teal); border-color: var(--teal); text-decoration: none; }
+
+    /* -- Mobile hamburger -- */
+    .hamburger {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      padding: 0.25em 0.5em;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .hamburger:hover { color: var(--teal); border-color: var(--teal); }
+
+    /* -- Sidebar -- */
+    .sidebar {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      width: var(--sidebar-w);
+      bottom: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 1.25rem 0 2rem;
+      transition: transform 0.3s ease;
+    }
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .nav-section {
+      padding: 0.6rem 1rem 0.2rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .nav-item {
+      display: block;
+      padding: 0.4rem 1.25rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      border-left: 2px solid transparent;
+      transition: all 0.12s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .nav-item:hover, .nav-item.active {
+      color: var(--teal);
+      border-left-color: var(--teal);
+      background: rgba(20,184,166,0.06);
+      text-decoration: none;
+    }
+
+    /* -- Main content -- */
+    .main {
+      margin-left: var(--sidebar-w);
+      margin-top: var(--header-h);
+      padding: 2.5rem 3rem 4rem;
+      max-width: 1100px;
+    }
+
+    /* -- Sections -- */
+    .doc-section {
+      margin-bottom: 4rem;
+      padding-top: 1rem;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-header h2 {
+      color: var(--text);
+    }
+    .section-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      background: rgba(20,184,166,0.12);
+      border: 1px solid rgba(20,184,166,0.3);
+      border-radius: 6px;
+      color: var(--teal);
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* -- Cards -- */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin: 1rem 0;
+    }
+    .card h4 {
+      color: var(--teal);
+      margin-bottom: 0.5rem;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .card-small {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .card-small .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      margin-bottom: 0.3rem;
+    }
+    .card-small .value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--teal);
+      font-family: monospace;
+    }
+
+    /* -- Callouts -- */
+    .callout {
+      display: flex;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+      align-items: flex-start;
+    }
+    .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .callout-info  { background: rgba(8,145,178,0.1);   border: 1px solid rgba(8,145,178,0.3); }
+    .callout-info  .callout-icon, .callout-info  strong { color: var(--cyan); }
+    .callout-warn  { background: rgba(245,158,11,0.1);  border: 1px solid rgba(245,158,11,0.3); }
+    .callout-warn  .callout-icon, .callout-warn  strong { color: var(--yellow); }
+    .callout-success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); }
+    .callout-success .callout-icon, .callout-success strong { color: var(--green); }
+
+    /* -- Hero -- */
+    .hero {
+      background: linear-gradient(135deg, rgba(20,184,166,0.08) 0%, rgba(8,145,178,0.05) 100%);
+      border: 1px solid rgba(20,184,166,0.2);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+    .hero h1 {
+      font-size: 2rem;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 span { color: var(--teal); }
+    .hero p { color: var(--text-muted); font-size: 1rem; max-width: 640px; }
+    .hero-meta {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .hero-meta-item {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .hero-meta-item strong {
+      color: var(--text-muted);
+    }
+
+    /* -- Diagram -- */
+    .diagram {
+      background: #0a0f1e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      margin: 1rem 0;
+      font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: #c9d1d9;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .diagram .hl-teal { color: var(--teal); }
+    .diagram .hl-cyan { color: var(--cyan-light); }
+    .diagram .hl-yellow { color: var(--yellow); }
+    .diagram .hl-green { color: var(--green); }
+    .diagram .hl-purple { color: var(--purple); }
+    .diagram .hl-dim { color: var(--text-dim); }
+
+    /* -- Feature list -- */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+    .feature-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+    .feature-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .feature-item h4 {
+      color: var(--teal);
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+    .feature-item p {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin: 0;
+    }
+
+    /* -- Footer -- */
+    .footer {
+      margin-left: var(--sidebar-w);
+      border-top: 1px solid var(--border);
+      padding: 2rem 3rem;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+    }
+    .footer a { color: var(--teal); }
+
+    /* -- Responsive -- */
+    @media (max-width: 900px) {
+      :root { --sidebar-w: 0px; }
+      .hamburger { display: block; }
+      .sidebar {
+        transform: translateX(-280px);
+        width: 280px;
+        z-index: 99;
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .main { padding: 2rem 1.5rem 3rem; }
+      .footer { margin-left: 0; padding: 1.5rem; }
+      .hero { padding: 1.5rem 1.25rem; }
+      .hero h1 { font-size: 1.5rem; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- =============================== TOP BAR =============================== -->
+<header class="top-bar">
+  <button class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')" aria-label="Toggle navigation">&#9776;</button>
+  <div class="logo">Mcaster1DAWCast <span>Documentation</span></div>
+  <div class="version-pill">v1.0.0-alpha</div>
+  <div class="top-bar-right">
+    <a href="PLANNING.html">Roadmap</a>
+  </div>
+</header>
+
+<!-- =============================== SIDEBAR =============================== -->
+<nav class="sidebar" id="sidebar">
+  <div class="nav-section">Documentation</div>
+  <a href="#overview"          class="nav-item">Overview</a>
+  <a href="#architecture"      class="nav-item">Architecture</a>
+  <a href="#getting-started"   class="nav-item">Getting Started</a>
+  <a href="#build"             class="nav-item">Build Instructions</a>
+  <a href="#project-structure"  class="nav-item">Project Structure</a>
+
+  <div class="nav-section">Engines</div>
+  <a href="#audio-pipeline"    class="nav-item">Audio Pipeline</a>
+  <a href="#video-pipeline"    class="nav-item">Video Pipeline</a>
+  <a href="#formats"           class="nav-item">Supported Formats</a>
+  <a href="#effects-dsp"       class="nav-item">Effects &amp; DSP</a>
+
+  <div class="nav-section">Features</div>
+  <a href="#broadcasting"      class="nav-item">Broadcasting</a>
+  <a href="#podcasting"        class="nav-item">Podcasting</a>
+  <a href="#theme-engine"      class="nav-item">Theme Engine</a>
+
+  <div class="nav-section">Reference</div>
+  <a href="#platform-support"  class="nav-item">Platform Support</a>
+  <a href="#ecosystem"         class="nav-item">Ecosystem Integration</a>
+  <a href="#license"           class="nav-item">License</a>
+</nav>
+
+<!-- =============================== MAIN CONTENT =============================== -->
+<main class="main">
+
+  <!-- -- Hero -- -->
+  <div class="hero">
+    <h1>&#127908; <span>Mcaster1DAWCast</span></h1>
+    <p>Broadcast-grade digital audio workstation for audio and video production, live streaming, and podcast publishing. The creative production hub of the Mcaster1 ecosystem.</p>
+    <div class="hero-meta">
+      <div class="hero-meta-item"><strong>Language:</strong> C++17</div>
+      <div class="hero-meta-item"><strong>Build:</strong> GNU autotools</div>
+      <div class="hero-meta-item"><strong>GUI:</strong> Qt 6 (Widgets)</div>
+      <div class="hero-meta-item"><strong>License:</strong> GPL-2.0-or-later</div>
+      <div class="hero-meta-item"><strong>Author:</strong> David St. John</div>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card-small">
+      <div class="label">Version</div>
+      <div class="value">1.0.0-alpha</div>
+    </div>
+    <div class="card-small">
+      <div class="label">Platform</div>
+      <div class="value">macOS / Win / Linux</div>
+    </div>
+    <div class="card-small">
+      <div class="label">Audio Backend</div>
+      <div class="value">PortAudio</div>
+    </div>
+    <div class="card-small">
+      <div class="label">Video Backend</div>
+      <div class="value">FFmpeg</div>
+    </div>
+  </div>
+
+  <!-- ==================== 1. OVERVIEW ==================== -->
+  <section id="overview" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <h2>Overview</h2>
+    </div>
+
+    <p>
+      <strong>Mcaster1DAWCast</strong> is a broadcast-grade digital audio workstation (DAW) built
+      with C++17 and Qt 6. It combines multi-track audio editing, video compositing, live broadcast
+      streaming, and podcast production into a single integrated application. DAWCast serves as
+      the creative production centerpiece of the Mcaster1 broadcast ecosystem, working alongside
+      Mcaster1AMP (media player), Mcaster1AudioPipe (virtual audio routing), and Mcaster1DSPEncoder
+      (broadcast encoding).
+    </p>
+
+    <div class="card">
+      <h4>What It Does</h4>
+      <ul>
+        <li>Multi-track audio recording, editing, and mixing with non-destructive workflow</li>
+        <li>Video track compositing with 10 transitions, subtitles, and broadcast graphics</li>
+        <li>Live broadcast output to Icecast, Mcaster1DNAS, and RTMP servers</li>
+        <li>Podcast production with chapter markers, RSS generation, and loudness normalization</li>
+        <li>10 built-in DSP effects (EQ, compressor, limiter, reverb, de-esser, and more)</li>
+        <li>YAML-driven theme engine with hot-swappable theme packs</li>
+        <li>Cross-platform (macOS, Windows, Linux) via autotools + Qt 6</li>
+      </ul>
+    </div>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">&#8505;</div>
+      <div>
+        <strong>Ecosystem Role.</strong>
+        DAWCast is the production studio where content is created and mixed. It routes audio through
+        Mcaster1AudioPipe virtual devices for zero-latency inter-app routing, and can stream directly
+        to broadcast servers via Mcaster1DSPEncoder or its built-in stream encoder.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 2. ARCHITECTURE ==================== -->
+  <section id="architecture" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">2</div>
+      <h2>Architecture</h2>
+    </div>
+
+    <p>
+      Mcaster1DAWCast uses a modular architecture with clearly separated engine layers.
+      The core modules communicate through a module registry that supports dynamic
+      discovery and loading. All audio processing runs on a dedicated real-time thread
+      managed by PortAudio, while video decoding and broadcast encoding run on separate
+      worker threads.
+    </p>
+
+    <h3>Module Diagram</h3>
+    <div class="diagram"><span class="hl-teal">Mcaster1DAWCast</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-cyan">core/</span>                  <span class="hl-dim">// Foundation layer</span>
+<span class="hl-dim">|     +---</span> ModuleRegistry     <span class="hl-dim">// Dynamic module discovery &amp; loading</span>
+<span class="hl-dim">|     +---</span> ProjectManager     <span class="hl-dim">// Project file I/O (.dawcast JSON)</span>
+<span class="hl-dim">|     +---</span> UndoManager        <span class="hl-dim">// Command-pattern undo/redo stack</span>
+<span class="hl-dim">|     +---</span> IModule / IPlugin  <span class="hl-dim">// Abstract interfaces for extensibility</span>
+<span class="hl-dim">|     +---</span> IEffectUnit        <span class="hl-dim">// DSP effect interface (process, reset, params)</span>
+<span class="hl-dim">|     +---</span> IVideoEffect       <span class="hl-dim">// Video transition interface</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-green">audio_engine/</span>          <span class="hl-dim">// Real-time audio processing</span>
+<span class="hl-dim">|     +---</span> AudioEngine        <span class="hl-dim">// PortAudio callback, device management</span>
+<span class="hl-dim">|     +---</span> AudioMixer         <span class="hl-dim">// Summing bus, per-track gain/pan</span>
+<span class="hl-dim">|     +---</span> AudioWorker        <span class="hl-dim">// Worker thread for disk I/O + decode</span>
+<span class="hl-dim">|     +---</span> AudioResampler     <span class="hl-dim">// Sample rate conversion (SRC)</span>
+<span class="hl-dim">|     +---</span> RingBuffer         <span class="hl-dim">// Lock-free SPSC for RT thread decoupling</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">video_engine/</span>          <span class="hl-dim">// Video processing</span>
+<span class="hl-dim">|     +---</span> VideoDecoder       <span class="hl-dim">// FFmpeg decode (HW accel)</span>
+<span class="hl-dim">|     +---</span> VideoEncoder       <span class="hl-dim">// FFmpeg encode (H.264/265, VP9, AV1)</span>
+<span class="hl-dim">|     +---</span> VideoMixer         <span class="hl-dim">// Layer compositing with blend modes</span>
+<span class="hl-dim">|     +---</span> VideoRenderer      <span class="hl-dim">// QWidget-based preview output</span>
+<span class="hl-dim">|     +---</span> SubtitleRenderer   <span class="hl-dim">// SRT / ASS / VTT rendering</span>
+<span class="hl-dim">|     +---</span> MuxerDemuxer       <span class="hl-dim">// Container handling (MP4, MKV, WebM)</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-purple">dsp/</span>                   <span class="hl-dim">// Audio effects library (10 effects)</span>
+<span class="hl-dim">|     +---</span> DspChain           <span class="hl-dim">// Ordered effect chain per track</span>
+<span class="hl-dim">|     +---</span> ParametricEQ       <span class="hl-dim">// 10-band RBJ biquad EQ</span>
+<span class="hl-dim">|     +---</span> Compressor         <span class="hl-dim">// Dynamics processor</span>
+<span class="hl-dim">|     +---</span> Limiter            <span class="hl-dim">// Look-ahead brick-wall limiter</span>
+<span class="hl-dim">|     +---</span> Reverb, AGC, ...   <span class="hl-dim">// Additional processors</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-cyan">vfx/</span>                   <span class="hl-dim">// Video effects &amp; transitions (10)</span>
+<span class="hl-dim">+---</span> <span class="hl-green">broadcast/</span>             <span class="hl-dim">// Live streaming (Icecast, DNAS, RTMP)</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">podcast/</span>               <span class="hl-dim">// Chapters, RSS, metadata, export</span>
+<span class="hl-dim">+---</span> <span class="hl-purple">graphics/</span>              <span class="hl-dim">// Broadcast overlays (lower thirds, ticker)</span>
+<span class="hl-dim">+---</span> <span class="hl-cyan">timeline/</span>              <span class="hl-dim">// Tracks, clips, regions, automation</span>
+<span class="hl-dim">+---</span> <span class="hl-green">widgets/</span>               <span class="hl-dim">// Qt6 UI components</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">codec/</span>                 <span class="hl-dim">// Audio codec registry (WAV, FLAC, MP3, AAC...)</span>
+<span class="hl-dim">+---</span> <span class="hl-purple">config/</span>                <span class="hl-dim">// AppConfig, debug logger, YAML presets</span>
+<span class="hl-dim">+---</span> <span class="hl-dim">platform/</span>              <span class="hl-dim">// OS-specific (macOS, Windows, Linux)</span></div>
+
+    <h3>Thread Model</h3>
+    <div class="card">
+      <h4>Four-Thread Architecture</h4>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Thread</th>
+              <th>Priority</th>
+              <th>Responsibility</th>
+              <th>Communication</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>RT Audio</strong></td>
+              <td>Real-time</td>
+              <td>PortAudio callback, audio mixing, DSP chain processing, ring buffer read/write</td>
+              <td>Lock-free SPSC ring buffers, atomic flags</td>
+            </tr>
+            <tr>
+              <td><strong>UI Thread</strong></td>
+              <td>Normal</td>
+              <td>Qt6 event loop, widget rendering, user interaction, timeline display</td>
+              <td>Qt signals/slots, queued connections to audio thread</td>
+            </tr>
+            <tr>
+              <td><strong>Video Decode</strong></td>
+              <td>Normal</td>
+              <td>FFmpeg decode, frame scaling, subtitle rendering, transition compositing</td>
+              <td>Thread-safe frame queue, condition variables</td>
+            </tr>
+            <tr>
+              <td><strong>Broadcast</strong></td>
+              <td>Above normal</td>
+              <td>Stream encoding (MP3/AAC/Opus), Icecast/DNAS/RTMP output, ICY metadata</td>
+              <td>SPSC buffer from master bus, atomic state flags</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>Data Flow</h3>
+    <div class="diagram"><span class="hl-dim">  Audio Input (Mic/AudioPipe)      Video Files (MP4/MKV)</span>
+<span class="hl-dim">           |                              |</span>
+<span class="hl-dim">           v                              v</span>
+<span class="hl-cyan">  AudioEngine (PortAudio)</span>       <span class="hl-yellow">VideoDecoder (FFmpeg)</span>
+<span class="hl-dim">           |                              |</span>
+<span class="hl-dim">           v                              v</span>
+<span class="hl-cyan">  AudioTrack clips</span>              <span class="hl-yellow">VideoTrack clips</span>
+<span class="hl-dim">           |                              |</span>
+<span class="hl-dim">           v                              v</span>
+<span class="hl-green">  DspChain (per-track effects)</span>   <span class="hl-green">VideoEffectChain (transitions)</span>
+<span class="hl-dim">           |                              |</span>
+<span class="hl-dim">           v                              v</span>
+<span class="hl-teal">  AudioMixer (summing bus)</span>       <span class="hl-teal">VideoMixer (compositing)</span>
+<span class="hl-dim">           |                              |</span>
+<span class="hl-dim">     +-----+-----+               +---------+---------+</span>
+<span class="hl-dim">     |           |               |         |         |</span>
+<span class="hl-dim">     v           v               v         v         v</span>
+<span class="hl-purple">  Speakers    AudioPipe</span>   <span class="hl-purple">  Preview  Subtitles  Graphics</span>
+<span class="hl-dim">  /Headphones  (virtual)</span>   <span class="hl-dim">  Window   Overlay    Overlay</span>
+<span class="hl-dim">                 |                         |</span>
+<span class="hl-dim">                 v                         v</span>
+<span class="hl-yellow">          StreamEncoder ----+---- VideoEncoder</span>
+<span class="hl-dim">                 |                   |</span>
+<span class="hl-dim">           +-----+-----+            v</span>
+<span class="hl-dim">           |     |     |      MuxerDemuxer</span>
+<span class="hl-dim">           v     v     v           |</span>
+<span class="hl-green">        Icecast DNAS  RTMP   File Export</span></div>
+  </section>
+
+  <!-- ==================== 3. GETTING STARTED ==================== -->
+  <section id="getting-started" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <h2>Getting Started</h2>
+    </div>
+
+    <h3>Prerequisites</h3>
+    <div class="card">
+      <h4>Required Dependencies</h4>
+      <ul>
+        <li><strong>C++17 compiler</strong> &mdash; GCC 9+, Clang 10+, or MSVC 2019+</li>
+        <li><strong>Qt 6</strong> &mdash; Widgets, SVG, Multimedia modules</li>
+        <li><strong>PortAudio</strong> &mdash; Cross-platform audio I/O library</li>
+        <li><strong>FFmpeg</strong> &mdash; libavcodec, libavformat, libavutil, libswscale, libswresample</li>
+        <li><strong>libsamplerate</strong> &mdash; High-quality sample rate conversion</li>
+        <li><strong>yaml-cpp</strong> &mdash; YAML configuration parsing</li>
+        <li><strong>nlohmann-json</strong> &mdash; JSON project file I/O</li>
+        <li><strong>libmp3lame</strong> &mdash; MP3 encoding</li>
+        <li><strong>libvorbis / libogg</strong> &mdash; Vorbis encoding/decoding</li>
+        <li><strong>libopus</strong> &mdash; Opus encoding/decoding</li>
+        <li><strong>libflac</strong> &mdash; FLAC encoding/decoding</li>
+        <li><strong>fdk-aac</strong> &mdash; AAC encoding (optional, license-restricted)</li>
+      </ul>
+    </div>
+
+    <h3>Quick Start</h3>
+    <pre><code># Clone and build
+cd ~/dev/01_mcaster1.com/Mcaster1DAWCast
+./autogen.sh
+./configure
+make -j$(nproc)
+
+# Run
+./src/DAWCast/mcaster1dawcast</code></pre>
+
+    <h3>First Project</h3>
+    <p>
+      After launching, DAWCast opens with an empty project. Use <strong>File &rarr; New Project</strong>
+      to create a new session, or <strong>File &rarr; Open</strong> to load an existing
+      <code>.dawcast</code> project file. Import audio/video via the Media Browser or drag files
+      directly onto the timeline.
+    </p>
+  </section>
+
+  <!-- ==================== 4. BUILD INSTRUCTIONS ==================== -->
+  <section id="build" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <h2>Build Instructions</h2>
+    </div>
+
+    <h3>macOS (Homebrew)</h3>
+    <pre><code># Install dependencies
+brew install qt@6 portaudio ffmpeg libsamplerate yaml-cpp nlohmann-json \
+             lame libvorbis opus flac fdk-aac autoconf automake libtool pkg-config
+
+# Configure and build
+cd ~/dev/01_mcaster1.com/Mcaster1DAWCast
+./autogen.sh
+./configure --prefix=/usr/local
+make -j$(sysctl -n hw.ncpu)
+
+# Run
+./src/DAWCast/mcaster1dawcast</code></pre>
+
+    <h3>Windows (MSYS2 / MinGW-w64)</h3>
+    <pre><code># Install dependencies in MSYS2 MinGW-w64 shell
+pacman -S mingw-w64-x86_64-qt6-base mingw-w64-x86_64-qt6-svg \
+          mingw-w64-x86_64-portaudio mingw-w64-x86_64-ffmpeg \
+          mingw-w64-x86_64-libsamplerate mingw-w64-x86_64-yaml-cpp \
+          mingw-w64-x86_64-nlohmann-json mingw-w64-x86_64-lame \
+          mingw-w64-x86_64-libvorbis mingw-w64-x86_64-opus \
+          mingw-w64-x86_64-flac mingw-w64-x86_64-fdk-aac \
+          autoconf automake libtool pkg-config
+
+# Configure and build
+./autogen.sh
+./configure
+make -j$(nproc)</code></pre>
+
+    <h3>Linux (apt / dnf)</h3>
+    <pre><code># Ubuntu / Debian
+sudo apt install qt6-base-dev qt6-svg-dev libportaudio2 libportaudio-dev \
+     libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev \
+     libsamplerate0-dev libyaml-cpp-dev nlohmann-json3-dev \
+     libmp3lame-dev libvorbis-dev libopus-dev libflac-dev libfdk-aac-dev \
+     autoconf automake libtool pkg-config
+
+# Fedora / RHEL
+sudo dnf install qt6-qtbase-devel qt6-qtsvg-devel portaudio-devel \
+     ffmpeg-devel libsamplerate-devel yaml-cpp-devel json-devel \
+     lame-devel libvorbis-devel opus-devel flac-devel fdk-aac-devel \
+     autoconf automake libtool pkg-config
+
+# Configure and build
+./autogen.sh
+./configure
+make -j$(nproc)</code></pre>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">&#8505;</div>
+      <div>
+        <strong>autotools build system.</strong>
+        DAWCast uses GNU autotools (autoconf + automake) rather than CMake. The
+        <code>autogen.sh</code> script generates the configure script from
+        <code>configure.ac</code>. The <code>configure</code> script detects all
+        dependencies and generates platform-specific Makefiles.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 5. PROJECT STRUCTURE ==================== -->
+  <section id="project-structure" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <h2>Project Structure</h2>
+    </div>
+
+    <div class="diagram"><span class="hl-teal">Mcaster1DAWCast/</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-cyan">src/DAWCast/</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">main.cpp</span>                    <span class="hl-dim">// Application entry point</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">app.h / app.cpp</span>              <span class="hl-dim">// Application class (Qt6 setup)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">audio_engine/</span>                <span class="hl-dim">// PortAudio engine, mixer, resampler, ring buffer</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">video_engine/</span>                <span class="hl-dim">// FFmpeg decode/encode, compositing, subtitles</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">dsp/</span>                         <span class="hl-dim">// 10 audio effects (EQ, compressor, reverb, etc.)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">vfx/</span>                         <span class="hl-dim">// 10 video transitions (dissolve, wipe, key, etc.)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">broadcast/</span>                   <span class="hl-dim">// Stream encoder, tally light, broadcast clock</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">podcast/</span>                     <span class="hl-dim">// Chapters, RSS, metadata, show notes, exporter</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">graphics/</span>                    <span class="hl-dim">// Lower thirds, ticker, overlays, watermarks</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">timeline/</span>                    <span class="hl-dim">// Tracks, clips, regions, markers, automation</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">widgets/</span>                     <span class="hl-dim">// Qt6 UI (MainWindow, Mixer, Timeline, etc.)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">codec/</span>                       <span class="hl-dim">// Audio codecs (WAV, FLAC, MP3, AAC, Opus, Vorbis)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">config/</span>                      <span class="hl-dim">// AppConfig, DebugLogger, YamlPresets</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">core/</span>                        <span class="hl-dim">// Interfaces, ProjectManager, UndoManager</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">platform/</span>                    <span class="hl-dim">// OS-specific (macOS ObjC++, worker pool)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-cyan">resources/</span>                   <span class="hl-dim">// Qt resource file (.qrc)</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">themes/</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">Default/</span>                     <span class="hl-dim">// Default theme (theme.yaml + style.qss)</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">DarkStudio/</span>                  <span class="hl-dim">// Dark studio theme</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">BroadcastPro/</span>                <span class="hl-dim">// Broadcast professional theme</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">configs/</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">default_project.json</span>         <span class="hl-dim">// Default project template</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">installer/</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">macos/</span>                       <span class="hl-dim">// DMG + PKG creation scripts</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">windows/</span>                     <span class="hl-dim">// NSIS installer script</span>
+<span class="hl-dim">|     +---</span> <span class="hl-green">linux/</span>                       <span class="hl-dim">// AppImage + DEB/RPM metadata</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">docs/</span>
+<span class="hl-dim">|     +---</span> <span class="hl-purple">index.html</span>                   <span class="hl-dim">// This documentation file</span>
+<span class="hl-dim">|     +---</span> <span class="hl-purple">PLANNING.html</span>                <span class="hl-dim">// Development roadmap (12 phases)</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-green">configure.ac</span>                     <span class="hl-dim">// Autoconf configuration</span>
+<span class="hl-dim">+---</span> <span class="hl-green">Makefile.am</span>                      <span class="hl-dim">// Top-level Automake</span>
+<span class="hl-dim">+---</span> <span class="hl-green">autogen.sh</span>                       <span class="hl-dim">// Bootstrap script (aclocal, autoconf, automake)</span></div>
+  </section>
+
+  <!-- ==================== 6. AUDIO PIPELINE ==================== -->
+  <section id="audio-pipeline" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">6</div>
+      <h2>Audio Pipeline</h2>
+    </div>
+
+    <p>
+      The audio pipeline is built on PortAudio for cross-platform audio I/O. The real-time
+      callback processes audio in fixed-size buffers (typically 256&ndash;1024 frames), reading
+      from track clips, applying DSP chains, and mixing to the master bus. A lock-free SPSC ring
+      buffer decouples the real-time audio thread from the UI and disk I/O threads.
+    </p>
+
+    <h3>PortAudio Callback Flow</h3>
+    <div class="diagram"><span class="hl-dim">PortAudio callback (RT thread, ~5ms period at 48kHz/256 frames)</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-cyan">1. Read audio clips</span>
+<span class="hl-dim">|     Each AudioTrack reads its active clip region into a buffer.</span>
+<span class="hl-dim">|     Clips reference source files via offset + length (non-destructive).</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-green">2. Apply DSP chain</span>
+<span class="hl-dim">|     Per-track DspChain processes audio through ordered effect inserts.</span>
+<span class="hl-dim">|     Effects: EQ, Compressor, Limiter, Gate, DeEsser, AGC, Reverb, etc.</span>
+<span class="hl-dim">|     Float64 internal precision, bypass toggle per effect.</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-yellow">3. Mix to buses</span>
+<span class="hl-dim">|     AudioMixer sums all tracks with per-track gain + pan.</span>
+<span class="hl-dim">|     Auxiliary sends route to aux buses (pre/post-fader).</span>
+<span class="hl-dim">|     Master bus applies final limiter.</span>
+<span class="hl-dim">|</span>
+<span class="hl-dim">+---</span> <span class="hl-purple">4. Output</span>
+<span class="hl-dim">      Master bus writes to PortAudio output buffer (speakers/headphones).</span>
+<span class="hl-dim">      Simultaneously feeds SPSC ring buffer for broadcast encoder.</span>
+<span class="hl-dim">      Optionally routes to Mcaster1AudioPipe virtual device.</span></div>
+
+    <div class="card">
+      <h4>SPSC Ring Buffer</h4>
+      <p>
+        The <code>RingBuffer</code> class provides a lock-free single-producer single-consumer
+        circular buffer using C++17 <code>std::atomic</code> with <code>memory_order_acquire</code>
+        / <code>memory_order_release</code> semantics. The RT audio thread writes mixed output;
+        the broadcast encoder thread reads it. No mutexes, no system calls, no priority inversion.
+      </p>
+    </div>
+
+    <div class="callout callout-success">
+      <div class="callout-icon">&#10003;</div>
+      <div>
+        <strong>Real-time safe.</strong>
+        The audio callback never allocates memory, never locks a mutex, and never performs disk I/O.
+        Audio data is pre-loaded by the AudioWorker thread into per-clip buffers. The callback only
+        reads, mixes, and writes &mdash; all bounded-time operations.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 7. VIDEO PIPELINE ==================== -->
+  <section id="video-pipeline" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">7</div>
+      <h2>Video Pipeline</h2>
+    </div>
+
+    <p>
+      Video processing is powered by FFmpeg (libav*). The decoder runs on a dedicated thread,
+      feeding decoded frames into a thread-safe queue. The video mixer composites multiple
+      layers with opacity and blend modes, while the subtitle renderer overlays SRT/ASS/VTT
+      text. During export or live broadcast, the encoder writes frames to container files or
+      streams.
+    </p>
+
+    <h3>Video Processing Chain</h3>
+    <div class="diagram"><span class="hl-cyan">VideoDecoder</span>                    <span class="hl-dim">// FFmpeg avcodec decode (HW: VideoToolbox / VAAPI / DXVA2)</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     v</span>
+<span class="hl-green">VideoTrack clips</span>                <span class="hl-dim">// Timeline clips with in/out points, playback rate</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     v</span>
+<span class="hl-yellow">VideoEffectChain</span>                <span class="hl-dim">// CrossDissolve, DipToBlack, ChromaKey, WipeLeft, etc.</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     v</span>
+<span class="hl-teal">VideoMixer</span>                      <span class="hl-dim">// Layer compositing (opacity, blend modes)</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-purple">SubtitleRenderer</span>        <span class="hl-dim">// SRT, ASS/SSA, VTT overlay</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-purple">GraphicsRenderer</span>        <span class="hl-dim">// Lower thirds, ticker, watermarks</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-green">VideoRenderer</span>           <span class="hl-dim">// Qt widget preview display</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-cyan">VideoEncoder</span>            <span class="hl-dim">// H.264, H.265, VP9, AV1 via FFmpeg</span>
+<span class="hl-dim">              |</span>
+<span class="hl-dim">              v</span>
+<span class="hl-yellow">         MuxerDemuxer</span>            <span class="hl-dim">// MP4, MKV, WebM, MOV container output</span></div>
+
+    <div class="card">
+      <h4>Hardware Acceleration</h4>
+      <p>
+        Video decoding uses hardware acceleration when available: <strong>VideoToolbox</strong>
+        on macOS, <strong>VAAPI</strong> on Linux, and <strong>DXVA2</strong> on Windows. The
+        platform abstraction layer in <code>platform/macos_video.h</code> manages device
+        selection. Hardware acceleration is optional &mdash; the decoder falls back to software
+        (libavcodec) automatically.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 8. SUPPORTED FORMATS ==================== -->
+  <section id="formats" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">8</div>
+      <h2>Supported Formats</h2>
+    </div>
+
+    <h3>Audio Formats</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Codec</th>
+            <th>Extension</th>
+            <th>Import</th>
+            <th>Export</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>WAV</strong></td>
+            <td>PCM (16/24/32-bit)</td>
+            <td>.wav</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Lossless, uncompressed. Default recording format.</td>
+          </tr>
+          <tr>
+            <td><strong>FLAC</strong></td>
+            <td>FLAC</td>
+            <td>.flac</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Lossless, compressed. ~60% of WAV size.</td>
+          </tr>
+          <tr>
+            <td><strong>MP3</strong></td>
+            <td>LAME MP3</td>
+            <td>.mp3</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Lossy. 64&ndash;320 kbps VBR/CBR. Podcast standard.</td>
+          </tr>
+          <tr>
+            <td><strong>AAC</strong></td>
+            <td>FDK-AAC / FFmpeg AAC</td>
+            <td>.m4a, .aac</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Lossy. Better quality than MP3 at same bitrate.</td>
+          </tr>
+          <tr>
+            <td><strong>Ogg Vorbis</strong></td>
+            <td>libvorbis</td>
+            <td>.ogg</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Open source lossy. Icecast default format.</td>
+          </tr>
+          <tr>
+            <td><strong>Opus</strong></td>
+            <td>libopus</td>
+            <td>.opus</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td>Modern lossy. Excellent at low bitrates. WebRTC standard.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Video Formats</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Container</th>
+            <th>Video Codecs</th>
+            <th>Extension</th>
+            <th>Import</th>
+            <th>Export</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>MP4</strong></td>
+            <td>H.264, H.265, AAC</td>
+            <td>.mp4</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+          </tr>
+          <tr>
+            <td><strong>MKV</strong></td>
+            <td>H.264, H.265, VP9, AV1, Opus</td>
+            <td>.mkv</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+          </tr>
+          <tr>
+            <td><strong>WebM</strong></td>
+            <td>VP9, AV1, Opus</td>
+            <td>.webm</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+          </tr>
+          <tr>
+            <td><strong>MOV</strong></td>
+            <td>H.264, ProRes, AAC</td>
+            <td>.mov</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-complete">Yes</span></td>
+          </tr>
+          <tr>
+            <td><strong>AVI</strong></td>
+            <td>Various (FFmpeg)</td>
+            <td>.avi</td>
+            <td><span class="badge badge-complete">Yes</span></td>
+            <td><span class="badge badge-planned">No</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Subtitle Formats</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extension</th>
+            <th>Features</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>SRT</strong></td>
+            <td>.srt</td>
+            <td>Simple timed text. Most widely supported.</td>
+          </tr>
+          <tr>
+            <td><strong>ASS / SSA</strong></td>
+            <td>.ass, .ssa</td>
+            <td>Advanced styling: fonts, colors, positioning, animations.</td>
+          </tr>
+          <tr>
+            <td><strong>WebVTT</strong></td>
+            <td>.vtt</td>
+            <td>Web standard. Cue settings, CSS-like styling.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== 9. EFFECTS & DSP ==================== -->
+  <section id="effects-dsp" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">9</div>
+      <h2>Effects &amp; DSP</h2>
+    </div>
+
+    <p>
+      DAWCast includes 10 built-in audio effects and 10 video transitions. All audio effects
+      implement the <code>IEffectUnit</code> interface and process audio in Float64 precision.
+      Video transitions implement the <code>IVideoEffect</code> interface.
+    </p>
+
+    <h3>Audio Effects (10)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Effect</th>
+            <th>Class</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Parametric EQ</strong></td>
+            <td><code>ParametricEQ</code></td>
+            <td>10-band parametric equalizer using RBJ biquad filter coefficients. Adjustable frequency, gain, and Q per band.</td>
+          </tr>
+          <tr>
+            <td><strong>31-Band Graphic EQ</strong></td>
+            <td><code>GraphicEQ31</code></td>
+            <td>31-band graphic equalizer at ISO 1/3-octave center frequencies (20 Hz &ndash; 20 kHz).</td>
+          </tr>
+          <tr>
+            <td><strong>Compressor</strong></td>
+            <td><code>Compressor</code></td>
+            <td>Dynamics processor with adjustable threshold, ratio, attack, release, and soft knee.</td>
+          </tr>
+          <tr>
+            <td><strong>Limiter</strong></td>
+            <td><code>Limiter</code></td>
+            <td>Look-ahead brick-wall limiter for true peak prevention. Broadcast-safe output ceiling.</td>
+          </tr>
+          <tr>
+            <td><strong>Noise Gate</strong></td>
+            <td><code>NoiseGate</code></td>
+            <td>Gate with threshold, hold time, and range control. Eliminates background noise between speech.</td>
+          </tr>
+          <tr>
+            <td><strong>De-Esser</strong></td>
+            <td><code>DeEsser</code></td>
+            <td>Sibilance reduction via frequency-selective dynamic compression (4&ndash;8 kHz band).</td>
+          </tr>
+          <tr>
+            <td><strong>AGC</strong></td>
+            <td><code>AGC</code></td>
+            <td>Automatic gain control for broadcast-consistent output levels. Slow attack, medium release.</td>
+          </tr>
+          <tr>
+            <td><strong>Reverb</strong></td>
+            <td><code>Reverb</code></td>
+            <td>Algorithmic reverb with room size, damping, pre-delay, and wet/dry mix controls.</td>
+          </tr>
+          <tr>
+            <td><strong>Sonic Enhancer</strong></td>
+            <td><code>SonicEnhancer</code></td>
+            <td>BBE-style psychoacoustic enhancement using 3-band Linkwitz-Riley crossover with phase delay correction.</td>
+          </tr>
+          <tr>
+            <td><strong>Normalizer</strong></td>
+            <td><code>Normalizer</code></td>
+            <td>Peak and LUFS normalization to target level (e.g., -16 LUFS for Apple Podcasts, -14 LUFS for Spotify).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Video Transitions (10)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Transition</th>
+            <th>Class</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cross Dissolve</strong></td>
+            <td><code>CrossDissolve</code></td>
+            <td>Smooth opacity cross-fade between two clips. The most common video transition.</td>
+          </tr>
+          <tr>
+            <td><strong>Dip to Black</strong></td>
+            <td><code>DipToBlack</code></td>
+            <td>Fade out to solid black, then fade in to the next clip. Classic dramatic cut.</td>
+          </tr>
+          <tr>
+            <td><strong>Dip to White</strong></td>
+            <td><code>DipToWhite</code></td>
+            <td>Fade out to solid white, then fade in. Flash/dream sequence effect.</td>
+          </tr>
+          <tr>
+            <td><strong>Wipe Left</strong></td>
+            <td><code>WipeLeft</code></td>
+            <td>Horizontal wipe reveal from right to left with adjustable edge softness.</td>
+          </tr>
+          <tr>
+            <td><strong>Push Slide</strong></td>
+            <td><code>PushSlide</code></td>
+            <td>New clip pushes old clip off screen. Configurable direction (L/R/U/D).</td>
+          </tr>
+          <tr>
+            <td><strong>Zoom Through</strong></td>
+            <td><code>ZoomThrough</code></td>
+            <td>Zoom into clip A, emerge from clip B. Dynamic camera-style transition.</td>
+          </tr>
+          <tr>
+            <td><strong>Chroma Key</strong></td>
+            <td><code>ChromaKey</code></td>
+            <td>Green/blue screen removal with spill suppression and edge feathering.</td>
+          </tr>
+          <tr>
+            <td><strong>Luma Key</strong></td>
+            <td><code>LumaKey</code></td>
+            <td>Luminance-based transparency keying. Remove dark or light areas from foreground.</td>
+          </tr>
+          <tr>
+            <td><strong>Glitch Cut</strong></td>
+            <td><code>GlitchCut</code></td>
+            <td>Digital glitch effect with block displacement, color channel shift, and scan lines.</td>
+          </tr>
+          <tr>
+            <td><strong>Stinger Overlay</strong></td>
+            <td><code>StingerOverlay</code></td>
+            <td>Animated overlay transition for broadcast. Plays a stinger video clip over the cut point.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ==================== 10. BROADCASTING ==================== -->
+  <section id="broadcasting" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">10</div>
+      <h2>Broadcasting</h2>
+    </div>
+
+    <p>
+      DAWCast can stream live audio and video to Icecast2, Mcaster1DNAS, and RTMP servers.
+      The built-in stream encoder runs on a dedicated thread, reading from the master bus
+      ring buffer and encoding in real-time. ICY metadata (track title, artist) is pushed
+      automatically as content changes.
+    </p>
+
+    <div class="card">
+      <h4>Icecast / DNAS Integration</h4>
+      <ul>
+        <li><strong>Protocol:</strong> HTTP source client (Icecast2 protocol) and Mcaster1DNAS native protocol</li>
+        <li><strong>Codecs:</strong> MP3, Ogg Vorbis, Opus, AAC</li>
+        <li><strong>Metadata:</strong> ICY inline metadata with configurable update interval</li>
+        <li><strong>Multi-server:</strong> Simultaneous broadcast to up to 4 destinations</li>
+        <li><strong>Reconnect:</strong> Automatic reconnection on network failure with exponential backoff</li>
+        <li><strong>Archive:</strong> Simultaneous local recording of broadcast stream</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>RTMP Live Streaming</h4>
+      <ul>
+        <li><strong>Targets:</strong> YouTube Live, Twitch, Facebook Live, custom RTMP servers</li>
+        <li><strong>Video:</strong> H.264 encoding via FFmpeg with configurable bitrate and keyframe interval</li>
+        <li><strong>Audio:</strong> AAC encoding at 128&ndash;320 kbps</li>
+        <li><strong>Graphics:</strong> Lower thirds, ticker crawl, and watermarks composited into output</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h4>Broadcast Widgets</h4>
+      <ul>
+        <li><strong>Tally Light:</strong> ON AIR (red), STANDBY (yellow), OFF (dim) status indicator</li>
+        <li><strong>Broadcast Clock:</strong> Elapsed time, segment timers, countdown to next event</li>
+        <li><strong>Live Recorder:</strong> Archive the broadcast to a local file (WAV, FLAC, or MP3)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==================== 11. PODCASTING ==================== -->
+  <section id="podcasting" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">11</div>
+      <h2>Podcasting</h2>
+    </div>
+
+    <p>
+      DAWCast provides a complete podcast production workflow from recording to publishing.
+      The podcast module handles chapter markers, RSS feed generation, metadata embedding,
+      show notes authoring, loudness metering, and one-click export.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-item">
+        <div class="feature-icon">&#128214;</div>
+        <div>
+          <h4>Chapter Markers</h4>
+          <p>Add, edit, and delete chapter markers with titles, URLs, and artwork. Chapters are embedded in MP3 (ID3v2 CHAP/CTOC) and M4A on export.</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">&#128225;</div>
+        <div>
+          <h4>RSS Feed Generator</h4>
+          <p>Generates iTunes/Apple Podcasts-compatible RSS XML with episode metadata, enclosures, artwork, and categories.</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">&#127925;</div>
+        <div>
+          <h4>Loudness Metering</h4>
+          <p>LUFS measurement per ITU-R BS.1770-4. Target -16 LUFS (Apple Podcasts) or -14 LUFS (Spotify) with auto-normalization.</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">&#128221;</div>
+        <div>
+          <h4>Show Notes Editor</h4>
+          <p>Rich text show notes with HTML export. Links, timestamps, guest info, and sponsor sections.</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">&#128230;</div>
+        <div>
+          <h4>Podcast Exporter</h4>
+          <p>One-click render to MP3 or AAC with chapters, metadata, artwork, and loudness normalization applied.</p>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">&#9997;</div>
+        <div>
+          <h4>Metadata Editor</h4>
+          <p>Edit title, description, author, artwork, categories, and episode type (full, trailer, bonus).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 12. THEME ENGINE ==================== -->
+  <section id="theme-engine" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">12</div>
+      <h2>Theme Engine</h2>
+    </div>
+
+    <p>
+      DAWCast includes a YAML-driven theme engine that supports hot-swappable theme packs.
+      Each theme is a directory containing a <code>theme.yaml</code> configuration file and a
+      <code>style.qss</code> Qt stylesheet. The theme engine reads YAML variables and performs
+      string substitution into the QSS template, enabling dynamic color and style changes
+      without recompilation.
+    </p>
+
+    <h3>Theme Pack Structure</h3>
+    <pre><code>themes/
+  Default/
+    theme.yaml          # Theme name, author, color variables
+    style.qss           # Qt stylesheet with {{variable}} placeholders
+  DarkStudio/
+    theme.yaml
+    style.qss
+  BroadcastPro/
+    theme.yaml
+    style.qss</code></pre>
+
+    <h3>Included Themes</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Theme</th>
+            <th>Style</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Default</strong></td>
+            <td>Light/neutral</td>
+            <td>Clean, neutral color palette suitable for extended editing sessions.</td>
+          </tr>
+          <tr>
+            <td><strong>DarkStudio</strong></td>
+            <td>Dark</td>
+            <td>Dark theme inspired by professional DAW interfaces. Low-contrast for studio environments.</td>
+          </tr>
+          <tr>
+            <td><strong>BroadcastPro</strong></td>
+            <td>Dark/teal</td>
+            <td>Navy and teal broadcast studio theme matching the Mcaster1 ecosystem visual identity.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Creating a Custom Theme</h3>
+    <pre><code># 1. Copy an existing theme as a starting point
+cp -r themes/Default themes/MyCustomTheme
+
+# 2. Edit theme.yaml to define your colors
+#    Variables like {{bg_primary}}, {{accent_color}}, {{text_color}}
+#    are substituted into style.qss at load time
+
+# 3. Edit style.qss with Qt widget selectors
+#    Use {{variable_name}} placeholders for colors
+
+# 4. Select your theme in Preferences &gt; Appearance</code></pre>
+
+    <div class="callout callout-info">
+      <div class="callout-icon">&#8505;</div>
+      <div>
+        <strong>Runtime switching.</strong>
+        Themes can be switched at runtime without restarting. The ThemeEngine class watches
+        the theme directory and reloads QSS when files change, making theme development
+        interactive.
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 13. PLATFORM SUPPORT ==================== -->
+  <section id="platform-support" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">13</div>
+      <h2>Platform Support</h2>
+    </div>
+
+    <p>
+      Mcaster1DAWCast targets all three major desktop platforms. The autotools build system
+      and Qt 6 GUI framework provide cross-platform compatibility. Platform-specific code
+      is isolated in the <code>platform/</code> directory.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Platform</th>
+            <th>Audio Backend</th>
+            <th>Video HW Accel</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>macOS</strong> (arm64 + x86_64)</td>
+            <td>PortAudio (CoreAudio)</td>
+            <td>VideoToolbox</td>
+            <td><span class="badge badge-active">Primary</span></td>
+          </tr>
+          <tr>
+            <td><strong>Windows</strong> (x86_64)</td>
+            <td>PortAudio (WASAPI / DirectSound)</td>
+            <td>DXVA2 / D3D11VA</td>
+            <td><span class="badge badge-planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td><strong>Linux</strong> (x86_64)</td>
+            <td>PortAudio (ALSA / PulseAudio / PipeWire)</td>
+            <td>VAAPI / VDPAU</td>
+            <td><span class="badge badge-planned">Planned</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h4>Platform-Specific Files</h4>
+      <ul>
+        <li><code>platform/macos_audio.h / .mm</code> &mdash; CoreAudio device discovery and AudioPipe integration (Objective-C++)</li>
+        <li><code>platform/macos_video.h / .mm</code> &mdash; VideoToolbox hardware acceleration setup</li>
+        <li><code>platform/device_discovery.h / .mm</code> &mdash; Audio/video device enumeration</li>
+        <li><code>platform/worker_pool.h / .cpp</code> &mdash; Thread pool for parallel processing (cross-platform)</li>
+        <li><code>platform/compat.h</code> &mdash; Cross-platform compatibility macros and type definitions</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==================== 14. ECOSYSTEM INTEGRATION ==================== -->
+  <section id="ecosystem" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">14</div>
+      <h2>Ecosystem Integration</h2>
+    </div>
+
+    <p>
+      Mcaster1DAWCast integrates with the broader Mcaster1 broadcast stack. Each component
+      is a standalone application that connects through standard audio interfaces, streaming
+      protocols, and file formats.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Role</th>
+            <th>DAWCast Integration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Mcaster1AudioPipe</strong></td>
+            <td>Virtual Audio Routing</td>
+            <td>DAWCast outputs master bus to AudioPipe virtual devices for zero-latency routing to other applications (DSPEncoder, AMP).</td>
+          </tr>
+          <tr>
+            <td><strong>Mcaster1DSPEncoder</strong></td>
+            <td>Broadcast Encoder</td>
+            <td>DAWCast can route audio to DSPEncoder via AudioPipe for professional broadcast chain (EQ &rarr; AGC &rarr; encode &rarr; stream).</td>
+          </tr>
+          <tr>
+            <td><strong>Mcaster1AMP</strong></td>
+            <td>Media Player</td>
+            <td>AMP can output to AudioPipe; DAWCast can record from AudioPipe inputs, capturing AMP playback as source material.</td>
+          </tr>
+          <tr>
+            <td><strong>Mcaster1DNAS</strong></td>
+            <td>Streaming Server</td>
+            <td>DAWCast streams directly to DNAS using the built-in stream encoder. ICY metadata is pushed with track info.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Integration Flow</h3>
+    <div class="diagram"><span class="hl-teal">Mcaster1DAWCast</span> (Production Studio)
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-cyan">Mcaster1AudioPipe</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-green">Mcaster1DSPEncoder</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-yellow">Mcaster1DNAS</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-purple">Listeners</span>
+<span class="hl-dim">     |        (virtual routing)       (broadcast encoding)       (distribution)</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-green">Built-in Encoder</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-yellow">Icecast2 / RTMP</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-purple">Listeners / Viewers</span>
+<span class="hl-dim">     |        (direct streaming)</span>
+<span class="hl-dim">     |</span>
+<span class="hl-dim">     +---&gt;</span> <span class="hl-cyan">Podcast Export</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-green">RSS Feed</span>  <span class="hl-dim">---&gt;</span>  <span class="hl-yellow">Apple Podcasts / Spotify / etc.</span></div>
+  </section>
+
+  <!-- ==================== 15. LICENSE ==================== -->
+  <section id="license" class="doc-section">
+    <div class="section-header">
+      <div class="section-number">15</div>
+      <h2>License</h2>
+    </div>
+
+    <div class="card">
+      <h4>GNU General Public License v2.0 or later</h4>
+      <p>
+        Mcaster1DAWCast is free software: you can redistribute it and/or modify it under the
+        terms of the GNU General Public License as published by the Free Software Foundation,
+        either version 2 of the License, or (at your option) any later version.
+      </p>
+      <p>
+        This program is distributed in the hope that it will be useful, but WITHOUT ANY
+        WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+        PARTICULAR PURPOSE. See the GNU General Public License for more details.
+      </p>
+      <pre><code>Copyright (C) 2026 David St. John
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.</code></pre>
+    </div>
+
+    <h3>Third-Party Dependencies</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Library</th>
+            <th>License</th>
+            <th>Usage</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Qt 6</strong></td>
+            <td>LGPL-3.0 / Commercial</td>
+            <td>GUI framework (Widgets, SVG, Multimedia)</td>
+          </tr>
+          <tr>
+            <td><strong>PortAudio</strong></td>
+            <td>MIT</td>
+            <td>Cross-platform audio I/O</td>
+          </tr>
+          <tr>
+            <td><strong>FFmpeg</strong></td>
+            <td>LGPL-2.1+ / GPL-2.0+</td>
+            <td>Video decode/encode, container handling</td>
+          </tr>
+          <tr>
+            <td><strong>libsamplerate</strong></td>
+            <td>BSD-2-Clause</td>
+            <td>High-quality sample rate conversion</td>
+          </tr>
+          <tr>
+            <td><strong>yaml-cpp</strong></td>
+            <td>MIT</td>
+            <td>YAML configuration and preset parsing</td>
+          </tr>
+          <tr>
+            <td><strong>nlohmann-json</strong></td>
+            <td>MIT</td>
+            <td>JSON project file serialization</td>
+          </tr>
+          <tr>
+            <td><strong>LAME</strong></td>
+            <td>LGPL-2.0</td>
+            <td>MP3 encoding</td>
+          </tr>
+          <tr>
+            <td><strong>libvorbis / libogg</strong></td>
+            <td>BSD-3-Clause</td>
+            <td>Ogg Vorbis encoding/decoding</td>
+          </tr>
+          <tr>
+            <td><strong>libopus</strong></td>
+            <td>BSD-3-Clause</td>
+            <td>Opus encoding/decoding</td>
+          </tr>
+          <tr>
+            <td><strong>libflac</strong></td>
+            <td>BSD-3-Clause</td>
+            <td>FLAC encoding/decoding</td>
+          </tr>
+          <tr>
+            <td><strong>FDK-AAC</strong></td>
+            <td>FDK License (non-GPL)</td>
+            <td>AAC encoding (optional, not linked by default)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<!-- =============================== FOOTER =============================== -->
+<footer class="footer">
+  <p>
+    Mcaster1DAWCast v1.0.0-alpha &mdash; Broadcast-Grade Digital Audio Workstation
+    &bull; Copyright &copy; 2026 <a href="mailto:davestj@gmail.com">David St. John</a>
+    &bull; Licensed under <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html">GPL-2.0-or-later</a>
+  </p>
+  <p style="margin-top: 0.5rem;">
+    Part of the <a href="https://mcaster1.com">Mcaster1</a> broadcast ecosystem.
+  </p>
+</footer>
+
+<!-- -- Active nav highlight -- -->
+<script>
+  (function() {
+    var navItems = document.querySelectorAll('.nav-item');
+    var sections = [];
+    navItems.forEach(function(item) {
+      var id = item.getAttribute('href');
+      if (id && id.startsWith('#')) {
+        var el = document.querySelector(id);
+        if (el) sections.push({ el: el, nav: item });
+      }
+    });
+
+    function updateActive() {
+      var current = null;
+      var scrollY = window.scrollY + 100;
+      for (var i = sections.length - 1; i >= 0; i--) {
+        if (sections[i].el.offsetTop <= scrollY) {
+          current = sections[i];
+          break;
+        }
+      }
+      navItems.forEach(function(n) { n.classList.remove('active'); });
+      if (current) current.nav.classList.add('active');
+    }
+
+    window.addEventListener('scroll', updateActive, { passive: true });
+    updateActive();
+
+    // Close mobile sidebar on nav click
+    navItems.forEach(function(item) {
+      item.addEventListener('click', function() {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('open');
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>

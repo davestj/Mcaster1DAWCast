@@ -1,0 +1,20 @@
+# Podcast AAC — Higher quality podcast format
+name: "Podcast AAC"
+description: "96kbps HE-AAC v2 in M4A — smaller files, better quality at low bitrates"
+
+audio:
+  codec: "aac"
+  profile: "he-aac-v2"
+  bitrate_kbps: 96
+  sample_rate: 44100
+  channels: 2
+
+video:
+  enabled: false
+
+container: "m4a"
+
+metadata:
+  write_mp4_atoms: true
+  write_chapters: true
+  write_artwork: true

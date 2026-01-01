@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { font-family: -apple-system, Helvetica Neue, Arial, sans-serif; font-size: 13px; color: #333; line-height: 1.5; }
+h2 { font-size: 16px; color: #1a1a1a; }
+h3 { font-size: 13px; color: #555; margin-bottom: 4px; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e0e0e0; font-size: 12px; }
+th { background: #f5f5f5; font-weight: 600; }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+.note { background: #FFF8E1; border-left: 3px solid #FFC107; padding: 8px 12px; margin: 12px 0; font-size: 12px; }
+.footer { margin-top: 16px; font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+
+<h2>What Gets Installed</h2>
+
+<table>
+  <tr><th>Component</th><th>Location</th><th>Purpose</th></tr>
+  <tr>
+    <td><strong>Mcaster1DAWCast.app</strong></td>
+    <td><code>/Applications/</code></td>
+    <td>Main application &mdash; multi-channel DAW</td>
+  </tr>
+  <tr>
+    <td><strong>Portable copy</strong></td>
+    <td><code>~/Mcaster1/Mcaster1DAWCast/</code></td>
+    <td>Self-contained copy with config, data, and logs</td>
+  </tr>
+</table>
+
+<h3>Bundled Resources</h3>
+
+<table>
+  <tr><th>Resource</th><th>Description</th></tr>
+  <tr><td>Themes</td><td>BroadcastPro, DarkStudio, Default &mdash; QSS stylesheets with assets</td></tr>
+  <tr><td>DSP Presets</td><td>Broadcast Chain, Music Master, Podcast Voice, Spoken Word</td></tr>
+  <tr><td>Export Profiles</td><td>Broadcast WAV, Podcast MP3, Podcast AAC, YouTube 1080p, WebM VP9</td></tr>
+  <tr><td>Documentation</td><td>Getting started guide and feature reference</td></tr>
+</table>
+
+<div class="note">
+  <strong>Note:</strong> This installer creates a portable application layout. All configuration,
+  project data, and logs are stored inside the application directory. No files are written to
+  <code>~/Library/Application Support/</code> or other system locations.
+</div>
+
+<h2>System Requirements</h2>
+
+<table>
+  <tr><th>Requirement</th><th>Minimum</th></tr>
+  <tr><td>macOS</td><td>13.0 Ventura or later</td></tr>
+  <tr><td>Processor</td><td>Apple Silicon (M1/M2/M3/M4) or Intel x86_64</td></tr>
+  <tr><td>Disk Space</td><td>~200 MB (plus project storage)</td></tr>
+  <tr><td>RAM</td><td>8 GB (16 GB recommended for large sessions)</td></tr>
+  <tr><td>Audio</td><td>CoreAudio-compatible audio interface</td></tr>
+</table>
+
+<h2>Dependencies</h2>
+
+<table>
+  <tr><th>Library</th><th>Purpose</th></tr>
+  <tr><td>Qt 6</td><td>GUI framework, multimedia, and networking</td></tr>
+  <tr><td>FFmpeg</td><td>Audio/video codec support</td></tr>
+  <tr><td>PortAudio</td><td>Cross-platform audio I/O</td></tr>
+  <tr><td>libsndfile</td><td>Audio file reading/writing</td></tr>
+  <tr><td>Rubberband</td><td>Time-stretching and pitch-shifting</td></tr>
+  <tr><td>SQLite3</td><td>Project and media database</td></tr>
+  <tr><td>libyaml</td><td>Configuration file parsing</td></tr>
+</table>
+
+<p>All dependencies are bundled inside the application bundle. No additional software installation is required.</p>
+
+<h2>Uninstall</h2>
+
+<p>To remove Mcaster1DAWCast:</p>
+<ol>
+  <li>Delete <code>/Applications/Mcaster1DAWCast.app</code></li>
+  <li>Delete <code>~/Mcaster1/Mcaster1DAWCast/</code> (includes config and project data)</li>
+</ol>
+
+<p class="footer">mcaster1.com</p>
+
+</body>
+</html>

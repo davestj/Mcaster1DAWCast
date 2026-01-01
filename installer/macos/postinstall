@@ -1,0 +1,29 @@
+#!/bin/bash
+# postinstall — Mcaster1DAWCast PKG post-installation script
+# Creates writable data directories and portable home copy.
+
+set -e
+
+APP_PATH="/Applications/Mcaster1DAWCast.app"
+RESOURCES="$APP_PATH/Contents/Resources"
+
+# Create writable data directories inside the app bundle
+mkdir -p "$RESOURCES/config" "$RESOURCES/data" "$RESOURCES/logs"
+chmod -R a+rw "$RESOURCES/config" "$RESOURCES/data" "$RESOURCES/logs" 2>/dev/null || true
+
+# Copy to portable home directory
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(eval echo "~$REAL_USER")
+
+if [ -n "$REAL_HOME" ] && [ "$REAL_HOME" != "/" ]; then
+    USER_DIR="$REAL_HOME/Mcaster1/Mcaster1DAWCast"
+    mkdir -p "$USER_DIR"
+    rm -rf "$USER_DIR/Mcaster1DAWCast.app" 2>/dev/null
+    cp -R "$APP_PATH" "$USER_DIR/"
+    chown -R "$REAL_USER" "$USER_DIR" 2>/dev/null || true
+fi
+
+# Register with Launch Services
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -f "$APP_PATH" 2>/dev/null || true
+
+exit 0

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- JIT compilation for real-time DSP and scripting engines -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- Disable library validation for loading third-party audio plugins (VST/AU/CLAP) -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Audio input access for recording and monitoring -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+
+    <!-- Camera access for video recording tracks -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
+
+    <!-- Network server for remote control, OSC, and MIDI network sessions -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- Network client for streaming output, cloud sync, and update checks -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Read/write access to user-selected files (projects, media import/export) -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+</dict>
+</plist>

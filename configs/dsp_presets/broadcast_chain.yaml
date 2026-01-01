@@ -1,0 +1,49 @@
+# Broadcast Chain — Standard broadcast audio processing chain
+# Apply to voice tracks for consistent on-air sound.
+
+name: "Broadcast Chain"
+description: "Standard broadcast voice processing: gate → EQ → compressor → enhancer → limiter"
+author: "Mcaster1"
+
+effects:
+  - id: "com.mcaster1.dawcast.fx.noise_gate"
+    bypass: false
+    params:
+      threshold_db: -40.0
+      attack_ms: 0.5
+      hold_ms: 100.0
+      release_ms: 200.0
+      range_db: -60.0
+
+  - id: "com.mcaster1.dawcast.fx.parametric_eq"
+    bypass: false
+    params:
+      band_0: { type: "high_pass", freq: 80, q: 0.707, gain_db: 0 }
+      band_1: { type: "peaking", freq: 180, q: 2.0, gain_db: -3.0 }
+      band_2: { type: "peaking", freq: 2500, q: 1.5, gain_db: 2.5 }
+      band_3: { type: "peaking", freq: 5000, q: 2.0, gain_db: 1.5 }
+      band_4: { type: "high_shelf", freq: 10000, q: 0.707, gain_db: -1.0 }
+
+  - id: "com.mcaster1.dawcast.fx.compressor"
+    bypass: false
+    params:
+      threshold_db: -20.0
+      ratio: 4.0
+      attack_ms: 5.0
+      release_ms: 150.0
+      makeup_db: 8.0
+      knee_db: 6.0
+
+  - id: "com.mcaster1.dawcast.fx.sonic_enhancer"
+    bypass: false
+    params:
+      low_contour: 0.4
+      process_amount: 0.5
+      presence: 0.3
+
+  - id: "com.mcaster1.dawcast.fx.limiter"
+    bypass: false
+    params:
+      ceiling_db: -0.3
+      release_ms: 50.0
+      lookahead_ms: 1.5

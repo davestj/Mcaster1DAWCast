@@ -1,0 +1,166 @@
+/* Mcaster1DAWCast — Default Theme
+ * Uses system palette colors with minimal overrides.
+ * Variables like ${accent} are substituted by ThemeEngine from theme.yaml.
+ */
+
+/* ── Global ────────────────────────────────────────────────────────── */
+
+QMainWindow {
+    background-color: ${primary};
+}
+
+QDockWidget {
+    titlebar-close-icon: url(:/icons/close.svg);
+    titlebar-normal-icon: url(:/icons/undock.svg);
+}
+
+QDockWidget::title {
+    background-color: ${secondary};
+    padding: 4px;
+    border-bottom: 1px solid ${border};
+}
+
+/* ── Transport Bar ─────────────────────────────────────────────────── */
+
+#TransportBar {
+    background-color: ${transport_bg};
+    border-top: 1px solid ${border};
+    padding: 4px;
+}
+
+#TransportBar QPushButton {
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 4px;
+    border: 1px solid ${border};
+    background-color: ${secondary};
+    color: ${text_primary};
+}
+
+#TransportBar QPushButton:hover {
+    background-color: ${accent};
+}
+
+#TransportBar QPushButton:pressed {
+    background-color: ${highlight};
+}
+
+#TransportBar QPushButton#recordButton {
+    color: ${meter_red};
+    font-weight: bold;
+}
+
+#TransportBar QPushButton#recordButton:checked {
+    background-color: ${meter_red};
+    color: white;
+}
+
+/* ── Timeline ──────────────────────────────────────────────────────── */
+
+#TimelineWidget {
+    background-color: ${timeline_bg};
+}
+
+/* ── Track Headers ─────────────────────────────────────────────────── */
+
+#TrackHeaderWidget {
+    background-color: ${track_header_bg};
+    border-right: 1px solid ${border};
+    padding: 2px;
+}
+
+/* ── Mixer ─────────────────────────────────────────────────────────── */
+
+#MixerWidget {
+    background-color: ${secondary};
+    border-top: 1px solid ${border};
+}
+
+QSlider::groove:vertical {
+    width: 6px;
+    background-color: ${border};
+    border-radius: 3px;
+}
+
+QSlider::handle:vertical {
+    height: 16px;
+    width: 20px;
+    background-color: ${accent};
+    border-radius: 3px;
+    margin: 0 -7px;
+}
+
+/* ── Menus ─────────────────────────────────────────────────────────── */
+
+QMenuBar {
+    background-color: ${primary};
+    color: ${text_primary};
+}
+
+QMenuBar::item:selected {
+    background-color: ${accent};
+}
+
+QMenu {
+    background-color: ${secondary};
+    color: ${text_primary};
+    border: 1px solid ${border};
+}
+
+QMenu::item:selected {
+    background-color: ${accent};
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────── */
+
+QTabWidget::pane {
+    border: 1px solid ${border};
+}
+
+QTabBar::tab {
+    background-color: ${secondary};
+    color: ${text_secondary};
+    padding: 6px 12px;
+    border: 1px solid ${border};
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: ${primary};
+    color: ${text_primary};
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────────── */
+
+QScrollBar:vertical {
+    width: 10px;
+    background-color: ${secondary};
+}
+
+QScrollBar::handle:vertical {
+    background-color: ${border};
+    border-radius: 4px;
+    min-height: 20px;
+}
+
+QScrollBar:horizontal {
+    height: 10px;
+    background-color: ${secondary};
+}
+
+QScrollBar::handle:horizontal {
+    background-color: ${border};
+    border-radius: 4px;
+    min-width: 20px;
+}
+
+/* ── Tooltips ──────────────────────────────────────────────────────── */
+
+QToolTip {
+    background-color: ${secondary};
+    color: ${text_primary};
+    border: 1px solid ${border};
+    padding: 4px;
+}

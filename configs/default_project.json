@@ -1,0 +1,70 @@
+{
+  "dawcast_version": "1.0.0-alpha",
+  "project": {
+    "name": "Untitled Project",
+    "created": "",
+    "modified": "",
+    "author": "",
+    "sample_rate": 48000,
+    "bit_depth": 32,
+    "channels": 2,
+    "video_resolution": [1920, 1080],
+    "video_framerate": 30.0,
+    "tempo_bpm": 120.0,
+    "notes": ""
+  },
+  "timeline": {
+    "duration_samples": 0,
+    "playhead_samples": 0,
+    "loop_enabled": false,
+    "loop_in_samples": 0,
+    "loop_out_samples": 0,
+    "zoom_level": 1.0,
+    "scroll_position": 0,
+    "audio_tracks": [],
+    "video_tracks": [],
+    "markers": []
+  },
+  "master": {
+    "volume_db": 0.0,
+    "effects": []
+  },
+  "graphics_overlays": [],
+  "subtitles": [],
+  "podcast_metadata": {
+    "title": "",
+    "subtitle": "",
+    "author": "",
+    "description": "",
+    "category": "Technology",
+    "explicit": false,
+    "language": "en-US",
+    "artwork_path": "",
+    "keywords": [],
+    "season": 1,
+    "episode": 1,
+    "episode_type": "full"
+  },
+  "export_settings": {
+    "last_used": "podcast_mp3",
+    "custom": {
+      "audio_codec": "mp3",
+      "audio_bitrate_kbps": 192,
+      "audio_sample_rate": 44100,
+      "audio_channels": 2,
+      "video_codec": "h264",
+      "video_bitrate_kbps": 5000,
+      "video_resolution": [1920, 1080],
+      "video_framerate": 30.0,
+      "container": "mp4"
+    }
+  },
+  "ui_state": {
+    "window_geometry": "",
+    "dock_state": "",
+    "timeline_zoom": 1.0,
+    "mixer_visible": true,
+    "video_preview_visible": true,
+    "effects_rack_visible": false
+  }
+}

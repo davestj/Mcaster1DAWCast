@@ -1,0 +1,12 @@
+mcaster1dawcast (1.0.0~alpha-1) unstable; urgency=low
+
+  * Initial release.
+  * Multi-track audio recording and editing.
+  * Video editing with FFmpeg backend.
+  * Live broadcasting to Icecast/DNAS/RTMP.
+  * Podcast production with chapters, RSS, loudness metering.
+  * Broadcast graphics: lower thirds, ticker, overlays, watermarks.
+  * 10 audio DSP effects, 10 video transitions.
+  * Theme engine with 3 included themes.
+
+ -- David St. John <davestj@gmail.com>  Wed, 02 Apr 2026 12:00:00 -0700

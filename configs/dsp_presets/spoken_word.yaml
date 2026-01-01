@@ -1,0 +1,38 @@
+# Spoken Word — Clean processing for audiobooks, narration, talk radio
+# Focused on clarity and intelligibility with minimal coloration.
+
+name: "Spoken Word"
+description: "Clean vocal chain: gate → EQ → AGC → limiter"
+author: "Mcaster1"
+
+effects:
+  - id: "com.mcaster1.dawcast.fx.noise_gate"
+    bypass: false
+    params:
+      threshold_db: -50.0
+      attack_ms: 1.0
+      hold_ms: 200.0
+      release_ms: 400.0
+      range_db: -30.0
+
+  - id: "com.mcaster1.dawcast.fx.parametric_eq"
+    bypass: false
+    params:
+      band_0: { type: "high_pass", freq: 80, q: 0.707, gain_db: 0 }
+      band_1: { type: "peaking", freq: 250, q: 1.0, gain_db: -2.0 }
+      band_2: { type: "peaking", freq: 3000, q: 1.0, gain_db: 1.5 }
+
+  - id: "com.mcaster1.dawcast.fx.agc"
+    bypass: false
+    params:
+      target_db: -18.0
+      attack_ms: 1000.0
+      release_ms: 5000.0
+      max_gain_db: 20.0
+
+  - id: "com.mcaster1.dawcast.fx.limiter"
+    bypass: false
+    params:
+      ceiling_db: -0.5
+      release_ms: 80.0
+      lookahead_ms: 1.5

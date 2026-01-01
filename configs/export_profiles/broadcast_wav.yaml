@@ -1,0 +1,18 @@
+# Broadcast WAV — Uncompressed broadcast-quality audio
+name: "Broadcast WAV"
+description: "48kHz 24-bit WAV — EBU standard for broadcast interchange"
+
+audio:
+  codec: "pcm_s24le"
+  bit_depth: 24
+  sample_rate: 48000
+  channels: 2
+
+video:
+  enabled: false
+
+container: "wav"
+
+metadata:
+  write_bwf: true
+  write_id3v2: false
