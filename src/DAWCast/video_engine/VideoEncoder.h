@@ -38,6 +38,9 @@ private:
     // FFmpeg opaque pointers
     void* m_formatCtx = nullptr;  // AVFormatContext*
     void* m_codecCtx  = nullptr;  // AVCodecContext*
+    void* m_swsCtx    = nullptr;  // SwsContext*
+    void* m_frame     = nullptr;  // AVFrame*
+    void* m_packet    = nullptr;  // AVPacket*
     int64_t m_frameIndex = 0;
 };
 

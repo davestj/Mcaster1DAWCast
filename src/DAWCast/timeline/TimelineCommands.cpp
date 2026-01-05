@@ -43,31 +43,41 @@ SplitClipCommand::SplitClipCommand(Clip* clip, int64_t splitPosition,
     , m_splitPosition(splitPosition)
     , m_originalSourceOut(clip ? clip->sourceOut() : 0)
 {
+    // Resolve the parent track so we can add/remove the new clip
+    if (m_originalClip) {
+        m_track = qobject_cast<AudioTrack*>(m_originalClip->parent());
+    }
 }
 
 void SplitClipCommand::undo()
 {
     if (!m_originalClip) return;
 
-    // Restore original clip's source out
+    // Restore original clip's source out to merge back
     m_originalClip->setSourceOut(m_originalSourceOut);
 
-    // TODO: Remove m_newClip from its track
-    if (m_newClip) {
-        delete m_newClip;
-        m_newClip = nullptr;
+    // Remove the right-side clip from the track
+    if (m_newClip && m_track) {
+        for (int i = 0; i < m_track->clipCount(); ++i) {
+            if (m_track->clip(i) == m_newClip) {
+                m_track->removeClip(i);
+                break;
+            }
+        }
     }
+    delete m_newClip;
+    m_newClip = nullptr;
 }
 
 void SplitClipCommand::redo()
 {
     if (!m_originalClip) return;
 
-    // Calculate split point relative to source
+    // Calculate split point relative to source media
     int64_t splitInSource = m_originalClip->sourceIn() +
         (m_splitPosition - m_originalClip->timelinePosition());
 
-    // Trim original clip's right edge
+    // Trim original clip's right edge to the split point
     m_originalClip->setSourceOut(splitInSource);
 
     // Create new clip for the right portion
@@ -77,8 +87,16 @@ void SplitClipCommand::redo()
     m_newClip->setSourceOut(m_originalSourceOut);
     m_newClip->setTimelinePosition(m_splitPosition);
     m_newClip->setGain(m_originalClip->gain());
+    m_newClip->setFadeIn(0);
+    m_newClip->setFadeOut(m_originalClip->fadeOut());
 
-    // TODO: Add m_newClip to the same track as m_originalClip
+    // Zero out the original clip's fade-out since it now ends at the split
+    m_originalClip->setFadeOut(0);
+
+    // Add the new clip to the same track
+    if (m_track) {
+        m_track->addClip(m_newClip);
+    }
 }
 
 // ─── TrimClipCommand ────────────────────────────────────────────────
@@ -140,8 +158,10 @@ void DeleteClipCommand::undo()
 void DeleteClipCommand::redo()
 {
     if (!m_track) return;
-    // TODO: Store clip reference before removing
-    // m_clip = m_track->clip(m_clipIndex);
+    if (m_clipIndex < 0 || m_clipIndex >= m_track->clipCount()) return;
+
+    // Store clip reference before removing so undo can re-add it
+    m_clip = m_track->clip(m_clipIndex);
     m_track->removeClip(m_clipIndex);
     m_ownsClip = true;
 }

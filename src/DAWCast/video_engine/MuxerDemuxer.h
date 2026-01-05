@@ -36,8 +36,9 @@ public:
     [[nodiscard]] bool isOutputOpen() const { return m_outputOpen; }
 
 private:
-    bool m_inputOpen  = false;
-    bool m_outputOpen = false;
+    bool m_inputOpen     = false;
+    bool m_outputOpen    = false;
+    bool m_headerWritten = false;
 
     // FFmpeg opaque pointers
     void* m_inputFmtCtx  = nullptr;  // AVFormatContext* for demux

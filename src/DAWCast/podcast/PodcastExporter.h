@@ -6,10 +6,14 @@
 
 #include <QObject>
 #include <QString>
+#include <QDateTime>
 
 namespace dawcast {
 
-class ProjectManager; // forward declaration
+class ProjectManager;
+class MetadataEditor;
+class ChapterEditor;
+class RSSGenerator;
 
 class PodcastExporter : public QObject
 {
@@ -23,6 +27,10 @@ public:
     void setOutputPath(const QString &path);
     void setAudioFormat(const QString &codec, int bitrate);
 
+    MetadataEditor* metadataEditor() const { return m_metadataEditor; }
+    ChapterEditor*  chapterEditor()  const { return m_chapterEditor; }
+    RSSGenerator*   rssGenerator()   const { return m_rssGenerator; }
+
     void exportEpisode();
 
 Q_SIGNALS:
@@ -31,10 +39,13 @@ Q_SIGNALS:
     void error(const QString &message);
 
 private:
-    ProjectManager *m_project{nullptr};
-    QString m_outputPath;
-    QString m_codec;
-    int m_bitrate{192};
+    ProjectManager  *m_project{nullptr};
+    MetadataEditor  *m_metadataEditor{nullptr};
+    ChapterEditor   *m_chapterEditor{nullptr};
+    RSSGenerator    *m_rssGenerator{nullptr};
+    QString          m_outputPath;
+    QString          m_codec;
+    int              m_bitrate{192};
 };
 
 } // namespace dawcast

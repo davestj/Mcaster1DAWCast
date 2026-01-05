@@ -12,6 +12,8 @@ class VideoPreview : public QWidget {
     Q_OBJECT
 
 public:
+    enum class ScaleMode { Fit, ActualSize, Half, Double };
+
     explicit VideoPreview(QWidget* parent = nullptr);
     ~VideoPreview() override;
 
@@ -20,10 +22,13 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
-    QImage m_frame;
-    bool   m_playing = false;
+    QImage    m_frame;
+    bool      m_playing   = false;
+    ScaleMode m_scaleMode = ScaleMode::Fit;
 };
 
 } // namespace dawcast::widgets

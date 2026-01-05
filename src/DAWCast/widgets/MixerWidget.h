@@ -6,7 +6,9 @@
 #include <QWidget>
 #include <QHBoxLayout>
 
-namespace dawcast::audio_engine { class AudioMixer; }
+class QFrame;
+
+namespace dawcast { class AudioMixer; }
 
 namespace dawcast::widgets {
 
@@ -17,17 +19,19 @@ public:
     explicit MixerWidget(QWidget* parent = nullptr);
     ~MixerWidget() override;
 
-    void setMixer(audio_engine::AudioMixer* mixer);
+    void setMixer(AudioMixer* mixer);
     void addStrip();
     void removeStrip(int index);
 
     int stripCount() const;
 
 private:
-    audio_engine::AudioMixer* m_mixer = nullptr;
+    AudioMixer* m_mixer = nullptr;
     int m_stripCount = 0;
 
-    QHBoxLayout* m_stripLayout = nullptr;
+    QHBoxLayout* m_stripLayout  = nullptr;
+    QFrame*      m_masterSeparator = nullptr;
+    QWidget*     m_masterStrip  = nullptr;
 };
 
 } // namespace dawcast::widgets

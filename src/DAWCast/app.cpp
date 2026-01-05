@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "app.h"
-// TODO: #include "audio_engine/AudioEngine.h"
-// TODO: #include "config/ThemeEngine.h"
-// TODO: #include "core/ProjectManager.h"
-// TODO: #include "config/AppConfig.h"
+#include "audio_engine/AudioEngine.h"
+#include "widgets/ThemeEngine.h"
+#include "core/ProjectManager.h"
+#include "config/AppConfig.h"
 
 namespace dawcast {
 
@@ -23,15 +23,25 @@ App* App::instance()
 App::App(QObject* parent)
     : QObject(parent)
 {
-    // TODO: Initialize subsystems
-    // m_appConfig      = new AppConfig(this);
-    // m_audioEngine    = new AudioEngine(this);
-    // m_themeEngine    = new ThemeEngine(this);
-    // m_projectManager = new ProjectManager(this);
+    // Initialize subsystems in dependency order:
+    // 1. Configuration first (other subsystems may read config values)
+    m_appConfig = dawcast::config::AppConfig::instance();
+
+    // 2. Theme engine (UI styling, loaded before widgets are created)
+    m_themeEngine = dawcast::widgets::ThemeEngine::instance();
+
+    // 3. Audio engine (PortAudio initialization, sample rate, buffer size)
+    m_audioEngine = new AudioEngine(this);
+
+    // 4. Project manager (depends on audio engine for sample rate defaults)
+    m_projectManager = new ProjectManager(this);
 }
 
 App::~App()
 {
+    // Audio engine and project manager are parented to this QObject,
+    // so they will be destroyed automatically by Qt's parent-child system.
+    // ThemeEngine and AppConfig are singletons managed by their own static lifetime.
     s_instance = nullptr;
 }
 

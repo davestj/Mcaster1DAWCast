@@ -7,7 +7,7 @@
 #include <QLineEdit>
 #include <QLabel>
 
-namespace dawcast::podcast { class MetadataEditor; }
+namespace dawcast { class MetadataEditor; }
 
 namespace dawcast::widgets {
 
@@ -18,10 +18,12 @@ public:
     explicit MetadataPanel(QWidget* parent = nullptr);
     ~MetadataPanel() override;
 
-    void setMetadataEditor(podcast::MetadataEditor* editor);
+    void setMetadataEditor(MetadataEditor* editor);
 
 private:
-    podcast::MetadataEditor* m_editor = nullptr;
+    void setArtworkPath(const QString& path);
+
+    MetadataEditor* m_editor = nullptr;
 
     QLineEdit* m_titleEdit   = nullptr;
     QLineEdit* m_artistEdit  = nullptr;

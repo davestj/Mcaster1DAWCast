@@ -7,6 +7,12 @@
 #include <QTabWidget>
 #include <QComboBox>
 
+class QSpinBox;
+class QCheckBox;
+class QLabel;
+class QTableWidget;
+class QFrame;
+
 namespace dawcast::widgets {
 
 class PreferencesDialog : public QDialog {
@@ -20,24 +26,35 @@ public:
     void saveSettings();
 
 private:
+    void updateLatencyLabel();
+
     QTabWidget* m_tabs = nullptr;
 
     // General tab
-    QWidget* m_generalTab = nullptr;
+    QWidget*   m_generalTab            = nullptr;
+    QComboBox* m_defaultSampleRateCombo = nullptr;
+    QComboBox* m_defaultBitDepthCombo  = nullptr;
+    QSpinBox*  m_autoSaveIntervalSpin  = nullptr;
 
     // Audio tab
     QComboBox* m_audioDeviceCombo  = nullptr;
     QComboBox* m_sampleRateCombo   = nullptr;
     QComboBox* m_bufferSizeCombo   = nullptr;
+    QLabel*    m_latencyLabel      = nullptr;
 
     // Video tab
-    QWidget* m_videoTab = nullptr;
+    QWidget*   m_videoTab              = nullptr;
+    QComboBox* m_videoResolutionCombo  = nullptr;
+    QComboBox* m_videoFramerateCombo   = nullptr;
+    QCheckBox* m_hwAccelCheck          = nullptr;
 
     // Theme tab
-    QComboBox* m_themeCombo = nullptr;
+    QComboBox* m_themeCombo   = nullptr;
+    QFrame*    m_themePreview = nullptr;
 
     // Shortcuts tab
-    QWidget* m_shortcutsTab = nullptr;
+    QWidget*       m_shortcutsTab   = nullptr;
+    QTableWidget*  m_shortcutsTable = nullptr;
 };
 
 } // namespace dawcast::widgets

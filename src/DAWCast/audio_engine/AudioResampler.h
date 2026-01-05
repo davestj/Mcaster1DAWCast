@@ -23,7 +23,10 @@ public:
                  int channels);
 
 private:
-    void* m_swrCtx = nullptr;  // SwrContext*
+    void* m_swrCtx = nullptr;  // SwrContext* (lazily initialized)
+    int   m_lastInRate   = 0;
+    int   m_lastOutRate  = 0;
+    int   m_lastChannels = 0;
 };
 
 } // namespace dawcast

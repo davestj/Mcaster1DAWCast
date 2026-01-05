@@ -17,9 +17,12 @@ struct PodcastEpisode {
     QString audioUrl;
     QString audioMimeType;
     int64_t audioLength{0};
-    int durationSeconds{0};
+    int     durationSeconds{0};
     QDateTime pubDate;
     QString guid;
+    int     episodeNumber{0};      // itunes:episode
+    int     seasonNumber{0};       // itunes:season
+    QString episodeType;           // itunes:episodeType (full, trailer, bonus)
 };
 
 class RSSGenerator : public QObject
@@ -33,6 +36,11 @@ public:
     void setFeedTitle(const QString &title);
     void setFeedDescription(const QString &description);
     void setFeedURL(const QString &url);
+    void setAuthor(const QString &author);
+    void setFeedImageUrl(const QString &url);
+    void setCategory(const QString &category);
+    void setLanguage(const QString &language);
+    void setExplicit(bool isExplicit);
 
     void addEpisode(const PodcastEpisode &episode);
     void clearEpisodes();
@@ -44,6 +52,11 @@ private:
     QString m_feedTitle;
     QString m_feedDescription;
     QString m_feedURL;
+    QString m_author;
+    QString m_feedImageUrl;
+    QString m_category;
+    QString m_language;
+    bool    m_explicit{false};
     QList<PodcastEpisode> m_episodes;
 };
 

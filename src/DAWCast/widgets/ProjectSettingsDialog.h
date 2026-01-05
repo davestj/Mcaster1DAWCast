@@ -7,7 +7,9 @@
 #include <QComboBox>
 #include <QSpinBox>
 
-namespace dawcast::core { class ProjectManager; }
+class QLineEdit;
+
+namespace dawcast { class ProjectManager; }
 
 namespace dawcast::widgets {
 
@@ -18,16 +20,19 @@ public:
     explicit ProjectSettingsDialog(QWidget* parent = nullptr);
     ~ProjectSettingsDialog() override;
 
-    void setProjectManager(core::ProjectManager* pm);
+    void setProjectManager(ProjectManager* pm);
 
 private:
-    core::ProjectManager* m_projectManager = nullptr;
+    void applyToProject();
 
-    QComboBox* m_sampleRateCombo  = nullptr;
-    QComboBox* m_bitDepthCombo    = nullptr;
-    QSpinBox*  m_videoWidthSpin   = nullptr;
-    QSpinBox*  m_videoHeightSpin  = nullptr;
-    QComboBox* m_videoFpsCombo    = nullptr;
+    ProjectManager* m_projectManager = nullptr;
+
+    QLineEdit* m_projectNameEdit     = nullptr;
+    QLineEdit* m_authorEdit          = nullptr;
+    QComboBox* m_sampleRateCombo     = nullptr;
+    QComboBox* m_bitDepthCombo       = nullptr;
+    QComboBox* m_videoResolutionCombo = nullptr;
+    QComboBox* m_videoFpsCombo       = nullptr;
 };
 
 } // namespace dawcast::widgets

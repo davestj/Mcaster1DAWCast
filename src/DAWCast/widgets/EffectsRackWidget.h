@@ -6,7 +6,9 @@
 #include <QWidget>
 #include <QVBoxLayout>
 
-namespace dawcast::dsp { class DspChain; class IEffectUnit; }
+class QPushButton;
+
+namespace dawcast { class DspChain; class IEffectUnit; }
 
 namespace dawcast::widgets {
 
@@ -17,17 +19,20 @@ public:
     explicit EffectsRackWidget(QWidget* parent = nullptr);
     ~EffectsRackWidget() override;
 
-    void setDspChain(dsp::DspChain* chain);
-    void addEffect(dsp::IEffectUnit* effect);
+    void setDspChain(DspChain* chain);
+    void addEffect(IEffectUnit* effect);
     void removeEffect(int index);
 
     int effectCount() const;
 
 private:
-    dsp::DspChain* m_chain = nullptr;
+    void showAddEffectMenu();
+
+    DspChain* m_chain = nullptr;
     int m_effectCount = 0;
 
-    QVBoxLayout* m_slotLayout = nullptr;
+    QVBoxLayout* m_slotLayout   = nullptr;
+    QPushButton* m_addEffectBtn = nullptr;
 };
 
 } // namespace dawcast::widgets

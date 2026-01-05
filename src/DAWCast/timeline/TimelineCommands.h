@@ -43,10 +43,11 @@ public:
     void redo() override;
 
 private:
-    Clip*   m_originalClip;
-    Clip*   m_newClip = nullptr;
-    int64_t m_splitPosition;
-    int64_t m_originalSourceOut;
+    Clip*       m_originalClip;
+    Clip*       m_newClip = nullptr;
+    AudioTrack* m_track = nullptr;
+    int64_t     m_splitPosition;
+    int64_t     m_originalSourceOut;
 };
 
 // ─── TrimClipCommand ────────────────────────────────────────────────

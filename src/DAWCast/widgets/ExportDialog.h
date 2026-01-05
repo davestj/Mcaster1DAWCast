@@ -8,7 +8,10 @@
 #include <QComboBox>
 #include <QSpinBox>
 
-namespace dawcast::core { class ProjectManager; }
+class QLineEdit;
+class QTabWidget;
+
+namespace dawcast { class ProjectManager; }
 
 namespace dawcast::widgets {
 
@@ -30,20 +33,29 @@ public:
     explicit ExportDialog(QWidget* parent = nullptr);
     ~ExportDialog() override;
 
-    void setProject(core::ProjectManager* project);
+    void setProject(ProjectManager* project);
     ExportSettings exportSettings() const;
 
 private:
-    core::ProjectManager* m_project = nullptr;
+    void applyPreset(int index);
 
-    QComboBox* m_formatCombo    = nullptr;
-    QComboBox* m_audioCodecCombo = nullptr;
-    QSpinBox*  m_bitrateSpin    = nullptr;
-    QComboBox* m_sampleRateCombo = nullptr;
-    QComboBox* m_videoCodecCombo = nullptr;
-    QSpinBox*  m_widthSpin      = nullptr;
-    QSpinBox*  m_heightSpin     = nullptr;
-    QSpinBox*  m_fpsSpin        = nullptr;
+    ProjectManager* m_project = nullptr;
+
+    QComboBox*  m_presetCombo     = nullptr;
+    QComboBox*  m_formatCombo     = nullptr;
+    QComboBox*  m_audioCodecCombo = nullptr;
+    QSpinBox*   m_bitrateSpin     = nullptr;
+    QComboBox*  m_sampleRateCombo = nullptr;
+    QComboBox*  m_channelsCombo   = nullptr;
+    QComboBox*  m_videoCodecCombo = nullptr;
+    QSpinBox*   m_videoBitrateSpin = nullptr;
+    QComboBox*  m_resolutionCombo = nullptr;
+    QComboBox*  m_containerCombo  = nullptr;
+    QSpinBox*   m_widthSpin       = nullptr;
+    QSpinBox*   m_heightSpin      = nullptr;
+    QSpinBox*   m_fpsSpin         = nullptr;
+    QLineEdit*  m_outputPathEdit  = nullptr;
+    QTabWidget* m_activeTab       = nullptr;
 };
 
 } // namespace dawcast::widgets

@@ -7,7 +7,10 @@
 #include <QList>
 #include <cstdint>
 
-namespace dawcast::core { class Timeline; }
+class QPainter;
+
+namespace dawcast { class Clip; }
+namespace dawcast { class Timeline; }
 
 namespace dawcast::widgets {
 
@@ -18,7 +21,7 @@ public:
     explicit TimelineWidget(QWidget* parent = nullptr);
     ~TimelineWidget() override;
 
-    void setTimeline(core::Timeline* timeline);
+    void setTimeline(Timeline* timeline);
     void setZoom(float zoom);
     void setScroll(int64_t position);
 
@@ -34,10 +37,14 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
-    core::Timeline* m_timeline = nullptr;
+    void drawRuler(QPainter& painter, int viewWidth);
+    void drawClip(QPainter& painter, Clip* clip, int trackIndex, int clipIndex, int yTop);
+
+    Timeline* m_timeline = nullptr;
     float           m_zoom     = 1.0f;
     int64_t         m_scroll   = 0;
     QList<int>      m_selectedClips;

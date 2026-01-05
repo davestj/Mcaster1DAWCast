@@ -32,6 +32,8 @@ private:
     int                m_fftSize = 2048;
     SpectrumMode       m_mode    = SpectrumMode::Bars;
     std::vector<float> m_magnitudes;
+    std::vector<float> m_smoothed;
+    std::vector<std::vector<float>> m_waterfallHistory;
 };
 
 } // namespace dawcast::widgets

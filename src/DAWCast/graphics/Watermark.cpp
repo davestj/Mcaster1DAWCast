@@ -5,6 +5,7 @@
 #include "Watermark.h"
 
 #include <QPainter>
+#include <QDebug>
 
 namespace dawcast {
 
@@ -17,7 +18,11 @@ Watermark::~Watermark() = default;
 
 void Watermark::setImage(const QString &path)
 {
+    m_imagePath = path;
     m_image = QImage(path);
+    // Invalidate cached scaled image when source changes
+    m_cachedScaled = QImage();
+    m_cachedScaleForWidth = -1;
 }
 
 void Watermark::setPosition(Qt::Alignment alignment)
@@ -33,6 +38,9 @@ void Watermark::setOpacity(float opacity)
 void Watermark::setScale(float scale)
 {
     m_scale = qBound(0.01f, scale, 10.0f);
+    // Invalidate cache when scale changes
+    m_cachedScaled = QImage();
+    m_cachedScaleForWidth = -1;
 }
 
 float Watermark::opacity() const { return m_opacity; }
@@ -42,28 +50,40 @@ void Watermark::render(QPainter &painter, int frameWidth, int frameHeight)
 {
     if (m_image.isNull()) return;
 
-    QImage scaled = m_image.scaled(
-        static_cast<int>(m_image.width() * m_scale),
-        static_cast<int>(m_image.height() * m_scale),
-        Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // Scale watermark relative to frame width for consistent sizing
+    // across different output resolutions
+    const int targetWidth = static_cast<int>(m_scale * frameWidth);
 
-    const int margin = 10;
+    // Use cached scaled image if dimensions haven't changed
+    if (m_cachedScaled.isNull() || m_cachedScaleForWidth != targetWidth) {
+        m_cachedScaled = m_image.scaledToWidth(
+            targetWidth, Qt::SmoothTransformation);
+        m_cachedScaleForWidth = targetWidth;
+    }
+
+    const QImage &scaled = m_cachedScaled;
+    const int margin = 16;
     int x = margin;
     int y = margin;
 
+    // Horizontal alignment
     if (m_alignment & Qt::AlignRight) {
         x = frameWidth - scaled.width() - margin;
     } else if (m_alignment & Qt::AlignHCenter) {
         x = (frameWidth - scaled.width()) / 2;
     }
+    // else: Qt::AlignLeft (default), x stays at margin
 
+    // Vertical alignment
     if (m_alignment & Qt::AlignBottom) {
         y = frameHeight - scaled.height() - margin;
     } else if (m_alignment & Qt::AlignVCenter) {
         y = (frameHeight - scaled.height()) / 2;
     }
+    // else: Qt::AlignTop (default), y stays at margin
 
     painter.save();
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter.setOpacity(static_cast<qreal>(m_opacity));
     painter.drawImage(x, y, scaled);
     painter.restore();
@@ -71,9 +91,13 @@ void Watermark::render(QPainter &painter, int frameWidth, int frameHeight)
 
 QImage Watermark::extractWatermark(const QImage &frame)
 {
-    // TODO: Implement watermark extraction/detection
-    // This would involve frequency-domain analysis or template matching
+    // Watermark extraction requires frequency-domain analysis
+    // (DFT/DCT based blind watermark detection) which is beyond the scope
+    // of a simple render overlay module. This would need a dedicated
+    // signal-processing pipeline with FFT support.
     Q_UNUSED(frame)
+    qDebug() << "Watermark::extractWatermark: Not implemented. "
+                "Frequency-domain watermark extraction requires a dedicated DSP pipeline.";
     return QImage{};
 }
 

@@ -101,7 +101,7 @@ AM_CONDITIONAL([HAVE_LAME], [test "x$have_lame" = "xyes"])
 
 dnl ── Vorbis (optional — Ogg Vorbis encoding) ──────────────────────────────
 have_vorbis=no
-PKG_CHECK_MODULES([VORBIS], [vorbis vorbisenc],
+PKG_CHECK_MODULES([VORBIS], [vorbis vorbisenc vorbisfile ogg],
     [have_vorbis=yes
      AC_DEFINE([HAVE_VORBIS], [1], [Vorbis encoder available])],
     [AC_MSG_NOTICE([libvorbis not found — Vorbis support disabled])])

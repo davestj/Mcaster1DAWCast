@@ -9,9 +9,10 @@
 namespace dawcast {
 
 class AudioEngine;
-class ThemeEngine;
 class ProjectManager;
-class AppConfig;
+
+namespace widgets { class ThemeEngine; }
+namespace config  { class AppConfig; }
 
 class App : public QObject
 {
@@ -20,10 +21,10 @@ class App : public QObject
 public:
     static App* instance();
 
-    AudioEngine*    audioEngine()    const { return m_audioEngine; }
-    ThemeEngine*    themeEngine()    const { return m_themeEngine; }
-    ProjectManager* projectManager() const { return m_projectManager; }
-    AppConfig*      appConfig()      const { return m_appConfig; }
+    AudioEngine*          audioEngine()    const { return m_audioEngine; }
+    widgets::ThemeEngine* themeEngine()    const { return m_themeEngine; }
+    ProjectManager*       projectManager() const { return m_projectManager; }
+    config::AppConfig*    appConfig()      const { return m_appConfig; }
 
 private:
     explicit App(QObject* parent = nullptr);
@@ -31,10 +32,10 @@ private:
 
     static App* s_instance;
 
-    AudioEngine*    m_audioEngine    = nullptr;
-    ThemeEngine*    m_themeEngine    = nullptr;
-    ProjectManager* m_projectManager = nullptr;
-    AppConfig*      m_appConfig      = nullptr;
+    AudioEngine*          m_audioEngine    = nullptr;
+    widgets::ThemeEngine* m_themeEngine    = nullptr;
+    ProjectManager*       m_projectManager = nullptr;
+    config::AppConfig*    m_appConfig      = nullptr;
 };
 
 } // namespace dawcast

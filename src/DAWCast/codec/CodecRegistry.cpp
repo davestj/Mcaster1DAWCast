@@ -4,6 +4,8 @@
 
 #include "CodecRegistry.h"
 
+#include <QDebug>
+
 namespace dawcast {
 
 CodecRegistry &CodecRegistry::instance()
@@ -22,40 +24,159 @@ CodecRegistry::~CodecRegistry() = default;
 
 void CodecRegistry::populateDefaults()
 {
-    // WAV is always available (built-in)
+    // ---- WAV: always available (built-in, no external library) ----
     registerCodec({"wav", "WAV (PCM)", true, true, {"wav", "wave"}});
 
+    // ---- FLAC ----
 #ifdef HAVE_FLAC
     registerCodec({"flac", "FLAC (Free Lossless)", true, true, {"flac"}});
+#elif defined(HAVE_AVFORMAT)
+    // FFmpeg fallback for FLAC (encode + decode)
+    registerCodec({"flac", "FLAC (FFmpeg)", true, true, {"flac"}});
 #endif
+
+    // ---- MP3 ----
+    {
+        bool canEncMp3 = false;
+        bool canDecMp3 = false;
+        QString mp3Name;
 
 #ifdef HAVE_LAME
-    registerCodec({"mp3", "MP3 (LAME)", true,
+        canEncMp3 = true;
+        mp3Name = QStringLiteral("MP3 (LAME");
+#endif
 #ifdef HAVE_MPG123
-                    true,
-#else
-                    false,
+        canDecMp3 = true;
+        if (mp3Name.isEmpty())
+            mp3Name = QStringLiteral("MP3 (mpg123");
+        else
+            mp3Name += QStringLiteral("/mpg123");
 #endif
-                    {"mp3"}});
-#elif defined(HAVE_MPG123)
-    registerCodec({"mp3", "MP3 (mpg123 decode-only)", false, true, {"mp3"}});
+#ifdef HAVE_AVFORMAT
+        // FFmpeg can fill in either gap
+        if (!canEncMp3) {
+            canEncMp3 = true;
+            if (mp3Name.isEmpty())
+                mp3Name = QStringLiteral("MP3 (FFmpeg");
+            else
+                mp3Name += QStringLiteral("/FFmpeg");
+        }
+        if (!canDecMp3) {
+            canDecMp3 = true;
+            if (mp3Name.isEmpty())
+                mp3Name = QStringLiteral("MP3 (FFmpeg");
+            else if (!mp3Name.contains(QStringLiteral("FFmpeg")))
+                mp3Name += QStringLiteral("/FFmpeg");
+        }
 #endif
+        if (canEncMp3 || canDecMp3) {
+            mp3Name += QStringLiteral(")");
+            registerCodec({"mp3", mp3Name, canEncMp3, canDecMp3, {"mp3"}});
+        }
+    }
+
+    // ---- AAC ----
+    {
+        bool canEncAac = false;
+        bool canDecAac = false;
+        QString aacName;
 
 #ifdef HAVE_FDKAAC
-    registerCodec({"aac", "AAC (FDK-AAC)", true, true, {"aac", "m4a"}});
+        canEncAac = true;
+        aacName = QStringLiteral("AAC (FDK-AAC");
 #endif
+#ifdef HAVE_AVFORMAT
+        // Decode always via FFmpeg; encode as fallback
+        canDecAac = true;
+        if (!canEncAac) {
+            canEncAac = true;
+            aacName = QStringLiteral("AAC (FFmpeg");
+        } else {
+            aacName += QStringLiteral("/FFmpeg");
+        }
+#endif
+        if (canEncAac || canDecAac) {
+            aacName += QStringLiteral(")");
+            registerCodec({"aac", aacName, canEncAac, canDecAac, {"aac", "m4a"}});
+        }
+    }
+
+    // ---- Opus ----
+    {
+        bool canEncOpus = false;
+        bool canDecOpus = false;
+        QString opusName;
 
 #ifdef HAVE_OPUS
-    registerCodec({"opus", "Opus", true, true, {"opus", "ogg"}});
+        canEncOpus = true;
+        opusName = QStringLiteral("Opus (libopusenc");
 #endif
+#ifdef HAVE_OPUSFILE
+        canDecOpus = true;
+        if (opusName.isEmpty())
+            opusName = QStringLiteral("Opus (opusfile");
+        else
+            opusName += QStringLiteral("/opusfile");
+#endif
+#ifdef HAVE_AVFORMAT
+        if (!canEncOpus) {
+            canEncOpus = true;
+            if (opusName.isEmpty())
+                opusName = QStringLiteral("Opus (FFmpeg");
+            else
+                opusName += QStringLiteral("/FFmpeg");
+        }
+        if (!canDecOpus) {
+            canDecOpus = true;
+            if (opusName.isEmpty())
+                opusName = QStringLiteral("Opus (FFmpeg");
+            else if (!opusName.contains(QStringLiteral("FFmpeg")))
+                opusName += QStringLiteral("/FFmpeg");
+        }
+#endif
+        if (canEncOpus || canDecOpus) {
+            opusName += QStringLiteral(")");
+            registerCodec({"opus", opusName, canEncOpus, canDecOpus, {"opus"}});
+        }
+    }
+
+    // ---- Vorbis ----
+    {
+        bool canEncVorbis = false;
+        bool canDecVorbis = false;
+        QString vorbisName;
 
 #ifdef HAVE_VORBIS
-    registerCodec({"vorbis", "Ogg Vorbis", true, true, {"ogg", "oga"}});
+        canEncVorbis = true;
+        canDecVorbis = true;
+        vorbisName = QStringLiteral("Ogg Vorbis (libvorbis");
 #endif
+#ifdef HAVE_AVFORMAT
+        if (!canEncVorbis) {
+            canEncVorbis = true;
+            vorbisName = QStringLiteral("Ogg Vorbis (FFmpeg");
+        }
+        if (!canDecVorbis) {
+            canDecVorbis = true;
+            if (vorbisName.isEmpty())
+                vorbisName = QStringLiteral("Ogg Vorbis (FFmpeg");
+            else if (!vorbisName.contains(QStringLiteral("FFmpeg")))
+                vorbisName += QStringLiteral("/FFmpeg");
+        }
+#endif
+        if (canEncVorbis || canDecVorbis) {
+            vorbisName += QStringLiteral(")");
+            registerCodec({"vorbis", vorbisName, canEncVorbis, canDecVorbis,
+                           {"ogg", "oga"}});
+        }
+    }
 
+    // ---- FFmpeg generic (catch-all for any format FFmpeg supports) ----
 #ifdef HAVE_AVFORMAT
     registerCodec({"ffmpeg", "FFmpeg (generic)", true, true, {"*"}});
 #endif
+
+    qDebug() << "CodecRegistry: registered" << m_codecs.size() << "codecs";
 }
 
 void CodecRegistry::registerCodec(const CodecInfo &info)

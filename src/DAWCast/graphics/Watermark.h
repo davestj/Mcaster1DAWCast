@@ -33,10 +33,15 @@ public:
     static QImage extractWatermark(const QImage &frame);
 
 private:
-    QImage m_image;
+    QImage        m_image;
+    QString       m_imagePath;
     Qt::Alignment m_alignment{Qt::AlignBottom | Qt::AlignRight};
-    float m_opacity{0.3f};
-    float m_scale{1.0f};
+    float         m_opacity{0.3f};
+    float         m_scale{1.0f};
+
+    // Cached pre-scaled image to avoid re-scaling every frame
+    mutable QImage m_cachedScaled;
+    mutable int    m_cachedScaleForWidth{-1};
 };
 
 } // namespace dawcast

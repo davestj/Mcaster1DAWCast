@@ -7,7 +7,7 @@
 #include <QListWidget>
 #include <cstdint>
 
-namespace dawcast::core { class Timeline; }
+namespace dawcast { class Timeline; }
 
 namespace dawcast::widgets {
 
@@ -18,13 +18,16 @@ public:
     explicit ChapterWidget(QWidget* parent = nullptr);
     ~ChapterWidget() override;
 
-    void setTimeline(core::Timeline* timeline);
+    void setTimeline(Timeline* timeline);
+    void addChapter(int64_t position, const QString& title);
 
 signals:
     void chapterSelected(int64_t position);
 
 private:
-    core::Timeline* m_timeline = nullptr;
+    void refreshFromTimeline();
+
+    Timeline* m_timeline = nullptr;
 
     QListWidget* m_chapterList = nullptr;
 };

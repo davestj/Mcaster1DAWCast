@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QString>
+#include <atomic>
 #include "../core/AudioBuffer.h"
 
 namespace dawcast {
@@ -30,8 +31,8 @@ signals:
     void error(const QString& message);
 
 private:
-    QString m_sourcePath;
-    bool    m_running = false;
+    QString           m_sourcePath;
+    std::atomic<bool> m_running{false};
 };
 
 } // namespace dawcast
