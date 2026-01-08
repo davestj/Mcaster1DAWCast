@@ -10,6 +10,7 @@
 
 namespace dawcast {
 
+class Automation;
 class Clip;
 class DspChain;
 
@@ -44,15 +45,23 @@ public:
     DspChain* effectChain();
     [[nodiscard]] const DspChain* effectChain() const { return m_effectChain; }
 
+    // Automation lanes
+    [[nodiscard]] QList<Automation*> automations() const { return m_automations; }
+    Automation* addAutomation(const QString& parameterName);
+    Automation* automation(const QString& parameterName) const;
+    [[nodiscard]] QStringList automationNames() const { return m_automationNames; }
+
 private:
-    QList<Clip*> m_clips;
-    DspChain*    m_effectChain = nullptr;
-    QString      m_name;
-    float        m_volumeDb    = 0.0f;
-    float        m_pan         = 0.0f;
-    bool         m_muted       = false;
-    bool         m_solo        = false;
-    bool         m_recordArmed = false;
+    QList<Clip*>        m_clips;
+    DspChain*           m_effectChain = nullptr;
+    QString             m_name;
+    float               m_volumeDb    = 0.0f;
+    float               m_pan         = 0.0f;
+    bool                m_muted       = false;
+    bool                m_solo        = false;
+    bool                m_recordArmed = false;
+    QList<Automation*>  m_automations;
+    QStringList         m_automationNames;
 };
 
 } // namespace dawcast

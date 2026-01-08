@@ -5,6 +5,8 @@
 #include "Timeline.h"
 #include "AudioTrack.h"
 #include "VideoTrack.h"
+#include "MidiTrack.h"
+#include "MidiClip.h"
 #include "Clip.h"
 
 #include <algorithm>
@@ -31,6 +33,15 @@ VideoTrack* Timeline::addVideoTrack()
 {
     auto* track = new VideoTrack(this);
     track->setName(QStringLiteral("Video %1").arg(m_tracks.size() + 1));
+    m_tracks.append(track);
+    emit trackAdded(m_tracks.size() - 1);
+    return track;
+}
+
+MidiTrack* Timeline::addMidiTrack()
+{
+    auto* track = new MidiTrack(this);
+    track->setName(QStringLiteral("MIDI %1").arg(m_tracks.size() + 1));
     m_tracks.append(track);
     emit trackAdded(m_tracks.size() - 1);
     return track;
@@ -80,6 +91,20 @@ int64_t Timeline::duration() const
                 const Clip* c = videoTrack->clip(i);
                 if (c) {
                     int64_t clipEnd = c->timelinePosition() + c->duration();
+                    maxEnd = std::max(maxEnd, clipEnd);
+                }
+            }
+            continue;
+        }
+
+        // Check if this is a MidiTrack
+        const auto* midiTrack = qobject_cast<const MidiTrack*>(trackObj);
+        if (midiTrack) {
+            for (int i = 0; i < midiTrack->clipCount(); ++i) {
+                const MidiClip* mc = midiTrack->clip(i);
+                if (mc) {
+                    int64_t clipEnd = mc->timelinePosition()
+                                    + MidiClip::ticksToSamples(mc->durationTicks(), m_bpm, m_sampleRate);
                     maxEnd = std::max(maxEnd, clipEnd);
                 }
             }

@@ -21,6 +21,7 @@ AM_CPPFLAGS = \
     -I$(srcdir)/codec \
     -I$(srcdir)/graphics \
     -I$(srcdir)/widgets \
+    -I$(srcdir)/plugins \
     -I$(srcdir)/platform \
     -I$(srcdir)/config \
     -std=c++17 \
@@ -133,6 +134,12 @@ moc_AudioMixer.cpp: $(srcdir)/audio_engine/AudioMixer.h
 moc_AudioWorker.cpp: $(srcdir)/audio_engine/AudioWorker.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_WaveformCache.cpp: $(srcdir)/audio_engine/WaveformCache.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_PlaybackEngine.cpp: $(srcdir)/audio_engine/PlaybackEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- video_engine --
 moc_VideoDecoder.cpp: $(srcdir)/video_engine/VideoDecoder.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -152,6 +159,9 @@ moc_SubtitleRenderer.cpp: $(srcdir)/video_engine/SubtitleRenderer.h
 moc_MuxerDemuxer.cpp: $(srcdir)/video_engine/MuxerDemuxer.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_VideoPlaybackController.cpp: $(srcdir)/video_engine/VideoPlaybackController.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- timeline --
 moc_Timeline.cpp: $(srcdir)/timeline/Timeline.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -166,6 +176,19 @@ moc_Clip.cpp: $(srcdir)/timeline/Clip.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 moc_Automation.cpp: $(srcdir)/timeline/Automation.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MidiClip.cpp: $(srcdir)/timeline/MidiClip.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MidiTrack.cpp: $(srcdir)/timeline/MidiTrack.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- plugins --
+moc_PluginScanner.cpp: $(srcdir)/plugins/PluginScanner.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_PluginHost.cpp: $(srcdir)/plugins/PluginHost.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # -- dsp --
@@ -289,6 +312,9 @@ moc_ThemeEngine.cpp: $(srcdir)/widgets/ThemeEngine.h
 moc_AboutDialog.cpp: $(srcdir)/widgets/AboutDialog.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_PianoRollWidget.cpp: $(srcdir)/widgets/PianoRollWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -326,6 +352,12 @@ mcaster1dawcast_SOURCES = \
     audio_engine/RingBuffer.h \
     audio_engine/AudioWorker.h \
     audio_engine/AudioWorker.cpp \
+    audio_engine/WaveformCache.h \
+    audio_engine/WaveformCache.cpp \
+    audio_engine/PlaybackEngine.h \
+    audio_engine/PlaybackEngine.cpp \
+    audio_engine/AudioClipReader.h \
+    audio_engine/AudioClipReader.cpp \
     video_engine/VideoDecoder.h \
     video_engine/VideoDecoder.cpp \
     video_engine/VideoEncoder.h \
@@ -339,6 +371,8 @@ mcaster1dawcast_SOURCES = \
     video_engine/VideoFrame.cpp \
     video_engine/MuxerDemuxer.h \
     video_engine/MuxerDemuxer.cpp \
+    video_engine/VideoPlaybackController.h \
+    video_engine/VideoPlaybackController.cpp \
     timeline/Timeline.h \
     timeline/Timeline.cpp \
     timeline/AudioTrack.h \
@@ -357,6 +391,11 @@ mcaster1dawcast_SOURCES = \
     timeline/CrossfadeCalc.cpp \
     timeline/TimelineCommands.h \
     timeline/TimelineCommands.cpp \
+    timeline/MidiEvent.h \
+    timeline/MidiClip.h \
+    timeline/MidiClip.cpp \
+    timeline/MidiTrack.h \
+    timeline/MidiTrack.cpp \
     dsp/DspChain.h \
     dsp/DspChain.cpp \
     dsp/Biquad.h \
@@ -448,6 +487,10 @@ mcaster1dawcast_SOURCES = \
     graphics/Watermark.cpp \
     graphics/GraphicsRenderer.h \
     graphics/GraphicsRenderer.cpp \
+    plugins/PluginScanner.h \
+    plugins/PluginScanner.cpp \
+    plugins/PluginHost.h \
+    plugins/PluginHost.cpp \
     widgets/MainWindow.h \
     widgets/MainWindow.cpp \
     widgets/TimelineWidget.h \
@@ -488,6 +531,8 @@ mcaster1dawcast_SOURCES = \
     widgets/ThemeEngine.cpp \
     widgets/AboutDialog.h \
     widgets/AboutDialog.cpp \
+    widgets/PianoRollWidget.h \
+    widgets/PianoRollWidget.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -506,7 +551,8 @@ mcaster1dawcast_SOURCES += \
     platform/macos_video.h \
     platform/macos_video.mm \
     platform/device_discovery.h \
-    platform/device_discovery.mm
+    platform/device_discovery.mm \
+    plugins/PluginScannerAU.mm
 endif
 
 # ── MOC-generated sources ────────────────────────────────────────────────────
@@ -518,17 +564,24 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_AudioEngine.cpp \
     moc_AudioMixer.cpp \
     moc_AudioWorker.cpp \
+    moc_WaveformCache.cpp \
+    moc_PlaybackEngine.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
     moc_VideoRenderer.cpp \
     moc_SubtitleRenderer.cpp \
     moc_MuxerDemuxer.cpp \
+    moc_VideoPlaybackController.cpp \
     moc_Timeline.cpp \
     moc_AudioTrack.cpp \
     moc_VideoTrack.cpp \
     moc_Clip.cpp \
     moc_Automation.cpp \
+    moc_MidiClip.cpp \
+    moc_MidiTrack.cpp \
+    moc_PluginScanner.cpp \
+    moc_PluginHost.cpp \
     moc_DspChain.cpp \
     moc_VideoEffectChain.cpp \
     moc_ChapterEditor.cpp \
@@ -567,6 +620,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_EmbossedKnob.cpp \
     moc_ThemeEngine.cpp \
     moc_AboutDialog.cpp \
+    moc_PianoRollWidget.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 
@@ -579,17 +633,24 @@ BUILT_SOURCES = \
     moc_AudioEngine.cpp \
     moc_AudioMixer.cpp \
     moc_AudioWorker.cpp \
+    moc_WaveformCache.cpp \
+    moc_PlaybackEngine.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
     moc_VideoRenderer.cpp \
     moc_SubtitleRenderer.cpp \
     moc_MuxerDemuxer.cpp \
+    moc_VideoPlaybackController.cpp \
     moc_Timeline.cpp \
     moc_AudioTrack.cpp \
     moc_VideoTrack.cpp \
     moc_Clip.cpp \
     moc_Automation.cpp \
+    moc_MidiClip.cpp \
+    moc_MidiTrack.cpp \
+    moc_PluginScanner.cpp \
+    moc_PluginHost.cpp \
     moc_DspChain.cpp \
     moc_VideoEffectChain.cpp \
     moc_ChapterEditor.cpp \
@@ -628,6 +689,7 @@ BUILT_SOURCES = \
     moc_EmbossedKnob.cpp \
     moc_ThemeEngine.cpp \
     moc_AboutDialog.cpp \
+    moc_PianoRollWidget.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 

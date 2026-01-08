@@ -12,6 +12,7 @@
 #endif
 
 namespace dawcast { class AudioMixer; }
+namespace dawcast { class PlaybackEngine; }
 
 namespace dawcast {
 
@@ -36,6 +37,9 @@ public:
     AudioMixer* mixer() const { return m_mixer; }
     void setMixer(AudioMixer* mixer) { m_mixer = mixer; }
 
+    PlaybackEngine* playbackEngine() const { return m_playbackEngine; }
+    void setPlaybackEngine(PlaybackEngine* engine) { m_playbackEngine = engine; }
+
 signals:
     void bufferProcessed();
     void engineError(const QString& message);
@@ -57,6 +61,7 @@ private:
     bool m_running    = false;
     void* m_paStream  = nullptr;  // PortAudio PaStream*
     AudioMixer* m_mixer = nullptr;
+    PlaybackEngine* m_playbackEngine = nullptr;
 };
 
 } // namespace dawcast

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "AudioTrack.h"
+#include "Automation.h"
 #include "Clip.h"
 #include "../dsp/DspChain.h"
 #include <algorithm>
@@ -79,6 +80,29 @@ DspChain* AudioTrack::effectChain()
         m_effectChain = new DspChain(this);
     }
     return m_effectChain;
+}
+
+Automation* AudioTrack::addAutomation(const QString& parameterName)
+{
+    // Check if automation for this parameter already exists
+    int idx = m_automationNames.indexOf(parameterName);
+    if (idx >= 0) {
+        return m_automations.at(idx);
+    }
+
+    auto* automation = new Automation(this);
+    m_automations.append(automation);
+    m_automationNames.append(parameterName);
+    return automation;
+}
+
+Automation* AudioTrack::automation(const QString& parameterName) const
+{
+    int idx = m_automationNames.indexOf(parameterName);
+    if (idx >= 0 && idx < m_automations.size()) {
+        return m_automations.at(idx);
+    }
+    return nullptr;
 }
 
 } // namespace dawcast

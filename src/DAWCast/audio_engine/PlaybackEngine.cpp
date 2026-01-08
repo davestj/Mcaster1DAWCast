@@ -1,0 +1,343 @@
+// Mcaster1DAWCast — Multi-Channel DAW for Broadcasting
+// Copyright (C) 2026 David St. John <davestj@gmail.com>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#include "PlaybackEngine.h"
+#include "AudioEngine.h"
+#include "AudioMixer.h"
+#include "AudioClipReader.h"
+#include "../core/AudioBuffer.h"
+#include "../timeline/Timeline.h"
+#include "../timeline/AudioTrack.h"
+#include "../timeline/Clip.h"
+#include "../dsp/DspChain.h"
+
+#include <QDebug>
+#include <algorithm>
+#include <cstring>
+
+namespace dawcast {
+
+// Position poll interval -- 30 ms gives smooth playhead motion without
+// overwhelming the GUI event loop.
+static constexpr int kPositionPollMs = 30;
+
+// ---------------------------------------------------------------------------
+// Construction / destruction
+// ---------------------------------------------------------------------------
+
+PlaybackEngine::PlaybackEngine(QObject* parent)
+    : QObject(parent)
+{
+    m_positionTimer = new QTimer(this);
+    m_positionTimer->setTimerType(Qt::PreciseTimer);
+    connect(m_positionTimer, &QTimer::timeout,
+            this, &PlaybackEngine::onPositionTimer);
+}
+
+PlaybackEngine::~PlaybackEngine()
+{
+    stop();
+
+    for (auto& tp : m_tracks) {
+        for (auto* reader : tp.readers) {
+            delete reader;
+        }
+    }
+    m_tracks.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+void PlaybackEngine::setTimeline(Timeline* timeline)
+{
+    if (m_timeline == timeline) return;
+
+    if (m_playing.load(std::memory_order_acquire)) stop();
+
+    m_timeline = timeline;
+
+    if (m_timeline) {
+        connect(m_timeline, &Timeline::trackAdded,
+                this, &PlaybackEngine::rebuildReaders);
+        connect(m_timeline, &Timeline::trackRemoved,
+                this, &PlaybackEngine::rebuildReaders);
+    }
+
+    rebuildReaders();
+}
+
+void PlaybackEngine::setAudioEngine(AudioEngine* engine)
+{
+    m_audioEngine = engine;
+    if (engine) {
+        m_mixer = engine->mixer();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Transport controls (GUI thread)
+// ---------------------------------------------------------------------------
+
+void PlaybackEngine::play()
+{
+    if (!m_timeline || !m_audioEngine) {
+        qWarning() << "PlaybackEngine::play: no timeline or audio engine set";
+        return;
+    }
+
+    // Ensure the audio engine is running
+    if (!m_audioEngine->isRunning()) {
+        if (!m_audioEngine->start()) {
+            qWarning() << "PlaybackEngine::play: failed to start audio engine";
+            return;
+        }
+    }
+
+    // Rebuild readers in case clips were added/modified while stopped
+    rebuildReaders();
+    syncMixerStrips();
+
+    m_playing.store(true, std::memory_order_release);
+    m_positionTimer->start(kPositionPollMs);
+
+    emit playbackStarted();
+}
+
+void PlaybackEngine::pause()
+{
+    m_playing.store(false, std::memory_order_release);
+    m_positionTimer->stop();
+
+    emit playbackStopped();
+}
+
+void PlaybackEngine::stop()
+{
+    m_playing.store(false, std::memory_order_release);
+    m_positionTimer->stop();
+
+    m_playheadPos.store(0, std::memory_order_release);
+
+    if (m_timeline) {
+        m_timeline->setPlayhead(0);
+    }
+
+    emit playbackStopped();
+    emit positionChanged(0);
+}
+
+void PlaybackEngine::seekTo(int64_t samplePosition)
+{
+    m_playheadPos.store(std::max(int64_t(0), samplePosition),
+                        std::memory_order_release);
+}
+
+bool PlaybackEngine::isPlaying() const
+{
+    return m_playing.load(std::memory_order_acquire);
+}
+
+int64_t PlaybackEngine::currentPosition() const
+{
+    return m_playheadPos.load(std::memory_order_acquire);
+}
+
+// ---------------------------------------------------------------------------
+// Audio thread -- processBlock (RT-safe)
+// ---------------------------------------------------------------------------
+
+void PlaybackEngine::processBlock(int frames, int channels)
+{
+    // If not playing, leave everything silent -- the mixer strips have
+    // no input buffers set, so mixer->process() will output silence.
+    if (!m_playing.load(std::memory_order_acquire)) {
+        // Clear all mixer strip inputs
+        for (auto& tp : m_tracks) {
+            if (tp.mixerStrip >= 0 && m_mixer) {
+                m_mixer->setStripBuffer(tp.mixerStrip, nullptr);
+            }
+        }
+        return;
+    }
+
+    const int64_t pos = m_playheadPos.load(std::memory_order_acquire);
+
+    // Ensure per-track buffers are allocated for this block size.
+    // This only reallocates on the very first call or if buffer size changes.
+    ensureTrackBuffers(frames, channels);
+
+    const int totalSamples = frames * channels;
+
+    // Process each audio track: read clips, apply DSP, feed mixer strip
+    for (auto& tp : m_tracks) {
+        if (tp.mixerStrip < 0 || !m_mixer) continue;
+
+        // Zero this track's scratch buffer
+        std::memset(tp.buffer.data(), 0,
+                    static_cast<size_t>(totalSamples) * sizeof(float));
+
+        // Accumulate all overlapping clips into the track buffer
+        bool hasAudio = false;
+        for (auto* reader : tp.readers) {
+            if (!reader || !reader->isOpen()) continue;
+
+            Clip* clip = reader->clip();
+            if (!clip) continue;
+
+            // Quick overlap test: [pos, pos+frames) vs [clipStart, clipEnd)
+            int64_t clipStart = clip->timelinePosition();
+            int64_t clipEnd   = clip->endPosition();
+            if (pos + frames <= clipStart || pos >= clipEnd) continue;
+
+            // readSamples adds (not overwrites) into the buffer
+            reader->readSamples(tp.buffer.data(), pos, frames, channels);
+            hasAudio = true;
+        }
+
+        if (!hasAudio) {
+            m_mixer->setStripBuffer(tp.mixerStrip, nullptr);
+            continue;
+        }
+
+        // Apply the track's DspChain if present and has effects.
+        // DspChain::process is RT-safe (no alloc, no locks).
+        // Use the const accessor to avoid lazy allocation on the audio thread.
+        if (tp.audioTrack) {
+            const auto* constTrack =
+                static_cast<const AudioTrack*>(tp.audioTrack);
+            const DspChain* chain = constTrack->effectChain();
+            if (chain && chain->effectCount() > 0) {
+                // process() modifies the float* buffer in-place and is RT-safe.
+                const_cast<DspChain*>(chain)->process(
+                    tp.buffer.data(), frames, channels);
+            }
+        }
+
+        // Set up the AudioBuffer struct pointing to this track's data
+        tp.audioBuf.data       = tp.buffer.data();
+        tp.audioBuf.frames     = frames;
+        tp.audioBuf.channels   = channels;
+        tp.audioBuf.sampleRate = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+
+        // Point the mixer strip to this track's buffer
+        m_mixer->setStripBuffer(tp.mixerStrip, &tp.audioBuf);
+    }
+
+    // Advance the playhead. The GUI-thread timer will detect end-of-timeline.
+    m_playheadPos.store(pos + frames, std::memory_order_release);
+}
+
+// ---------------------------------------------------------------------------
+// GUI thread -- position polling
+// ---------------------------------------------------------------------------
+
+void PlaybackEngine::onPositionTimer()
+{
+    int64_t pos = m_playheadPos.load(std::memory_order_acquire);
+
+    if (m_timeline) {
+        // Check if we've passed the end of the timeline
+        int64_t dur = m_timeline->duration();
+        if (dur > 0 && pos >= dur) {
+            stop();
+            return;
+        }
+        m_timeline->setPlayhead(pos);
+    }
+
+    emit positionChanged(pos);
+}
+
+// ---------------------------------------------------------------------------
+// Reader management (GUI thread only)
+// ---------------------------------------------------------------------------
+
+void PlaybackEngine::rebuildReaders()
+{
+    // Clean up existing readers
+    for (auto& tp : m_tracks) {
+        for (auto* reader : tp.readers) {
+            delete reader;
+        }
+    }
+    m_tracks.clear();
+
+    if (!m_timeline) return;
+
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        QObject* trackObj = m_timeline->track(t);
+        auto* audioTrack = qobject_cast<AudioTrack*>(trackObj);
+        if (!audioTrack) continue;  // Skip video tracks
+
+        TrackPlayback tp;
+        tp.audioTrack = audioTrack;
+        tp.mixerStrip = -1;  // Assigned in syncMixerStrips
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            Clip* clip = audioTrack->clip(c);
+            if (!clip || clip->sourcePath().isEmpty()) continue;
+
+            auto* reader = new AudioClipReader(clip);
+            if (reader->open()) {
+                tp.readers.push_back(reader);
+            } else {
+                qWarning() << "PlaybackEngine: failed to open reader for"
+                           << clip->sourcePath();
+                delete reader;
+            }
+        }
+
+        m_tracks.push_back(std::move(tp));
+    }
+
+    // Force buffer reallocation on next processBlock
+    m_allocFrames   = 0;
+    m_allocChannels = 0;
+
+    qDebug() << "PlaybackEngine::rebuildReaders:"
+             << m_tracks.size() << "audio tracks prepared";
+}
+
+void PlaybackEngine::syncMixerStrips()
+{
+    if (!m_mixer || !m_timeline) return;
+
+    for (int i = 0; i < static_cast<int>(m_tracks.size()); ++i) {
+        auto& tp = m_tracks[static_cast<size_t>(i)];
+
+        // Add mixer strips as needed
+        while (m_mixer->stripCount() <= i) {
+            m_mixer->addStrip();
+        }
+
+        tp.mixerStrip = i;
+
+        // Sync mixer strip with the track's current settings
+        if (tp.audioTrack) {
+            m_mixer->setStripVolume(i, tp.audioTrack->volumeDb());
+            m_mixer->setStripPan(i,    tp.audioTrack->pan());
+            m_mixer->setStripMuted(i,  tp.audioTrack->isMuted());
+            m_mixer->setStripSolo(i,   tp.audioTrack->isSolo());
+        }
+    }
+}
+
+void PlaybackEngine::ensureTrackBuffers(int frames, int channels)
+{
+    if (frames == m_allocFrames && channels == m_allocChannels) return;
+
+    const auto totalSamples = static_cast<size_t>(frames * channels);
+
+    for (auto& tp : m_tracks) {
+        tp.buffer.resize(totalSamples, 0.0f);
+    }
+
+    m_allocFrames   = frames;
+    m_allocChannels = channels;
+}
+
+} // namespace dawcast

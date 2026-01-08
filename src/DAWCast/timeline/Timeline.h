@@ -12,6 +12,7 @@ namespace dawcast {
 
 class AudioTrack;
 class VideoTrack;
+class MidiTrack;
 
 class Timeline : public QObject
 {
@@ -23,6 +24,7 @@ public:
 
     AudioTrack* addAudioTrack();
     VideoTrack* addVideoTrack();
+    MidiTrack*  addMidiTrack();
     void removeTrack(int index);
 
     [[nodiscard]] int      trackCount() const;
@@ -35,15 +37,19 @@ public:
     void setSampleRate(int rate) { m_sampleRate = rate; }
     [[nodiscard]] int sampleRate() const { return m_sampleRate; }
 
+    void   setTempo(double bpm) { m_bpm = bpm; }
+    [[nodiscard]] double tempo() const { return m_bpm; }
+
 signals:
     void trackAdded(int index);
     void trackRemoved(int index);
     void playheadChanged(int64_t samples);
 
 private:
-    QList<QObject*> m_tracks;  // Mix of AudioTrack* and VideoTrack*
+    QList<QObject*> m_tracks;  // Mix of AudioTrack*, VideoTrack*, and MidiTrack*
     int64_t m_playhead   = 0;
     int     m_sampleRate = 48000;
+    double  m_bpm        = 120.0;
 };
 
 } // namespace dawcast

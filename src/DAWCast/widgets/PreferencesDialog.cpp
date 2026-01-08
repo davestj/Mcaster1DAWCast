@@ -19,6 +19,13 @@
 #include <QGroupBox>
 #include <QPushButton>
 #include <QFrame>
+#include <QKeySequenceEdit>
+#include <QMessageBox>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QAction>
+#include <QMainWindow>
 
 namespace dawcast::widgets {
 
@@ -198,6 +205,10 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     auto* shortcutsLayout = new QVBoxLayout(m_shortcutsTab);
     shortcutsLayout->setContentsMargins(12, 12, 12, 12);
 
+    auto* shortcutsHint = new QLabel(tr("Click a shortcut cell to edit. Press the new key combination to assign it."), m_shortcutsTab);
+    shortcutsHint->setStyleSheet(QStringLiteral("QLabel { color: #888; font-style: italic; font-size: 11px; }"));
+    shortcutsLayout->addWidget(shortcutsHint);
+
     m_shortcutsTable = new QTableWidget(m_shortcutsTab);
     m_shortcutsTable->setColumnCount(2);
     m_shortcutsTable->setHorizontalHeaderLabels({tr("Action"), tr("Shortcut")});
@@ -207,44 +218,16 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     m_shortcutsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_shortcutsTable->setAlternatingRowColors(true);
 
-    // Populate with default shortcuts
-    struct ShortcutEntry { const char* action; const char* key; };
-    static const ShortcutEntry defaultShortcuts[] = {
-        {"New Project",     "Ctrl+N"},
-        {"Open Project",    "Ctrl+O"},
-        {"Save Project",    "Ctrl+S"},
-        {"Save As...",      "Ctrl+Shift+S"},
-        {"Export...",        "Ctrl+E"},
-        {"Undo",            "Ctrl+Z"},
-        {"Redo",            "Ctrl+Shift+Z"},
-        {"Cut",             "Ctrl+X"},
-        {"Copy",            "Ctrl+C"},
-        {"Paste",           "Ctrl+V"},
-        {"Delete",          "Delete"},
-        {"Play/Pause",      "Space"},
-        {"Stop",            "Escape"},
-        {"Record",          "R"},
-        {"Zoom In",         "Ctrl+="},
-        {"Zoom Out",        "Ctrl+-"},
-        {"Zoom to Fit",     "Ctrl+0"},
-    };
-    constexpr int shortcutCount = sizeof(defaultShortcuts) / sizeof(defaultShortcuts[0]);
-
-    m_shortcutsTable->setRowCount(shortcutCount);
-    for (int i = 0; i < shortcutCount; ++i) {
-        auto* actionItem = new QTableWidgetItem(tr(defaultShortcuts[i].action));
-        actionItem->setFlags(actionItem->flags() & ~Qt::ItemIsEditable);
-        m_shortcutsTable->setItem(i, 0, actionItem);
-        m_shortcutsTable->setItem(i, 1, new QTableWidgetItem(
-            QString::fromLatin1(defaultShortcuts[i].key)));
-    }
+    // Load saved shortcuts, or use defaults
+    loadShortcuts();
 
     shortcutsLayout->addWidget(m_shortcutsTable);
 
     auto* shortcutBtnRow = new QHBoxLayout;
     shortcutBtnRow->addStretch();
-    auto* resetShortcutsBtn = new QPushButton(tr("Reset to Defaults"), m_shortcutsTab);
-    shortcutBtnRow->addWidget(resetShortcutsBtn);
+    m_resetShortcutsBtn = new QPushButton(tr("Reset to Defaults"), m_shortcutsTab);
+    connect(m_resetShortcutsBtn, &QPushButton::clicked, this, &PreferencesDialog::resetShortcutsToDefaults);
+    shortcutBtnRow->addWidget(m_resetShortcutsBtn);
     shortcutsLayout->addLayout(shortcutBtnRow);
 
     m_tabs->addTab(m_shortcutsTab, tr("Keyboard Shortcuts"));
@@ -337,6 +320,9 @@ void PreferencesDialog::saveSettings()
     // Theme
     cfg->setValue(QStringLiteral("theme/index"), m_themeCombo->currentIndex());
 
+    // Shortcuts
+    saveShortcuts();
+
     cfg->save();
 }
 
@@ -347,6 +333,209 @@ void PreferencesDialog::updateLatencyLabel()
     if (sampleRate > 0 && bufferSize > 0) {
         double latencyMs = static_cast<double>(bufferSize) / sampleRate * 1000.0;
         m_latencyLabel->setText(QString::number(latencyMs, 'f', 1) + tr(" ms"));
+    }
+}
+
+// ── Shortcut Defaults ──────────────────────────────────────────────────────
+
+QList<ShortcutEntry> PreferencesDialog::defaultShortcuts()
+{
+    return {
+        { QStringLiteral("New Project"),       QKeySequence(QStringLiteral("Ctrl+N")) },
+        { QStringLiteral("Open Project"),      QKeySequence(QStringLiteral("Ctrl+O")) },
+        { QStringLiteral("Save Project"),      QKeySequence(QStringLiteral("Ctrl+S")) },
+        { QStringLiteral("Save As..."),        QKeySequence(QStringLiteral("Ctrl+Shift+S")) },
+        { QStringLiteral("Export..."),         QKeySequence(QStringLiteral("Ctrl+E")) },
+        { QStringLiteral("Undo"),              QKeySequence(QStringLiteral("Ctrl+Z")) },
+        { QStringLiteral("Redo"),              QKeySequence(QStringLiteral("Ctrl+Shift+Z")) },
+        { QStringLiteral("Cut"),               QKeySequence(QStringLiteral("Ctrl+X")) },
+        { QStringLiteral("Copy"),              QKeySequence(QStringLiteral("Ctrl+C")) },
+        { QStringLiteral("Paste"),             QKeySequence(QStringLiteral("Ctrl+V")) },
+        { QStringLiteral("Delete"),            QKeySequence(QStringLiteral("Delete")) },
+        { QStringLiteral("Play/Pause"),        QKeySequence(QStringLiteral("Space")) },
+        { QStringLiteral("Stop"),              QKeySequence(QStringLiteral("Escape")) },
+        { QStringLiteral("Record"),            QKeySequence(QStringLiteral("R")) },
+        { QStringLiteral("Zoom In"),           QKeySequence(QStringLiteral("Ctrl+=")) },
+        { QStringLiteral("Zoom Out"),          QKeySequence(QStringLiteral("Ctrl+-")) },
+        { QStringLiteral("Zoom to Fit"),       QKeySequence(QStringLiteral("Ctrl+0")) },
+        { QStringLiteral("Add Audio Track"),   QKeySequence(QStringLiteral("Ctrl+Shift+A")) },
+        { QStringLiteral("Add Video Track"),   QKeySequence(QStringLiteral("Ctrl+Shift+V")) },
+        { QStringLiteral("Add MIDI Track"),    QKeySequence(QStringLiteral("Ctrl+Shift+M")) },
+    };
+}
+
+// ── Shortcut Table Population ──────────────────────────────────────────────
+
+void PreferencesDialog::populateShortcutsTable(const QList<ShortcutEntry>& entries)
+{
+    m_shortcutsTable->setRowCount(entries.size());
+
+    for (int i = 0; i < entries.size(); ++i) {
+        // Column 0: Action name (read-only)
+        auto* actionItem = new QTableWidgetItem(entries[i].action);
+        actionItem->setFlags(actionItem->flags() & ~Qt::ItemIsEditable);
+        m_shortcutsTable->setItem(i, 0, actionItem);
+
+        // Column 1: Editable shortcut via QKeySequenceEdit widget
+        auto* keySeqEdit = new QKeySequenceEdit(entries[i].shortcut, m_shortcutsTable);
+        keySeqEdit->setMaximumSequenceLength(1);
+
+        // When the user finishes editing, check for conflicts
+        int row = i;
+        connect(keySeqEdit, &QKeySequenceEdit::editingFinished, this, [this, keySeqEdit, row]() {
+            QKeySequence seq = keySeqEdit->keySequence();
+            if (!seq.isEmpty() && checkConflict(row, seq)) {
+                // Conflict found -- revert
+                QMessageBox::warning(this, tr("Shortcut Conflict"),
+                    tr("The shortcut \"%1\" is already assigned to another action.\n"
+                       "Please choose a different shortcut.").arg(seq.toString()));
+                // Restore previous value from the table item data
+                auto* item = m_shortcutsTable->item(row, 0);
+                if (item) {
+                    QKeySequence prev = QKeySequence(item->data(Qt::UserRole).toString());
+                    keySeqEdit->setKeySequence(prev);
+                }
+                return;
+            }
+            // Store current sequence as previous for future conflict checks
+            auto* item = m_shortcutsTable->item(row, 0);
+            if (item) {
+                item->setData(Qt::UserRole, seq.toString());
+            }
+        });
+
+        // Store the initial sequence as "previous" in UserRole
+        actionItem->setData(Qt::UserRole, entries[i].shortcut.toString());
+
+        m_shortcutsTable->setCellWidget(i, 1, keySeqEdit);
+    }
+}
+
+// ── Conflict Detection ─────────────────────────────────────────────────────
+
+bool PreferencesDialog::checkConflict(int editingRow, const QKeySequence& seq)
+{
+    for (int i = 0; i < m_shortcutsTable->rowCount(); ++i) {
+        if (i == editingRow) continue;
+
+        auto* widget = qobject_cast<QKeySequenceEdit*>(m_shortcutsTable->cellWidget(i, 1));
+        if (widget && widget->keySequence() == seq) {
+            return true; // conflict
+        }
+    }
+    return false;
+}
+
+// ── Reset to Defaults ──────────────────────────────────────────────────────
+
+void PreferencesDialog::resetShortcutsToDefaults()
+{
+    populateShortcutsTable(defaultShortcuts());
+}
+
+// ── Current Shortcuts from Table ───────────────────────────────────────────
+
+QList<ShortcutEntry> PreferencesDialog::currentShortcuts() const
+{
+    QList<ShortcutEntry> entries;
+    for (int i = 0; i < m_shortcutsTable->rowCount(); ++i) {
+        ShortcutEntry entry;
+        auto* actionItem = m_shortcutsTable->item(i, 0);
+        if (actionItem) {
+            entry.action = actionItem->text();
+        }
+        auto* widget = qobject_cast<QKeySequenceEdit*>(m_shortcutsTable->cellWidget(i, 1));
+        if (widget) {
+            entry.shortcut = widget->keySequence();
+        }
+        entries.append(entry);
+    }
+    return entries;
+}
+
+// ── Save/Load Shortcuts to AppConfig ───────────────────────────────────────
+
+void PreferencesDialog::saveShortcuts()
+{
+    auto* cfg = config::AppConfig::instance();
+    if (!cfg) return;
+
+    QJsonArray arr;
+    QList<ShortcutEntry> entries = currentShortcuts();
+    for (const auto& entry : entries) {
+        QJsonObject obj;
+        obj[QStringLiteral("action")]   = entry.action;
+        obj[QStringLiteral("shortcut")] = entry.shortcut.toString();
+        arr.append(obj);
+    }
+
+    cfg->setValue(QStringLiteral("shortcuts"), QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
+void PreferencesDialog::loadShortcuts()
+{
+    auto* cfg = config::AppConfig::instance();
+    QList<ShortcutEntry> entries;
+
+    if (cfg) {
+        QString jsonStr = cfg->value(QStringLiteral("shortcuts")).toString();
+        if (!jsonStr.isEmpty()) {
+            QJsonParseError err;
+            QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8(), &err);
+            if (err.error == QJsonParseError::NoError && doc.isArray()) {
+                QJsonArray arr = doc.array();
+                for (const auto& val : arr) {
+                    QJsonObject obj = val.toObject();
+                    ShortcutEntry entry;
+                    entry.action   = obj[QStringLiteral("action")].toString();
+                    entry.shortcut = QKeySequence(obj[QStringLiteral("shortcut")].toString());
+                    entries.append(entry);
+                }
+            }
+        }
+    }
+
+    // If no saved shortcuts or parse failed, use defaults
+    if (entries.isEmpty()) {
+        entries = defaultShortcuts();
+    }
+
+    populateShortcutsTable(entries);
+}
+
+// ── Apply Shortcuts to QActions ────────────────────────────────────────────
+
+void PreferencesDialog::applyShortcuts(QMainWindow* window)
+{
+    if (!window) return;
+
+    QList<ShortcutEntry> entries = currentShortcuts();
+
+    // Build a map of action text -> shortcut
+    QMap<QString, QKeySequence> shortcutMap;
+    for (const auto& entry : entries) {
+        shortcutMap[entry.action] = entry.shortcut;
+    }
+
+    // Walk all QActions in the window and match by text
+    const QList<QAction*> actions = window->findChildren<QAction*>();
+    for (QAction* action : actions) {
+        // Strip '&' accelerator markers for comparison
+        QString actionText = action->text().remove(QLatin1Char('&'));
+
+        // Try exact match first
+        if (shortcutMap.contains(actionText)) {
+            action->setShortcut(shortcutMap[actionText]);
+            continue;
+        }
+
+        // Try matching without "..." suffix
+        QString stripped = actionText;
+        stripped.remove(QStringLiteral("..."));
+        stripped = stripped.trimmed();
+        if (shortcutMap.contains(stripped)) {
+            action->setShortcut(shortcutMap[stripped]);
+        }
     }
 }
 

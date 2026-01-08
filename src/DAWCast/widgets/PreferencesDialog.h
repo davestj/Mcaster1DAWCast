@@ -6,15 +6,27 @@
 #include <QDialog>
 #include <QTabWidget>
 #include <QComboBox>
+#include <QKeySequenceEdit>
+#include <QJsonArray>
+#include <QMap>
 
 class QSpinBox;
 class QCheckBox;
 class QLabel;
 class QTableWidget;
 class QFrame;
+class QPushButton;
+class QMainWindow;
 
 namespace dawcast::widgets {
 
+// ── ShortcutEntry ──────────────────────────────────────────────────────────
+struct ShortcutEntry {
+    QString action;
+    QKeySequence shortcut;
+};
+
+// ── PreferencesDialog ──────────────────────────────────────────────────────
 class PreferencesDialog : public QDialog {
     Q_OBJECT
 
@@ -25,8 +37,20 @@ public:
     void loadSettings();
     void saveSettings();
 
+    // Apply the current shortcut mappings to QActions in the given window
+    void applyShortcuts(QMainWindow* window);
+
+    // Default shortcut definitions
+    static QList<ShortcutEntry> defaultShortcuts();
+
 private:
     void updateLatencyLabel();
+    void populateShortcutsTable(const QList<ShortcutEntry>& entries);
+    void resetShortcutsToDefaults();
+    bool checkConflict(int editingRow, const QKeySequence& seq);
+    QList<ShortcutEntry> currentShortcuts() const;
+    void saveShortcuts();
+    void loadShortcuts();
 
     QTabWidget* m_tabs = nullptr;
 
@@ -53,8 +77,9 @@ private:
     QFrame*    m_themePreview = nullptr;
 
     // Shortcuts tab
-    QWidget*       m_shortcutsTab   = nullptr;
-    QTableWidget*  m_shortcutsTable = nullptr;
+    QWidget*       m_shortcutsTab     = nullptr;
+    QTableWidget*  m_shortcutsTable   = nullptr;
+    QPushButton*   m_resetShortcutsBtn = nullptr;
 };
 
 } // namespace dawcast::widgets

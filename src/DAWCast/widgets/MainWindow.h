@@ -10,6 +10,14 @@
 #include <QSplitter>
 #include <QAction>
 
+namespace dawcast {
+class Timeline;
+class AudioEngine;
+class AudioMixer;
+class PlaybackEngine;
+class VideoPlaybackController;
+}
+
 namespace dawcast::widgets {
 
 class TimelineWidget;
@@ -51,6 +59,7 @@ private slots:
     // Track
     void addAudioTrack();
     void addVideoTrack();
+    void addMidiTrack();
     void removeTrack();
 
     // Podcast
@@ -110,6 +119,16 @@ private:
     QAction* m_actToggleEffectsRack  = nullptr;
 
     QString m_projectPath;
+
+    // Audio pipeline
+    Timeline*                  m_timelineModel          = nullptr;
+    AudioEngine*               m_audioEngine            = nullptr;
+    AudioMixer*                m_audioMixer             = nullptr;
+    PlaybackEngine*            m_playbackEngine         = nullptr;
+    VideoPlaybackController*   m_videoPlaybackController = nullptr;
+
+    void setupAudioPipeline();
+    void setupVideoPlayback();
 };
 
 } // namespace dawcast::widgets

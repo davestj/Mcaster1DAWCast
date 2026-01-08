@@ -10,6 +10,14 @@
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
 
+#include "../timeline/Timeline.h"
+#include "../timeline/AudioTrack.h"
+#include "../audio_engine/AudioEngine.h"
+#include "../audio_engine/AudioMixer.h"
+#include "../audio_engine/PlaybackEngine.h"
+#include "../audio_engine/WaveformCache.h"
+#include "../video_engine/VideoPlaybackController.h"
+
 #include <QAction>
 #include <QMenu>
 #include <QMenuBar>
@@ -36,6 +44,8 @@ MainWindow::MainWindow(QWidget* parent)
     setupCentralWidget();
     setupDockWidgets();
     setupStatusBar();
+    setupAudioPipeline();
+    setupVideoPlayback();
     setupConnections();
 }
 
@@ -138,6 +148,10 @@ void MainWindow::setupMenus()
     auto* actAddVideo = trackMenu->addAction(tr("Add &Video Track"));
     actAddVideo->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
     connect(actAddVideo, &QAction::triggered, this, &MainWindow::addVideoTrack);
+
+    auto* actAddMidi = trackMenu->addAction(tr("Add &MIDI Track"));
+    actAddMidi->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M));
+    connect(actAddMidi, &QAction::triggered, this, &MainWindow::addMidiTrack);
 
     auto* actRemoveTrack = trackMenu->addAction(tr("&Remove Track"));
     connect(actRemoveTrack, &QAction::triggered, this, &MainWindow::removeTrack);
@@ -261,6 +275,48 @@ void MainWindow::setupStatusBar()
     statusBar()->showMessage(tr("Ready"));
 }
 
+// ── Audio Pipeline ─────────────────────────────────────────────────────────
+
+void MainWindow::setupAudioPipeline()
+{
+    // Create the data model timeline (distinct from the TimelineWidget)
+    m_timelineModel = new dawcast::Timeline(this);
+    m_timelineModel->setSampleRate(48000);
+
+    // Give the TimelineWidget its data model
+    m_timeline->setTimeline(m_timelineModel);
+
+    // Audio mixer (volume / pan / mute / solo per strip)
+    m_audioMixer = new dawcast::AudioMixer(this);
+
+    // Audio engine (PortAudio I/O)
+    m_audioEngine = new dawcast::AudioEngine(this);
+    m_audioEngine->setSampleRate(48000);
+    m_audioEngine->setBufferSize(512);
+    m_audioEngine->setMixer(m_audioMixer);
+
+    // Playback engine (reads timeline clips -> feeds mixer -> PortAudio)
+    m_playbackEngine = new dawcast::PlaybackEngine(this);
+    m_playbackEngine->setTimeline(m_timelineModel);
+    m_playbackEngine->setAudioEngine(m_audioEngine);
+
+    // Tell the audio engine about the playback engine so the callback
+    // calls processBlock() before mixer->process().
+    m_audioEngine->setPlaybackEngine(m_playbackEngine);
+
+    // Start the audio engine so PortAudio is ready when the user hits Play
+    m_audioEngine->start();
+}
+
+// ── Video Playback ─────────────────────────────────────────────────────────
+
+void MainWindow::setupVideoPlayback()
+{
+    m_videoPlaybackController = new dawcast::VideoPlaybackController(this);
+    m_videoPlaybackController->setVideoPreview(m_videoPreview);
+    m_videoPlaybackController->setTimeline(m_timelineModel);
+}
+
 // ── Signal/Slot Connections ─────────────────────────────────────────────────
 
 void MainWindow::setupConnections()
@@ -269,6 +325,50 @@ void MainWindow::setupConnections()
     connect(m_transportBar, &TransportBar::playClicked, this, &MainWindow::onPlay);
     connect(m_transportBar, &TransportBar::stopClicked, this, &MainWindow::onStop);
     connect(m_transportBar, &TransportBar::recordClicked, this, &MainWindow::onRecord);
+    connect(m_transportBar, &TransportBar::pauseClicked, this, [this]() {
+        if (m_playbackEngine) m_playbackEngine->pause();
+        if (m_videoPlaybackController) m_videoPlaybackController->stop();
+        m_transportBar->setPlaying(false);
+        statusBar()->showMessage(tr("Paused"), 2000);
+    });
+    connect(m_transportBar, &TransportBar::rewindClicked, this, [this]() {
+        if (m_playbackEngine) {
+            m_playbackEngine->seekTo(0);
+            if (m_timelineModel) m_timelineModel->setPlayhead(0);
+        }
+    });
+
+    // PlaybackEngine -> TransportBar time display and TimelineWidget playhead
+    if (m_playbackEngine) {
+        connect(m_playbackEngine, &dawcast::PlaybackEngine::positionChanged,
+                this, [this](int64_t samples) {
+            int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+            m_transportBar->setPosition(samples, sr);
+            // TimelineWidget repaints automatically when Timeline::playheadChanged fires
+        });
+        connect(m_playbackEngine, &dawcast::PlaybackEngine::playbackStopped,
+                this, [this]() {
+            m_transportBar->setPlaying(false);
+        });
+        connect(m_playbackEngine, &dawcast::PlaybackEngine::playbackStarted,
+                this, [this]() {
+            m_transportBar->setPlaying(true);
+        });
+    }
+
+    // TimelineWidget playhead clicks -> seek PlaybackEngine + VideoPlaybackController
+    connect(m_timeline, &TimelineWidget::playheadMoved,
+            this, [this](int64_t pos) {
+        if (m_playbackEngine) {
+            m_playbackEngine->seekTo(pos);
+        }
+        if (m_videoPlaybackController && m_timelineModel) {
+            int sr = m_timelineModel->sampleRate();
+            if (sr <= 0) sr = 48000;
+            double timeSec = static_cast<double>(pos) / sr;
+            m_videoPlaybackController->seekTo(timeSec);
+        }
+    });
 
     // Sync dock visibility with View menu toggle actions
     connect(m_mixerDock, &QDockWidget::visibilityChanged,
@@ -279,6 +379,19 @@ void MainWindow::setupConnections()
             m_actToggleMediaBrowser, &QAction::setChecked);
     connect(m_effectsDock, &QDockWidget::visibilityChanged,
             m_actToggleEffectsRack, &QAction::setChecked);
+
+    // Pre-cache waveforms when files are imported or double-clicked in Media Browser
+    connect(m_mediaBrowser, &MediaBrowser::fileDoubleClicked,
+            this, [](const QString& path) {
+        dawcast::WaveformCache::instance()->requestWaveform(path);
+    });
+
+    connect(m_mediaBrowser, &MediaBrowser::importRequested,
+            this, [](const QStringList& paths) {
+        for (const QString& path : paths) {
+            dawcast::WaveformCache::instance()->requestWaveform(path);
+        }
+    });
 }
 
 // ── File Slots ──────────────────────────────────────────────────────────────
@@ -392,12 +505,31 @@ void MainWindow::toggleEffectsRack()
 
 void MainWindow::addAudioTrack()
 {
+    if (m_timelineModel) {
+        dawcast::AudioTrack* track = m_timelineModel->addAudioTrack();
+        Q_UNUSED(track)
+        // TimelineWidget repaints via Timeline::trackAdded signal
+        m_timeline->update();
+
+        // Update transport bar with timeline duration
+        int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+        m_transportBar->setDuration(m_timelineModel->duration(), sr);
+    }
     statusBar()->showMessage(tr("Audio track added"), 3000);
 }
 
 void MainWindow::addVideoTrack()
 {
     statusBar()->showMessage(tr("Video track added"), 3000);
+}
+
+void MainWindow::addMidiTrack()
+{
+    if (m_timelineModel) {
+        m_timelineModel->addMidiTrack();
+        m_timeline->update();
+    }
+    statusBar()->showMessage(tr("MIDI track added"), 3000);
 }
 
 void MainWindow::removeTrack()
@@ -471,11 +603,30 @@ void MainWindow::showDocumentation()
 
 void MainWindow::onPlay()
 {
+    if (m_playbackEngine) {
+        m_playbackEngine->play();
+    }
+    if (m_videoPlaybackController) {
+        // Sync video start time to the current playhead position
+        if (m_timelineModel) {
+            int sr = m_timelineModel->sampleRate();
+            if (sr <= 0) sr = 48000;
+            double timeSec = static_cast<double>(m_timelineModel->playhead()) / sr;
+            m_videoPlaybackController->seekTo(timeSec);
+        }
+        m_videoPlaybackController->play();
+    }
     statusBar()->showMessage(tr("Playing"), 2000);
 }
 
 void MainWindow::onStop()
 {
+    if (m_playbackEngine) {
+        m_playbackEngine->stop();
+    }
+    if (m_videoPlaybackController) {
+        m_videoPlaybackController->stop();
+    }
     statusBar()->showMessage(tr("Stopped"), 2000);
 }
 

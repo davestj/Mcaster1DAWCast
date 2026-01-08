@@ -4,6 +4,7 @@
 
 #include "AudioEngine.h"
 #include "AudioMixer.h"
+#include "PlaybackEngine.h"
 #include "../core/AudioBuffer.h"
 
 #include <cstring>
@@ -128,15 +129,24 @@ int AudioEngine::processCallback(const float* /*input*/, float* output,
                                  unsigned long frameCount)
 {
     static constexpr int kOutputChannels = 2;
-    const int totalSamples = static_cast<int>(frameCount) * kOutputChannels;
+    const int frames = static_cast<int>(frameCount);
+    const int totalSamples = frames * kOutputChannels;
 
     // Start with silence
     std::memset(output, 0, static_cast<size_t>(totalSamples) * sizeof(float));
 
+    // Let the PlaybackEngine read decoded clip audio into per-track
+    // buffers and set up mixer strip input pointers.
+    if (m_playbackEngine) {
+        m_playbackEngine->processBlock(frames, kOutputChannels);
+    }
+
+    // The mixer reads each strip's input buffer (set by PlaybackEngine)
+    // and sums with volume/pan/mute/solo into the output.
     if (m_mixer) {
         AudioBuffer buf;
         buf.data       = output;
-        buf.frames     = static_cast<int>(frameCount);
+        buf.frames     = frames;
         buf.channels   = kOutputChannels;
         buf.sampleRate = m_sampleRate;
 

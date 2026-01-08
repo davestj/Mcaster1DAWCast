@@ -1,0 +1,102 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build-macos:
+    name: macOS (Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake autoconf-archive pkg-config \
+            qt@6 portaudio ffmpeg taglib sqlite libyaml \
+            lame mpg123 libvorbis flac opus opusenc fdk-aac \
+            libsndfile x264 libtheora aom svt-av1 dav1d webp \
+            freetype fontconfig fribidi
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure --enable-macos-gui
+
+      - name: Build
+        run: make -C src/DAWCast -j$(sysctl -n hw.ncpu)
+
+      - name: Verify binary
+        run: |
+          file src/DAWCast/mcaster1dawcast
+          ls -lh src/DAWCast/mcaster1dawcast
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcaster1dawcast-macos-arm64
+          path: src/DAWCast/mcaster1dawcast
+
+  build-macos-intel:
+    name: macOS (Intel)
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install autoconf automake autoconf-archive pkg-config \
+            qt@6 portaudio ffmpeg taglib sqlite libyaml \
+            lame mpg123 libvorbis flac opus opusenc fdk-aac
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure --enable-macos-gui
+
+      - name: Build
+        run: make -C src/DAWCast -j$(sysctl -n hw.ncpu)
+
+      - name: Verify binary
+        run: |
+          file src/DAWCast/mcaster1dawcast
+          ls -lh src/DAWCast/mcaster1dawcast
+
+  build-linux:
+    name: Ubuntu 24.04
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential autoconf automake autoconf-archive pkg-config \
+            qt6-base-dev qt6-multimedia-dev libqt6svg6-dev \
+            libportaudio2 portaudio19-dev \
+            libavformat-dev libavcodec-dev libswresample-dev libswscale-dev libavutil-dev \
+            libtag1-dev libsqlite3-dev libyaml-dev \
+            libmp3lame-dev libmpg123-dev libvorbis-dev libflac-dev \
+            libopus-dev libfdk-aac-dev libsndfile1-dev \
+            libx264-dev libvpx-dev libtheora-dev \
+            libass-dev libfreetype-dev libfontconfig-dev libfribidi-dev
+
+      - name: Bootstrap autotools
+        run: ./autogen.sh
+
+      - name: Configure
+        run: ./configure
+
+      - name: Build
+        run: make -j$(nproc)
+
+      - name: Verify binary
+        run: |
+          file src/DAWCast/mcaster1dawcast
+          ls -lh src/DAWCast/mcaster1dawcast
