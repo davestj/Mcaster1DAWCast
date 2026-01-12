@@ -1,5 +1,24 @@
 <RCC>
-  <qresource prefix="/icons">
+  <qresource prefix="/">
+    <file>icons/play.svg</file>
+    <file>icons/pause.svg</file>
+    <file>icons/stop.svg</file>
+    <file>icons/record.svg</file>
+    <file>icons/rewind.svg</file>
+    <file>icons/forward.svg</file>
+    <file>icons/loop.svg</file>
+    <file>icons/close.svg</file>
+    <file>icons/undock.svg</file>
+    <file>icons/add-track.svg</file>
+    <file>icons/mixer.svg</file>
+    <file>icons/video.svg</file>
+    <file>icons/effects.svg</file>
+    <file>icons/podcast.svg</file>
+    <file>icons/broadcast.svg</file>
+    <file>icons/folder.svg</file>
+    <file>icons/export.svg</file>
+    <file>icons/settings.svg</file>
+    <file>icons/midi.svg</file>
   </qresource>
   <qresource prefix="/presets">
   </qresource>

@@ -10,6 +10,16 @@
 
 namespace dawcast::widgets {
 
+/// Custom tree view that initiates drag operations with file URLs
+class DraggableTreeView : public QTreeView {
+    Q_OBJECT
+public:
+    explicit DraggableTreeView(QWidget* parent = nullptr);
+
+protected:
+    void startDrag(Qt::DropActions supportedActions) override;
+};
+
 class MediaBrowser : public QWidget {
     Q_OBJECT
 
@@ -25,8 +35,8 @@ signals:
     void importRequested(const QStringList& paths);
 
 private:
-    QTreeView*        m_treeView  = nullptr;
-    QFileSystemModel* m_fileModel = nullptr;
+    DraggableTreeView* m_treeView  = nullptr;
+    QFileSystemModel*  m_fileModel = nullptr;
 };
 
 } // namespace dawcast::widgets

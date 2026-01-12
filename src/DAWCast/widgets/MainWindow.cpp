@@ -9,6 +9,7 @@
 #include "MediaBrowser.h"
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
+#include "LUFSMeterWidget.h"
 
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
@@ -16,7 +17,11 @@
 #include "../audio_engine/AudioMixer.h"
 #include "../audio_engine/PlaybackEngine.h"
 #include "../audio_engine/WaveformCache.h"
+#include "../audio_engine/ExportEngine.h"
 #include "../video_engine/VideoPlaybackController.h"
+#include "../config/AppConfig.h"
+#include "ExportDialog.h"
+#include "AboutDialog.h"
 
 #include <QAction>
 #include <QMenu>
@@ -30,6 +35,9 @@
 #include <QKeySequence>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QStringList>
+#include <QProgressDialog>
+#include <QLineEdit>
 
 namespace dawcast::widgets {
 
@@ -47,9 +55,20 @@ MainWindow::MainWindow(QWidget* parent)
     setupAudioPipeline();
     setupVideoPlayback();
     setupConnections();
+
+    // Restore window geometry, dock layout, and splitter state from last session
+    restoreWindowState();
 }
 
 MainWindow::~MainWindow() = default;
+
+// ── Close Event (save window state) ────────────────────────────────────────
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    saveWindowState();
+    QMainWindow::closeEvent(event);
+}
 
 // ── Menu Bar ────────────────────────────────────────────────────────────────
 
@@ -66,7 +85,7 @@ void MainWindow::setupMenus()
 
     auto* actOpen = fileMenu->addAction(tr("&Open Project..."));
     actOpen->setShortcut(QKeySequence::Open);
-    connect(actOpen, &QAction::triggered, this, &MainWindow::openProject);
+    connect(actOpen, &QAction::triggered, this, qOverload<>(&MainWindow::openProject));
 
     auto* actSave = fileMenu->addAction(tr("&Save Project"));
     actSave->setShortcut(QKeySequence::Save);
@@ -75,6 +94,24 @@ void MainWindow::setupMenus()
     auto* actSaveAs = fileMenu->addAction(tr("Save Project &As..."));
     actSaveAs->setShortcut(QKeySequence::SaveAs);
     connect(actSaveAs, &QAction::triggered, this, &MainWindow::saveProjectAs);
+
+    fileMenu->addSeparator();
+
+    // ── Recent Projects submenu ────────────────────────────────────────
+    m_recentFilesMenu = fileMenu->addMenu(tr("Recent Projects"));
+    for (int i = 0; i < kMaxRecentFiles; ++i) {
+        auto* action = new QAction(this);
+        action->setVisible(false);
+        connect(action, &QAction::triggered, this, &MainWindow::openRecentFile);
+        m_recentFileActions.append(action);
+        m_recentFilesMenu->addAction(action);
+    }
+    m_recentFilesMenu->addSeparator();
+    auto* actClearRecent = m_recentFilesMenu->addAction(tr("Clear Recent"));
+    connect(actClearRecent, &QAction::triggered, this, &MainWindow::clearRecentFiles);
+    updateRecentFilesMenu();
+
+    fileMenu->addSeparator();
 
     auto* actExport = fileMenu->addAction(tr("&Export..."));
     actExport->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
@@ -137,6 +174,13 @@ void MainWindow::setupMenus()
     m_actToggleEffectsRack->setCheckable(true);
     m_actToggleEffectsRack->setChecked(true);
     connect(m_actToggleEffectsRack, &QAction::triggered, this, &MainWindow::toggleEffectsRack);
+
+    m_actToggleLUFS = viewMenu->addAction(tr("&LUFS Meter"));
+    m_actToggleLUFS->setCheckable(true);
+    m_actToggleLUFS->setChecked(true);
+    connect(m_actToggleLUFS, &QAction::triggered, this, [this]() {
+        if (m_lufsDock) m_lufsDock->setVisible(!m_lufsDock->isVisible());
+    });
 
     // ── Track ───────────────────────────────────────────────────────────
     auto* trackMenu = m_menuBar->addMenu(tr("&Track"));
@@ -264,6 +308,14 @@ void MainWindow::setupDockWidgets()
     addDockWidget(Qt::RightDockWidgetArea, m_effectsDock);
     tabifyDockWidget(m_videoDock, m_effectsDock);
 
+    // Right dock — LUFS Meter
+    m_lufsDock = new QDockWidget(tr("LUFS Meter"), this);
+    m_lufsDock->setObjectName(QStringLiteral("LUFSMeterDock"));
+    m_lufsDock->setMinimumSize(80, 200);
+    m_lufsMeter = new LUFSMeterWidget(m_lufsDock);
+    m_lufsDock->setWidget(m_lufsMeter);
+    addDockWidget(Qt::RightDockWidgetArea, m_lufsDock);
+
     // Raise Video Preview as the default visible tab on the right
     m_videoDock->raise();
 }
@@ -379,6 +431,25 @@ void MainWindow::setupConnections()
             m_actToggleMediaBrowser, &QAction::setChecked);
     connect(m_effectsDock, &QDockWidget::visibilityChanged,
             m_actToggleEffectsRack, &QAction::setChecked);
+    connect(m_lufsDock, &QDockWidget::visibilityChanged,
+            m_actToggleLUFS, &QAction::setChecked);
+
+    // LUFS metering — feed from audio engine buffer-processed signal
+    if (m_audioEngine && m_lufsMeter) {
+        connect(m_audioEngine, &dawcast::AudioEngine::bufferProcessed,
+                m_lufsMeter, [this]() {
+            // In a full implementation, LUFS measurements would be computed
+            // from the master output buffer in the audio callback and
+            // posted to the GUI thread via atomic variables. For now, the
+            // LUFSMeterWidget receives values via its public setters.
+        });
+    }
+
+    // Reset LUFS meter when playback starts/stops
+    if (m_playbackEngine && m_lufsMeter) {
+        connect(m_playbackEngine, &dawcast::PlaybackEngine::playbackStarted,
+                m_lufsMeter, &LUFSMeterWidget::reset);
+    }
 
     // Pre-cache waveforms when files are imported or double-clicked in Media Browser
     connect(m_mediaBrowser, &MediaBrowser::fileDoubleClicked,
@@ -405,17 +476,34 @@ void MainWindow::newProject()
 
 void MainWindow::openProject()
 {
+    auto* config = dawcast::config::AppConfig::instance();
+    QString lastDir = config->value(QStringLiteral("file/lastOpenDir")).toString();
+
     QString path = QFileDialog::getOpenFileName(
         this, tr("Open Project"),
-        QString(),
+        lastDir,
         tr("DAWCast Projects (*.dawcast);;All Files (*)"));
 
     if (!path.isEmpty()) {
-        m_projectPath = path;
-        QFileInfo fi(path);
-        setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
-        statusBar()->showMessage(tr("Opened: %1").arg(fi.fileName()), 5000);
+        openProject(path);
     }
+}
+
+void MainWindow::openProject(const QString& path)
+{
+    if (path.isEmpty()) return;
+
+    m_projectPath = path;
+    QFileInfo fi(path);
+    setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
+    statusBar()->showMessage(tr("Opened: %1").arg(fi.fileName()), 5000);
+
+    addToRecentFiles(path);
+
+    // Remember directory for next file dialog
+    auto* config = dawcast::config::AppConfig::instance();
+    config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
+    config->save();
 }
 
 void MainWindow::saveProject()
@@ -429,9 +517,12 @@ void MainWindow::saveProject()
 
 void MainWindow::saveProjectAs()
 {
+    auto* config = dawcast::config::AppConfig::instance();
+    QString lastDir = config->value(QStringLiteral("file/lastOpenDir")).toString();
+
     QString path = QFileDialog::getSaveFileName(
         this, tr("Save Project As"),
-        QString(),
+        lastDir,
         tr("DAWCast Projects (*.dawcast);;All Files (*)"));
 
     if (!path.isEmpty()) {
@@ -439,12 +530,17 @@ void MainWindow::saveProjectAs()
         QFileInfo fi(path);
         setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
         statusBar()->showMessage(tr("Project saved as: %1").arg(fi.fileName()), 5000);
+
+        addToRecentFiles(path);
+
+        config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
+        config->save();
     }
 }
 
 void MainWindow::exportProject()
 {
-    statusBar()->showMessage(tr("Export not yet implemented"), 3000);
+    runExportPipeline();
 }
 
 // ── Edit Slots ──────────────────────────────────────────────────────────────
@@ -585,13 +681,8 @@ void MainWindow::stopStreaming()
 
 void MainWindow::showAbout()
 {
-    QMessageBox::about(
-        this,
-        tr("About Mcaster1DAWCast"),
-        tr("<h3>Mcaster1DAWCast 1.0.0-alpha</h3>"
-           "<p>Multi-Channel DAW for Broadcasting</p>"
-           "<p>Copyright &copy; 2026 David St. John</p>"
-           "<p><a href=\"https://mcaster1.com\">mcaster1.com</a></p>"));
+    AboutDialog dlg(this);
+    dlg.exec();
 }
 
 void MainWindow::showDocumentation()
@@ -633,6 +724,212 @@ void MainWindow::onStop()
 void MainWindow::onRecord()
 {
     statusBar()->showMessage(tr("Recording"), 2000);
+}
+
+// ── Recent Files ───────────────────────────────────────────────────────────
+
+void MainWindow::updateRecentFilesMenu()
+{
+    auto* config = dawcast::config::AppConfig::instance();
+    QStringList files = config->value(QStringLiteral("file/recentFiles")).toStringList();
+
+    int numRecent = qMin(files.size(), kMaxRecentFiles);
+    for (int i = 0; i < numRecent; ++i) {
+        QFileInfo fi(files[i]);
+        QString text = QStringLiteral("&%1  %2").arg(i + 1).arg(fi.fileName());
+        m_recentFileActions[i]->setText(text);
+        m_recentFileActions[i]->setData(files[i]);
+        m_recentFileActions[i]->setVisible(true);
+        m_recentFileActions[i]->setToolTip(files[i]);
+    }
+
+    for (int i = numRecent; i < kMaxRecentFiles; ++i) {
+        m_recentFileActions[i]->setVisible(false);
+    }
+
+    m_recentFilesMenu->setEnabled(numRecent > 0);
+}
+
+void MainWindow::addToRecentFiles(const QString& path)
+{
+    auto* config = dawcast::config::AppConfig::instance();
+    QStringList files = config->value(QStringLiteral("file/recentFiles")).toStringList();
+
+    // Remove duplicates, then prepend the new path
+    files.removeAll(path);
+    files.prepend(path);
+
+    // Cap at max
+    while (files.size() > kMaxRecentFiles) {
+        files.removeLast();
+    }
+
+    config->setValue(QStringLiteral("file/recentFiles"), files);
+    config->save();
+
+    updateRecentFilesMenu();
+}
+
+void MainWindow::openRecentFile()
+{
+    auto* action = qobject_cast<QAction*>(sender());
+    if (action) {
+        QString path = action->data().toString();
+        if (!path.isEmpty()) {
+            openProject(path);
+        }
+    }
+}
+
+void MainWindow::clearRecentFiles()
+{
+    auto* config = dawcast::config::AppConfig::instance();
+    config->setValue(QStringLiteral("file/recentFiles"), QStringList());
+    config->save();
+    updateRecentFilesMenu();
+    statusBar()->showMessage(tr("Recent files cleared"), 3000);
+}
+
+// ── Window State Persistence ───────────────────────────────────────────────
+
+void MainWindow::saveWindowState()
+{
+    auto* config = dawcast::config::AppConfig::instance();
+    config->setValue(QStringLiteral("window/geometry"),
+                     QString::fromLatin1(saveGeometry().toBase64()));
+    config->setValue(QStringLiteral("window/state"),
+                     QString::fromLatin1(saveState().toBase64()));
+    config->save();
+}
+
+void MainWindow::restoreWindowState()
+{
+    auto* config = dawcast::config::AppConfig::instance();
+
+    QByteArray geo = QByteArray::fromBase64(
+        config->value(QStringLiteral("window/geometry"), QString())
+            .toString().toLatin1());
+    QByteArray state = QByteArray::fromBase64(
+        config->value(QStringLiteral("window/state"), QString())
+            .toString().toLatin1());
+
+    if (!geo.isEmpty()) restoreGeometry(geo);
+    if (!state.isEmpty()) restoreState(state);
+}
+
+// ── Export Pipeline ───────────────────────────────────────────────────────
+
+void MainWindow::runExportPipeline()
+{
+    // Stop playback before exporting
+    if (m_playbackEngine && m_playbackEngine->isPlaying()) {
+        m_playbackEngine->stop();
+    }
+
+    // Show the ExportDialog to collect settings
+    ExportDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    ExportSettings settings = dlg.exportSettings();
+
+    // Build the ExportEngine config from dialog settings
+    dawcast::ExportEngine::ExportConfig config;
+    config.audioCodec   = settings.audioCodec;
+    config.audioBitrate = settings.audioBitrate;
+    config.sampleRate   = settings.sampleRate;
+    config.channels     = 2;  // Stereo by default
+
+    if (settings.audioOnly) {
+        config.videoCodec.clear();
+    } else {
+        config.videoCodec   = settings.videoCodec;
+        config.videoBitrate = 5000;
+        config.videoWidth   = settings.videoWidth;
+        config.videoHeight  = settings.videoHeight;
+        config.videoFps     = settings.videoFps;
+    }
+
+    // Determine output path -- use the outputPathEdit from the dialog,
+    // or fall back to a file dialog
+    // The ExportDialog stores the path in a QLineEdit; extract it
+    // via the settings. If empty, ask the user.
+    QString outputPath;
+    // Try to find the output path from the dialog's line edit
+    auto* pathEdit = dlg.findChild<QLineEdit*>();
+    if (pathEdit && !pathEdit->text().isEmpty()) {
+        outputPath = pathEdit->text();
+    }
+
+    if (outputPath.isEmpty()) {
+        QString filter;
+        if (settings.audioOnly) {
+            filter = tr("Audio Files (*.mp3 *.aac *.wav *.flac *.ogg *.opus);;All Files (*)");
+        } else {
+            filter = tr("Video Files (*.mp4 *.mkv *.webm *.avi);;All Files (*)");
+        }
+        outputPath = QFileDialog::getSaveFileName(
+            this, tr("Export"), QString(), filter);
+        if (outputPath.isEmpty())
+            return;
+    }
+
+    config.outputPath = outputPath;
+
+    // Determine container from the file extension
+    QFileInfo fi(outputPath);
+    config.container = fi.suffix().toLower();
+
+    // Create the export engine
+    m_exportEngine = new dawcast::ExportEngine(this);
+
+    // Show a progress dialog
+    auto* progressDlg = new QProgressDialog(
+        tr("Exporting..."), tr("Cancel"), 0, 100, this);
+    progressDlg->setWindowModality(Qt::WindowModal);
+    progressDlg->setMinimumDuration(0);
+    progressDlg->setValue(0);
+
+    // Connect signals
+    connect(m_exportEngine, &dawcast::ExportEngine::progress,
+            progressDlg, &QProgressDialog::setValue);
+
+    connect(m_exportEngine, &dawcast::ExportEngine::finished,
+            this, [this, progressDlg](const QString& path) {
+        progressDlg->close();
+        progressDlg->deleteLater();
+
+        QMessageBox::information(
+            this, tr("Export Complete"),
+            tr("Successfully exported to:\n%1").arg(path));
+
+        statusBar()->showMessage(
+            tr("Export complete: %1").arg(QFileInfo(path).fileName()), 5000);
+
+        m_exportEngine->deleteLater();
+        m_exportEngine = nullptr;
+    });
+
+    connect(m_exportEngine, &dawcast::ExportEngine::error,
+            this, [this, progressDlg](const QString& message) {
+        progressDlg->close();
+        progressDlg->deleteLater();
+
+        QMessageBox::warning(
+            this, tr("Export Error"), message);
+
+        statusBar()->showMessage(tr("Export failed"), 3000);
+
+        m_exportEngine->deleteLater();
+        m_exportEngine = nullptr;
+    });
+
+    connect(progressDlg, &QProgressDialog::canceled,
+            m_exportEngine, &dawcast::ExportEngine::cancelExport);
+
+    // Start the export
+    statusBar()->showMessage(tr("Exporting..."));
+    m_exportEngine->startExport(m_timelineModel, config);
 }
 
 } // namespace dawcast::widgets

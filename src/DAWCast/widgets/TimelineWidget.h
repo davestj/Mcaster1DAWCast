@@ -6,9 +6,13 @@
 #include <QWidget>
 #include <QList>
 #include <QString>
+#include <QStringList>
 #include <cstdint>
 
 class QPainter;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 
 namespace dawcast { class AudioTrack; }
 namespace dawcast { class Automation; }
@@ -32,6 +36,11 @@ public:
 
     QList<int> selectedClips() const;
 
+    /// Supported audio file extensions for drag-and-drop import
+    static QStringList supportedAudioExtensions();
+    /// Supported video file extensions for drag-and-drop import
+    static QStringList supportedVideoExtensions();
+
 signals:
     void clipMoved(int clipId, int64_t newPosition);
     void clipSelected(int clipId);
@@ -50,6 +59,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private:
     void drawRuler(QPainter& painter, int viewWidth);
@@ -62,6 +74,11 @@ private:
     // Automation point hit-testing
     int  hitTestAutomationPoint(int trackIndex, int x, int y) const;
     QColor automationColor(const QString& paramName) const;
+
+    // Drag-and-drop file import helpers
+    bool isSupportedMediaFile(const QString& filePath) const;
+    bool isVideoFile(const QString& filePath) const;
+    int64_t probeDuration(const QString& filePath) const;
 
     Timeline* m_timeline = nullptr;
     float           m_zoom     = 1.0f;

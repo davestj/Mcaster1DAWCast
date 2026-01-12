@@ -8,6 +8,7 @@
 
 #include "app.h"
 #include "widgets/MainWindow.h"
+#include "widgets/SplashScreen.h"
 #include "config/DebugLogger.h"
 #include "widgets/ThemeEngine.h"
 
@@ -22,7 +23,14 @@ int main(int argc, char* argv[])
     // Use Fusion as the base style for consistent cross-platform appearance
     app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
 
+    // Show the splash screen immediately
+    auto* splash = new dawcast::widgets::SplashScreen();
+    splash->show();
+    splash->showMessage(QStringLiteral("Initializing"));
+    app.processEvents();
+
     // Initialize debug logger — write to <appDir>/logs/mcaster1dawcast.log
+    splash->showMessage(QStringLiteral("Starting debug logger"));
     QString appDir = QCoreApplication::applicationDirPath();
     QDir logDir(appDir + QStringLiteral("/logs"));
     if (!logDir.exists()) {
@@ -34,11 +42,19 @@ int main(int argc, char* argv[])
         QStringLiteral("Mcaster1DAWCast 1.0.0-alpha starting"));
 
     // Load default theme if available
+    splash->showMessage(QStringLiteral("Loading theme"));
     dawcast::widgets::ThemeEngine::instance()->loadTheme(QStringLiteral("default"));
 
-    // Create and show main window
+    // Create the main window (this initializes audio engine, timeline, etc.)
+    splash->showMessage(QStringLiteral("Loading audio engine"));
     auto* mainWindow = new dawcast::widgets::MainWindow();
+
+    splash->showMessage(QStringLiteral("Preparing workspace"));
+    app.processEvents();
+
+    // Show the main window and fade out the splash
     mainWindow->showMaximized();
+    splash->finish(mainWindow);
 
     dawcast::config::DebugLogger::instance()->info(
         QStringLiteral("Main window displayed — entering event loop"));

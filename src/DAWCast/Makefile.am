@@ -99,6 +99,11 @@ AM_CPPFLAGS += $(QT6MULTIMEDIA_CFLAGS) -DHAVE_QT6MULTIMEDIA
 mcaster1dawcast_LDADD += $(QT6MULTIMEDIA_LIBS)
 endif
 
+if HAVE_QT6SVG
+AM_CPPFLAGS += $(QT6SVG_CFLAGS) -DHAVE_QT6SVG
+mcaster1dawcast_LDADD += $(QT6SVG_LIBS)
+endif
+
 # ── Objective-C++ (.mm) compilation rule ─────────────────────────────────────
 SUFFIXES = .mm
 .mm.o:
@@ -315,6 +320,19 @@ moc_AboutDialog.cpp: $(srcdir)/widgets/AboutDialog.h
 moc_PianoRollWidget.cpp: $(srcdir)/widgets/PianoRollWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_ParametricEQDialog.cpp: $(srcdir)/widgets/ParametricEQDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_LUFSMeterWidget.cpp: $(srcdir)/widgets/LUFSMeterWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_SplashScreen.cpp: $(srcdir)/widgets/SplashScreen.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- audio_engine (ExportEngine) --
+moc_ExportEngine.cpp: $(srcdir)/audio_engine/ExportEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -358,6 +376,8 @@ mcaster1dawcast_SOURCES = \
     audio_engine/PlaybackEngine.cpp \
     audio_engine/AudioClipReader.h \
     audio_engine/AudioClipReader.cpp \
+    audio_engine/ExportEngine.h \
+    audio_engine/ExportEngine.cpp \
     video_engine/VideoDecoder.h \
     video_engine/VideoDecoder.cpp \
     video_engine/VideoEncoder.h \
@@ -533,6 +553,12 @@ mcaster1dawcast_SOURCES = \
     widgets/AboutDialog.cpp \
     widgets/PianoRollWidget.h \
     widgets/PianoRollWidget.cpp \
+    widgets/ParametricEQDialog.h \
+    widgets/ParametricEQDialog.cpp \
+    widgets/LUFSMeterWidget.h \
+    widgets/LUFSMeterWidget.cpp \
+    widgets/SplashScreen.h \
+    widgets/SplashScreen.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -566,6 +592,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_AudioWorker.cpp \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
+    moc_ExportEngine.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
@@ -621,6 +648,9 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_ThemeEngine.cpp \
     moc_AboutDialog.cpp \
     moc_PianoRollWidget.cpp \
+    moc_ParametricEQDialog.cpp \
+    moc_LUFSMeterWidget.cpp \
+    moc_SplashScreen.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 
@@ -635,6 +665,7 @@ BUILT_SOURCES = \
     moc_AudioWorker.cpp \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
+    moc_ExportEngine.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
@@ -690,6 +721,9 @@ BUILT_SOURCES = \
     moc_ThemeEngine.cpp \
     moc_AboutDialog.cpp \
     moc_PianoRollWidget.cpp \
+    moc_ParametricEQDialog.cpp \
+    moc_LUFSMeterWidget.cpp \
+    moc_SplashScreen.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 

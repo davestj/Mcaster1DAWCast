@@ -4,8 +4,10 @@
 
 #include "EffectsRackWidget.h"
 #include "BevelButton.h"
+#include "ParametricEQDialog.h"
 #include "DspChain.h"
 #include "IEffectUnit.h"
+#include "ParametricEQ.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -168,9 +170,20 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
         "QPushButton:hover { background: #4a4a52; }"));
     layout->addWidget(editBtn);
 
-    connect(editBtn, &QPushButton::clicked, this, [slotIndex] {
-        // In a full implementation, this would open an effect editor dialog
+    connect(editBtn, &QPushButton::clicked, this, [this, effect, slotIndex] {
         Q_UNUSED(slotIndex);
+        if (!effect) return;
+
+        // Check if this effect is a ParametricEQ and open the visual editor
+        auto* peq = dynamic_cast<ParametricEQ*>(effect);
+        if (peq) {
+            auto* dialog = new ParametricEQDialog(peq, this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            dialog->show();
+            return;
+        }
+
+        // Other effect types can be wired up to their editors here in the future
     });
 
     // Remove button

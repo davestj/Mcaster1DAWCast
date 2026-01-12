@@ -9,6 +9,9 @@
 #include <QDockWidget>
 #include <QSplitter>
 #include <QAction>
+#include <QCloseEvent>
+#include <QList>
+#include <QMenu>
 
 namespace dawcast {
 class Timeline;
@@ -16,6 +19,7 @@ class AudioEngine;
 class AudioMixer;
 class PlaybackEngine;
 class VideoPlaybackController;
+class ExportEngine;
 }
 
 namespace dawcast::widgets {
@@ -26,6 +30,7 @@ class VideoPreview;
 class MediaBrowser;
 class EffectsRackWidget;
 class TransportBar;
+class LUFSMeterWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -34,13 +39,21 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private slots:
     // File
     void newProject();
     void openProject();
+    void openProject(const QString& path);
     void saveProject();
     void saveProjectAs();
     void exportProject();
+
+    // Recent files
+    void openRecentFile();
+    void clearRecentFiles();
 
     // Edit
     void undo();
@@ -91,6 +104,15 @@ private:
     void setupStatusBar();
     void setupConnections();
 
+    // Recent files
+    void updateRecentFilesMenu();
+    void addToRecentFiles(const QString& path);
+    static constexpr int kMaxRecentFiles = 10;
+
+    // Window state persistence
+    void saveWindowState();
+    void restoreWindowState();
+
     // Central
     QSplitter*          m_centralSplitter = nullptr;
     TimelineWidget*     m_timeline        = nullptr;
@@ -101,6 +123,7 @@ private:
     MediaBrowser*       m_mediaBrowser  = nullptr;
     EffectsRackWidget*  m_effectsRack   = nullptr;
     TransportBar*       m_transportBar  = nullptr;
+    LUFSMeterWidget*    m_lufsMeter     = nullptr;
 
     // Menu bar & toolbar
     QMenuBar*   m_menuBar   = nullptr;
@@ -111,12 +134,18 @@ private:
     QDockWidget* m_videoDock        = nullptr;
     QDockWidget* m_mediaBrowserDock = nullptr;
     QDockWidget* m_effectsDock      = nullptr;
+    QDockWidget* m_lufsDock         = nullptr;
 
     // View menu toggle actions (to sync checkmarks with dock visibility)
     QAction* m_actToggleMixer        = nullptr;
     QAction* m_actToggleVideo        = nullptr;
     QAction* m_actToggleMediaBrowser = nullptr;
     QAction* m_actToggleEffectsRack  = nullptr;
+    QAction* m_actToggleLUFS         = nullptr;
+
+    // Recent files menu
+    QMenu*          m_recentFilesMenu = nullptr;
+    QList<QAction*> m_recentFileActions;
 
     QString m_projectPath;
 
@@ -129,6 +158,9 @@ private:
 
     void setupAudioPipeline();
     void setupVideoPlayback();
+    void runExportPipeline();
+
+    ExportEngine* m_exportEngine = nullptr;
 };
 
 } // namespace dawcast::widgets

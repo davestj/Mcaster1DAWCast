@@ -19,9 +19,20 @@
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QContextMenuEvent>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <QMenu>
 #include <QFontMetrics>
 #include <QFileInfo>
+
+#ifdef HAVE_AVFORMAT
+extern "C" {
+#include <libavformat/avformat.h>
+}
+#endif
 
 #include <cmath>
 #include <algorithm>
@@ -72,6 +83,7 @@ TimelineWidget::TimelineWidget(QWidget* parent)
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
+    setAcceptDrops(true);
     setMinimumHeight(kRulerHeight + kTrackHeight * 2);
 
     // Repaint when waveform data becomes available
@@ -995,6 +1007,177 @@ QColor TimelineWidget::automationColor(const QString& paramName) const
         return kAutoPanColor;
     // Default for effect parameters and anything else
     return kAutoEffectColor;
+}
+
+// ── Drag-and-Drop File Import ─────────────────────────────────────────────
+
+QStringList TimelineWidget::supportedAudioExtensions()
+{
+    return { QStringLiteral("wav"), QStringLiteral("mp3"),
+             QStringLiteral("flac"), QStringLiteral("aac"),
+             QStringLiteral("ogg"), QStringLiteral("opus") };
+}
+
+QStringList TimelineWidget::supportedVideoExtensions()
+{
+    return { QStringLiteral("mp4"), QStringLiteral("mkv"),
+             QStringLiteral("webm"), QStringLiteral("avi") };
+}
+
+bool TimelineWidget::isSupportedMediaFile(const QString& filePath) const
+{
+    const QString ext = QFileInfo(filePath).suffix().toLower();
+    return supportedAudioExtensions().contains(ext)
+        || supportedVideoExtensions().contains(ext);
+}
+
+bool TimelineWidget::isVideoFile(const QString& filePath) const
+{
+    const QString ext = QFileInfo(filePath).suffix().toLower();
+    return supportedVideoExtensions().contains(ext);
+}
+
+int64_t TimelineWidget::probeDuration(const QString& filePath) const
+{
+    int sampleRate = 48000;
+    if (m_timeline)
+        sampleRate = m_timeline->sampleRate() > 0 ? m_timeline->sampleRate() : 48000;
+
+#ifdef HAVE_AVFORMAT
+    AVFormatContext* fmtCtx = nullptr;
+    QByteArray pathUtf8 = filePath.toUtf8();
+    if (avformat_open_input(&fmtCtx, pathUtf8.constData(), nullptr, nullptr) < 0)
+        return sampleRate * 10; // fallback: 10 seconds
+
+    if (avformat_find_stream_info(fmtCtx, nullptr) < 0) {
+        avformat_close_input(&fmtCtx);
+        return sampleRate * 10;
+    }
+
+    // Use the overall container duration (in AV_TIME_BASE units)
+    int64_t durationSamples = sampleRate * 10; // fallback
+    if (fmtCtx->duration > 0) {
+        double durationSec = static_cast<double>(fmtCtx->duration) / AV_TIME_BASE;
+        durationSamples = static_cast<int64_t>(durationSec * sampleRate);
+    }
+
+    avformat_close_input(&fmtCtx);
+    return durationSamples;
+#else
+    // Without FFmpeg, fall back to WaveformCache data if available
+    auto* cache = WaveformCache::instance();
+    const WaveformData* wf = cache->getWaveform(filePath);
+    if (wf && wf->totalFrames > 0) {
+        return wf->totalFrames;
+    }
+    // Last resort: assume 10 seconds
+    return static_cast<int64_t>(sampleRate) * 10;
+#endif
+}
+
+void TimelineWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (!event->mimeData()->hasUrls()) return;
+
+    const QList<QUrl> urls = event->mimeData()->urls();
+    for (const QUrl& url : urls) {
+        if (!url.isLocalFile()) continue;
+        if (isSupportedMediaFile(url.toLocalFile())) {
+            event->acceptProposedAction();
+            return;
+        }
+    }
+}
+
+void TimelineWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    event->acceptProposedAction();
+}
+
+void TimelineWidget::dropEvent(QDropEvent* event)
+{
+    if (!m_timeline) return;
+
+    const QList<QUrl> urls = event->mimeData()->urls();
+    if (urls.isEmpty()) return;
+
+    int64_t dropSample = pixelToSample(static_cast<int>(event->position().x()),
+                                        m_scroll, m_zoom);
+    dropSample = qMax(int64_t(0), dropSample);
+
+    // Determine which track the drop landed on (if any)
+    int dropTrackIdx = -1;
+    int dropY = static_cast<int>(event->position().y());
+    if (dropY >= kRulerHeight) {
+        dropTrackIdx = (dropY - kRulerHeight) / kTrackHeight;
+        if (dropTrackIdx >= m_timeline->trackCount())
+            dropTrackIdx = -1; // dropped below existing tracks
+    }
+
+    int64_t cursorPos = dropSample;
+
+    for (const QUrl& url : urls) {
+        if (!url.isLocalFile()) continue;
+        const QString filePath = url.toLocalFile();
+        if (!isSupportedMediaFile(filePath)) continue;
+
+        bool video = isVideoFile(filePath);
+
+        // Find or create the target track
+        int targetTrackIdx = dropTrackIdx;
+        if (targetTrackIdx < 0) {
+            // No valid track at drop position: create a new one
+            if (video)
+                m_timeline->addVideoTrack();
+            else
+                m_timeline->addAudioTrack();
+            targetTrackIdx = m_timeline->trackCount() - 1;
+        }
+
+        // Verify the target track type is compatible, otherwise create new
+        QObject* trackObj = m_timeline->track(targetTrackIdx);
+        auto* audioTrack = qobject_cast<AudioTrack*>(trackObj);
+        auto* videoTrack = qobject_cast<VideoTrack*>(trackObj);
+
+        if (video && !videoTrack) {
+            m_timeline->addVideoTrack();
+            targetTrackIdx = m_timeline->trackCount() - 1;
+            trackObj = m_timeline->track(targetTrackIdx);
+            videoTrack = qobject_cast<VideoTrack*>(trackObj);
+        } else if (!video && !audioTrack) {
+            m_timeline->addAudioTrack();
+            targetTrackIdx = m_timeline->trackCount() - 1;
+            trackObj = m_timeline->track(targetTrackIdx);
+            audioTrack = qobject_cast<AudioTrack*>(trackObj);
+        }
+
+        // Probe file duration
+        int64_t durationSamples = probeDuration(filePath);
+
+        // Create the clip
+        auto* clip = new Clip(trackObj);
+        clip->setSourcePath(filePath);
+        clip->setSourceIn(0);
+        clip->setSourceOut(durationSamples);
+        clip->setTimelinePosition(cursorPos);
+
+        // Add clip to the appropriate track
+        if (audioTrack)
+            audioTrack->addClip(clip);
+        else if (videoTrack)
+            videoTrack->addClip(clip);
+
+        // Request waveform decode for audio files
+        if (!video) {
+            WaveformCache::instance()->requestWaveform(filePath);
+        }
+
+        // Advance cursor for the next dropped file so they don't overlap
+        cursorPos += durationSamples;
+    }
+
+    event->acceptProposedAction();
+    update();
 }
 
 } // namespace dawcast::widgets

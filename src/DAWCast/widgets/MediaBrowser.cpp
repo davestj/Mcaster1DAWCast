@@ -8,8 +8,51 @@
 #include <QTreeView>
 #include <QFileSystemModel>
 #include <QPushButton>
+#include <QDrag>
+#include <QMimeData>
+#include <QUrl>
 
 namespace dawcast::widgets {
+
+// ── DraggableTreeView ─────────────────────────────────────────────────────
+
+DraggableTreeView::DraggableTreeView(QWidget* parent)
+    : QTreeView(parent)
+{
+    setDragEnabled(true);
+    setDragDropMode(QAbstractItemView::DragOnly);
+    setDefaultDropAction(Qt::CopyAction);
+}
+
+void DraggableTreeView::startDrag(Qt::DropActions supportedActions)
+{
+    auto* fsModel = qobject_cast<QFileSystemModel*>(model());
+    if (!fsModel) {
+        QTreeView::startDrag(supportedActions);
+        return;
+    }
+
+    QModelIndexList selected = selectionModel()->selectedIndexes();
+    QList<QUrl> urls;
+    for (const QModelIndex& idx : selected) {
+        if (idx.column() != 0) continue;
+        QString path = fsModel->filePath(idx);
+        if (!fsModel->isDir(idx)) {
+            urls.append(QUrl::fromLocalFile(path));
+        }
+    }
+
+    if (urls.isEmpty()) return;
+
+    auto* mimeData = new QMimeData;
+    mimeData->setUrls(urls);
+
+    auto* drag = new QDrag(this);
+    drag->setMimeData(mimeData);
+    drag->exec(Qt::CopyAction);
+}
+
+// ── MediaBrowser ──────────────────────────────────────────────────────────
 
 MediaBrowser::MediaBrowser(QWidget* parent)
     : QWidget(parent)
@@ -20,13 +63,14 @@ MediaBrowser::MediaBrowser(QWidget* parent)
     m_fileModel->setNameFilters({
         QStringLiteral("*.wav"), QStringLiteral("*.mp3"),
         QStringLiteral("*.flac"), QStringLiteral("*.aac"),
-        QStringLiteral("*.ogg"), QStringLiteral("*.mp4"),
-        QStringLiteral("*.mov"), QStringLiteral("*.avi"),
-        QStringLiteral("*.mkv")
+        QStringLiteral("*.ogg"), QStringLiteral("*.opus"),
+        QStringLiteral("*.mp4"), QStringLiteral("*.mov"),
+        QStringLiteral("*.avi"), QStringLiteral("*.mkv"),
+        QStringLiteral("*.webm")
     });
     m_fileModel->setNameFilterDisables(false);
 
-    m_treeView = new QTreeView(this);
+    m_treeView = new DraggableTreeView(this);
     m_treeView->setModel(m_fileModel);
     m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     layout->addWidget(m_treeView);
