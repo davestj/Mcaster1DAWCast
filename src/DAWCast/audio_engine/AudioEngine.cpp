@@ -58,6 +58,39 @@ AudioEngine::~AudioEngine()
 }
 
 // ---------------------------------------------------------------------------
+// Device enumeration
+// ---------------------------------------------------------------------------
+QList<AudioDeviceInfo> AudioEngine::enumerateDevices()
+{
+    QList<AudioDeviceInfo> devices;
+
+#ifdef HAVE_PORTAUDIO
+    int count = Pa_GetDeviceCount();
+    if (count < 0) return devices;
+
+    int defaultIn  = Pa_GetDefaultInputDevice();
+    int defaultOut = Pa_GetDefaultOutputDevice();
+
+    for (int i = 0; i < count; ++i) {
+        const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
+        if (!info) continue;
+
+        AudioDeviceInfo dev;
+        dev.index             = i;
+        dev.name              = QString::fromUtf8(info->name);
+        dev.maxInputChannels  = info->maxInputChannels;
+        dev.maxOutputChannels = info->maxOutputChannels;
+        dev.defaultSampleRate = info->defaultSampleRate;
+        dev.isDefaultInput    = (i == defaultIn);
+        dev.isDefaultOutput   = (i == defaultOut);
+        devices.append(dev);
+    }
+#endif
+
+    return devices;
+}
+
+// ---------------------------------------------------------------------------
 // start / stop
 // ---------------------------------------------------------------------------
 bool AudioEngine::start()
@@ -68,30 +101,101 @@ bool AudioEngine::start()
     static constexpr int kOutputChannels = 2;
 
     PaStream* stream = nullptr;
-    PaError err = Pa_OpenDefaultStream(
-        &stream,
-        0,                     // no input channels
-        kOutputChannels,       // stereo output
-        paFloat32,             // 32-bit float samples
-        m_sampleRate,
-        static_cast<unsigned long>(m_bufferSize),
-        &AudioEngine::paCallback,
-        this);
 
-    m_paStream = stream;
-    if (err != paNoError) {
-        emit engineError(
-            QStringLiteral("Pa_OpenDefaultStream failed: %1")
-                .arg(QString::fromUtf8(Pa_GetErrorText(err))));
-        m_paStream = nullptr;
-        return false;
+    // Determine whether to use the explicit-device path or the default path.
+    bool useExplicitDevice = (m_outputDeviceIndex >= 0) || m_duplexEnabled;
+
+    if (useExplicitDevice) {
+        // -- Output parameters -----------------------------------------------
+        PaStreamParameters outParams;
+        std::memset(&outParams, 0, sizeof(outParams));
+
+        if (m_outputDeviceIndex >= 0) {
+            outParams.device = m_outputDeviceIndex;
+        } else {
+            outParams.device = Pa_GetDefaultOutputDevice();
+        }
+        if (outParams.device == paNoDevice) {
+            emit engineError(QStringLiteral("No output device available"));
+            return false;
+        }
+
+        const PaDeviceInfo* outInfo = Pa_GetDeviceInfo(outParams.device);
+        outParams.channelCount = kOutputChannels;
+        outParams.sampleFormat = paFloat32;
+        outParams.suggestedLatency =
+            outInfo ? outInfo->defaultLowOutputLatency : 0.0;
+        outParams.hostApiSpecificStreamInfo = nullptr;
+
+        // -- Input parameters (only when duplex) -----------------------------
+        PaStreamParameters inParams;
+        PaStreamParameters* inPtr = nullptr;
+
+        if (m_duplexEnabled) {
+            std::memset(&inParams, 0, sizeof(inParams));
+
+            if (m_inputDeviceIndex >= 0) {
+                inParams.device = m_inputDeviceIndex;
+            } else {
+                inParams.device = Pa_GetDefaultInputDevice();
+            }
+
+            if (inParams.device != paNoDevice) {
+                const PaDeviceInfo* inInfo = Pa_GetDeviceInfo(inParams.device);
+                int maxIn = inInfo ? inInfo->maxInputChannels : 2;
+                m_inputChannelCount = qMin(2, maxIn);
+                inParams.channelCount = m_inputChannelCount;
+                inParams.sampleFormat = paFloat32;
+                inParams.suggestedLatency =
+                    inInfo ? inInfo->defaultLowInputLatency : 0.0;
+                inParams.hostApiSpecificStreamInfo = nullptr;
+                inPtr = &inParams;
+            }
+        }
+
+        PaError err = Pa_OpenStream(
+            &stream,
+            inPtr,              // input params (nullptr = output-only)
+            &outParams,         // output params
+            m_sampleRate,
+            static_cast<unsigned long>(m_bufferSize),
+            paClipOff,
+            &AudioEngine::paCallback,
+            this);
+
+        if (err != paNoError) {
+            emit engineError(
+                QStringLiteral("Pa_OpenStream failed: %1")
+                    .arg(QString::fromUtf8(Pa_GetErrorText(err))));
+            return false;
+        }
+    } else {
+        // Fallback to simple default-device path
+        PaError err = Pa_OpenDefaultStream(
+            &stream,
+            0,                     // no input channels
+            kOutputChannels,       // stereo output
+            paFloat32,
+            m_sampleRate,
+            static_cast<unsigned long>(m_bufferSize),
+            &AudioEngine::paCallback,
+            this);
+
+        if (err != paNoError) {
+            emit engineError(
+                QStringLiteral("Pa_OpenDefaultStream failed: %1")
+                    .arg(QString::fromUtf8(Pa_GetErrorText(err))));
+            return false;
+        }
     }
 
-    err = Pa_StartStream(static_cast<PaStream*>(m_paStream));
-    if (err != paNoError) {
+    m_paStream = stream;
+
+    PaError startErr = Pa_StartStream(static_cast<PaStream*>(m_paStream));
+    if (startErr != paNoError) {
         emit engineError(
             QStringLiteral("Pa_StartStream failed: %1")
-                .arg(QString::fromUtf8(Pa_GetErrorText(err))));
+                .arg(QString::fromUtf8(Pa_GetErrorText(startErr))));
         Pa_CloseStream(static_cast<PaStream*>(m_paStream));
         m_paStream = nullptr;
         return false;
@@ -125,7 +229,7 @@ void AudioEngine::stop()
 // ---------------------------------------------------------------------------
 // Audio processing callback (runs on the audio thread)
 // ---------------------------------------------------------------------------
-int AudioEngine::processCallback(const float* /*input*/, float* output,
+int AudioEngine::processCallback(const float* input, float* output,
                                  unsigned long frameCount)
 {
     static constexpr int kOutputChannels = 2;
@@ -137,8 +241,11 @@ int AudioEngine::processCallback(const float* /*input*/, float* output,
 
     // Let the PlaybackEngine read decoded clip audio into per-track
     // buffers and set up mixer strip input pointers.
+    // Pass the input buffer through so the PlaybackEngine can hand it
+    // to the MultitrackRecorder for recording.
     if (m_playbackEngine) {
-        m_playbackEngine->processBlock(frames, kOutputChannels);
+        m_playbackEngine->processBlock(frames, kOutputChannels,
+                                       input, m_duplexEnabled ? m_inputChannelCount : 0);
     }
 
     // The mixer reads each strip's input buffer (set by PlaybackEngine)
@@ -173,6 +280,31 @@ void AudioEngine::setBufferSize(int size)
     bool wasRunning = m_running;
     if (wasRunning) stop();
     m_bufferSize = size;
+    if (wasRunning) start();
+}
+
+void AudioEngine::setOutputDevice(int deviceIndex)
+{
+    bool wasRunning = m_running;
+    if (wasRunning) stop();
+    m_outputDeviceIndex = deviceIndex;
+    if (wasRunning) start();
+}
+
+void AudioEngine::setInputDevice(int deviceIndex)
+{
+    bool wasRunning = m_running;
+    if (wasRunning) stop();
+    m_inputDeviceIndex = deviceIndex;
+    if (wasRunning) start();
+}
+
+void AudioEngine::setDuplexEnabled(bool enabled)
+{
+    if (m_duplexEnabled == enabled) return;
+    bool wasRunning = m_running;
+    if (wasRunning) stop();
+    m_duplexEnabled = enabled;
     if (wasRunning) start();
 }
 

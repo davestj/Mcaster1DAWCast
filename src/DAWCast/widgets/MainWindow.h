@@ -18,6 +18,7 @@ class Timeline;
 class AudioEngine;
 class AudioMixer;
 class PlaybackEngine;
+class MultitrackRecorder;
 class VideoPlaybackController;
 class ExportEngine;
 }
@@ -50,6 +51,7 @@ private slots:
     void saveProject();
     void saveProjectAs();
     void exportProject();
+    void openBatchEncoder();
 
     // Recent files
     void openRecentFile();
@@ -86,6 +88,9 @@ private slots:
     void stopRecording();
     void startStreaming();
     void stopStreaming();
+
+    // Tools
+    void openMassTagEditor();
 
     // Help
     void showAbout();
@@ -154,11 +159,14 @@ private:
     AudioEngine*               m_audioEngine            = nullptr;
     AudioMixer*                m_audioMixer             = nullptr;
     PlaybackEngine*            m_playbackEngine         = nullptr;
+    MultitrackRecorder*        m_recorder               = nullptr;
     VideoPlaybackController*   m_videoPlaybackController = nullptr;
 
     void setupAudioPipeline();
     void setupVideoPlayback();
     void runExportPipeline();
+    void updateRecordButtonState();
+    bool hasArmedTracks() const;
 
     ExportEngine* m_exportEngine = nullptr;
 };

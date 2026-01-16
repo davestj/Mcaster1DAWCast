@@ -5,6 +5,7 @@
 
 #include <QWidget>
 #include <QLabel>
+#include <QDoubleSpinBox>
 #include <cstdint>
 
 namespace dawcast::widgets {
@@ -23,6 +24,10 @@ public:
     void setPosition(int64_t samples, int sampleRate);
     void setDuration(int64_t samples, int sampleRate);
 
+    /// Flash the beat indicator. Call from Metronome::beat signal
+    /// with Qt::QueuedConnection.
+    void flashBeat(int beatNumber, bool isDownbeat);
+
 signals:
     void rewindClicked();
     void playClicked();
@@ -31,6 +36,8 @@ signals:
     void recordClicked();
     void fastForwardClicked();
     void loopToggled(bool enabled);
+    void metronomeToggled(bool enabled);
+    void tempoChanged(double bpm);
 
 private:
     void updateTimeDisplay();
@@ -47,7 +54,11 @@ private:
     BevelButton* m_stopBtn    = nullptr;
     BevelButton* m_recordBtn  = nullptr;
     BevelButton* m_ffBtn      = nullptr;
-    BevelButton* m_loopBtn    = nullptr;
+    BevelButton* m_loopBtn       = nullptr;
+    BevelButton* m_metronomeBtn  = nullptr;
+
+    QDoubleSpinBox* m_tempoSpin  = nullptr;
+    QLabel*         m_beatIndicator = nullptr;
 
     QLabel* m_timeDisplay = nullptr;
 };

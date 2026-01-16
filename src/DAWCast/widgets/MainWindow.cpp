@@ -16,11 +16,15 @@
 #include "../audio_engine/AudioEngine.h"
 #include "../audio_engine/AudioMixer.h"
 #include "../audio_engine/PlaybackEngine.h"
+#include "../audio_engine/MultitrackRecorder.h"
+#include "../audio_engine/Metronome.h"
 #include "../audio_engine/WaveformCache.h"
 #include "../audio_engine/ExportEngine.h"
 #include "../video_engine/VideoPlaybackController.h"
 #include "../config/AppConfig.h"
 #include "ExportDialog.h"
+#include "BatchEncoderDialog.h"
+#include "MassTagEditor.h"
 #include "AboutDialog.h"
 
 #include <QAction>
@@ -116,6 +120,10 @@ void MainWindow::setupMenus()
     auto* actExport = fileMenu->addAction(tr("&Export..."));
     actExport->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
     connect(actExport, &QAction::triggered, this, &MainWindow::exportProject);
+
+    auto* actBatchEncode = fileMenu->addAction(tr("&Batch Encoder..."));
+    actBatchEncode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    connect(actBatchEncode, &QAction::triggered, this, &MainWindow::openBatchEncoder);
 
     fileMenu->addSeparator();
 
@@ -232,6 +240,37 @@ void MainWindow::setupMenus()
     auto* actStopStream = broadcastMenu->addAction(tr("S&top Streaming"));
     connect(actStopStream, &QAction::triggered, this, &MainWindow::stopStreaming);
 
+    // ── Transport ──────────────────────────────────────────────────────
+    auto* transportMenu = m_menuBar->addMenu(tr("T&ransport"));
+
+    auto* actMetronome = transportMenu->addAction(tr("&Metronome"));
+    actMetronome->setCheckable(true);
+    actMetronome->setChecked(false);
+    actMetronome->setShortcut(QKeySequence(Qt::Key_M));
+    connect(actMetronome, &QAction::toggled, this, [this](bool on) {
+        if (m_playbackEngine && m_playbackEngine->metronome()) {
+            m_playbackEngine->metronome()->setEnabled(on);
+        }
+    });
+
+    transportMenu->addSeparator();
+
+    auto* actCountIn = transportMenu->addAction(tr("&Count-In (1 Bar)"));
+    actCountIn->setCheckable(true);
+    actCountIn->setChecked(false);
+    connect(actCountIn, &QAction::toggled, this, [this](bool on) {
+        if (m_playbackEngine && m_playbackEngine->metronome()) {
+            m_playbackEngine->metronome()->setCountIn(on ? 1 : 0);
+        }
+    });
+
+    // ── Tools ───────────────────────────────────────────────────────────
+    auto* toolsMenu = m_menuBar->addMenu(tr("&Tools"));
+
+    auto* actMassTag = toolsMenu->addAction(tr("Mass Tag &Editor..."));
+    actMassTag->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
+    connect(actMassTag, &QAction::triggered, this, &MainWindow::openMassTagEditor);
+
     // ── Help ────────────────────────────────────────────────────────────
     auto* helpMenu = m_menuBar->addMenu(tr("&Help"));
 
@@ -347,10 +386,25 @@ void MainWindow::setupAudioPipeline()
     m_audioEngine->setBufferSize(512);
     m_audioEngine->setMixer(m_audioMixer);
 
+    // Restore saved device selections from AppConfig
+    auto* cfg = dawcast::config::AppConfig::instance();
+    if (cfg) {
+        int outDev = cfg->value(QStringLiteral("audio/outputDeviceIndex"), -1).toInt();
+        int inDev  = cfg->value(QStringLiteral("audio/inputDeviceIndex"), -1).toInt();
+        if (outDev >= 0) m_audioEngine->setOutputDevice(outDev);
+        if (inDev >= 0)  m_audioEngine->setInputDevice(inDev);
+    }
+
+    // Multitrack recorder (records input to armed tracks)
+    m_recorder = new dawcast::MultitrackRecorder(this);
+    m_recorder->setTimeline(m_timelineModel);
+    m_recorder->setAudioEngine(m_audioEngine);
+
     // Playback engine (reads timeline clips -> feeds mixer -> PortAudio)
     m_playbackEngine = new dawcast::PlaybackEngine(this);
     m_playbackEngine->setTimeline(m_timelineModel);
     m_playbackEngine->setAudioEngine(m_audioEngine);
+    m_playbackEngine->setRecorder(m_recorder);
 
     // Tell the audio engine about the playback engine so the callback
     // calls processBlock() before mixer->process().
@@ -389,6 +443,28 @@ void MainWindow::setupConnections()
             if (m_timelineModel) m_timelineModel->setPlayhead(0);
         }
     });
+
+    // Metronome toggle and tempo from TransportBar -> PlaybackEngine::Metronome
+    connect(m_transportBar, &TransportBar::metronomeToggled, this, [this](bool on) {
+        if (m_playbackEngine && m_playbackEngine->metronome()) {
+            m_playbackEngine->metronome()->setEnabled(on);
+            statusBar()->showMessage(on ? tr("Metronome enabled")
+                                        : tr("Metronome disabled"), 2000);
+        }
+    });
+    connect(m_transportBar, &TransportBar::tempoChanged, this, [this](double bpm) {
+        if (m_playbackEngine && m_playbackEngine->metronome()) {
+            m_playbackEngine->metronome()->setTempo(bpm);
+        }
+    });
+
+    // Beat indicator: Metronome::beat fires on the audio thread, so use
+    // Qt::QueuedConnection to marshal to the GUI thread safely.
+    if (m_playbackEngine && m_playbackEngine->metronome()) {
+        connect(m_playbackEngine->metronome(), &dawcast::Metronome::beat,
+                m_transportBar, &TransportBar::flashBeat,
+                Qt::QueuedConnection);
+    }
 
     // PlaybackEngine -> TransportBar time display and TimelineWidget playhead
     if (m_playbackEngine) {
@@ -543,6 +619,12 @@ void MainWindow::exportProject()
     runExportPipeline();
 }
 
+void MainWindow::openBatchEncoder()
+{
+    BatchEncoderDialog dlg(this);
+    dlg.exec();
+}
+
 // ── Edit Slots ──────────────────────────────────────────────────────────────
 
 void MainWindow::undo()
@@ -677,6 +759,15 @@ void MainWindow::stopStreaming()
     statusBar()->showMessage(tr("Streaming stopped"), 3000);
 }
 
+// ── Tools Slots ────────────────────────────────────────────────────────────
+
+void MainWindow::openMassTagEditor()
+{
+    auto* editor = new MassTagEditor(this);
+    editor->setAttribute(Qt::WA_DeleteOnClose);
+    editor->show();
+}
+
 // ── Help Slots ──────────────────────────────────────────────────────────────
 
 void MainWindow::showAbout()
@@ -712,6 +803,12 @@ void MainWindow::onPlay()
 
 void MainWindow::onStop()
 {
+    // If we are recording, stop the recorder first
+    if (m_recorder && m_recorder->isRecording()) {
+        m_recorder->stopRecording();
+        m_transportBar->setRecording(false);
+    }
+
     if (m_playbackEngine) {
         m_playbackEngine->stop();
     }
@@ -723,7 +820,53 @@ void MainWindow::onStop()
 
 void MainWindow::onRecord()
 {
-    statusBar()->showMessage(tr("Recording"), 2000);
+    if (!m_recorder) return;
+
+    if (m_recorder->isRecording()) {
+        // Stop recording
+        m_recorder->stopRecording();
+        m_transportBar->setRecording(false);
+        statusBar()->showMessage(tr("Recording stopped"), 3000);
+        return;
+    }
+
+    // Check if any tracks are armed
+    if (!hasArmedTracks()) {
+        QMessageBox::information(this, tr("No Armed Tracks"),
+            tr("Arm one or more audio tracks to start recording.\n"
+               "Click the record-arm button (R) on a track header."));
+        return;
+    }
+
+    // Start playback simultaneously so the playhead advances
+    if (m_playbackEngine && !m_playbackEngine->isPlaying()) {
+        m_playbackEngine->play();
+    }
+
+    m_recorder->clearTargets(); // Let startRecording scan for armed tracks
+    m_recorder->startRecording();
+    m_transportBar->setRecording(true);
+    statusBar()->showMessage(tr("Recording..."), 0);
+}
+
+bool MainWindow::hasArmedTracks() const
+{
+    if (!m_timelineModel) return false;
+
+    int count = m_timelineModel->trackCount();
+    for (int i = 0; i < count; ++i) {
+        auto* audioTrack = qobject_cast<dawcast::AudioTrack*>(m_timelineModel->track(i));
+        if (audioTrack && audioTrack->isRecordArmed()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void MainWindow::updateRecordButtonState()
+{
+    // Future enhancement: disable the record button and show a tooltip
+    // when no tracks are armed. Connect to track arm-state changes.
 }
 
 // ── Recent Files ───────────────────────────────────────────────────────────

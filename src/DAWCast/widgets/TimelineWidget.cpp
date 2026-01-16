@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "TimelineWidget.h"
+#include "TimeStretchDialog.h"
+#include "CrossfadeEditorDialog.h"
 #include "Timeline.h"
 #include "AudioTrack.h"
 #include "VideoTrack.h"
@@ -681,6 +683,55 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
     });
     menu.addSeparator();
 
+    // ── Edit Crossfade — shown when two clips overlap or are adjacent ──
+    if (m_timeline && event->pos().y() >= kRulerHeight) {
+        int xfTrackIdx = (event->pos().y() - kRulerHeight) / kTrackHeight;
+        if (xfTrackIdx >= 0 && xfTrackIdx < m_timeline->trackCount()) {
+            auto* xfTrack = qobject_cast<AudioTrack*>(m_timeline->track(xfTrackIdx));
+            if (xfTrack && xfTrack->clipCount() >= 2) {
+                // Convert mouse X to timeline sample position
+                int64_t clickPos = static_cast<int64_t>(
+                    (event->pos().x() / m_zoom) + m_scroll);
+
+                // Find two clips near the click position that overlap or are adjacent
+                Clip* clipA = nullptr;
+                Clip* clipB = nullptr;
+                for (int ci = 0; ci < xfTrack->clipCount() - 1; ++ci) {
+                    Clip* a = xfTrack->clip(ci);
+                    Clip* b = xfTrack->clip(ci + 1);
+                    if (!a || !b) continue;
+
+                    int64_t aEnd   = a->endPosition();
+                    int64_t bStart = b->timelinePosition();
+                    // Overlapping or adjacent (within a small tolerance)
+                    int64_t gap = bStart - aEnd;
+                    if (gap <= 4800) { // within ~100ms at 48kHz
+                        // Check if click is near the boundary
+                        int64_t boundary = (aEnd + bStart) / 2;
+                        int64_t tolerance = std::max(int64_t(48000), // 1 second
+                                                     (aEnd - a->timelinePosition()) / 4);
+                        if (std::abs(clickPos - boundary) < tolerance) {
+                            clipA = a;
+                            clipB = b;
+                            break;
+                        }
+                    }
+                }
+
+                if (clipA && clipB) {
+                    menu.addAction(tr("Edit Crossfade..."), this,
+                                   [this, clipA, clipB]() {
+                        CrossfadeEditorDialog dlg(clipA, clipB, this);
+                        if (dlg.exec() == QDialog::Accepted) {
+                            update();
+                        }
+                    });
+                    menu.addSeparator();
+                }
+            }
+        }
+    }
+
     // Automation lane selection submenu
     if (m_timeline && event->pos().y() >= kRulerHeight) {
         int trackIdx = (event->pos().y() - kRulerHeight) / kTrackHeight;
@@ -727,6 +778,22 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
                 menu.addSeparator();
             }
         }
+    }
+
+    // Time Stretch / Pitch Shift (available when a clip is selected)
+    if (!m_selectedClips.isEmpty()) {
+        menu.addAction(tr("Time Stretch / Pitch Shift..."), this, [this] {
+            auto* dialog = new TimeStretchDialog(this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            connect(dialog, &QDialog::accepted, this, [this, dialog] {
+                // In a full implementation, this would apply the TimeStretch
+                // processor to the selected clip's audio data.
+                Q_UNUSED(dialog);
+                update();
+            });
+            dialog->show();
+        });
+        menu.addSeparator();
     }
 
     menu.addAction(tr("Zoom In"), this, [this]{

@@ -21,6 +21,12 @@ public:
 
     /// S-curve (smoothstep) crossfade.
     static float sCurve(float t);
+
+    /// Logarithmic crossfade (slow start, fast finish).
+    static float logarithmic(float t);
+
+    /// Exponential crossfade (fast start, slow finish).
+    static float exponential(float t);
 };
 
 } // namespace dawcast

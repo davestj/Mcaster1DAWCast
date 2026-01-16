@@ -31,4 +31,19 @@ float CrossfadeCalc::sCurve(float t)
     return t * t * (3.0f - 2.0f * t);
 }
 
+float CrossfadeCalc::logarithmic(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    // log10(1 + 9*t) maps [0,1] -> [0,1] — slow start, fast finish
+    return std::log10(1.0f + 9.0f * t);
+}
+
+float CrossfadeCalc::exponential(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    // (e^t - 1) / (e - 1) maps [0,1] -> [0,1] — fast start, slow finish
+    static constexpr float kE = 2.71828182845904523536f;
+    return (std::exp(t) - 1.0f) / (kE - 1.0f);
+}
+
 } // namespace dawcast

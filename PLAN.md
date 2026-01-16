@@ -230,6 +230,22 @@ It is part of the Mcaster1 ecosystem and integrates natively with Mcaster1AudioP
 | Export dialog | `ExportDialog` with format/codec/quality presets |
 | Export profiles | YAML export profiles from `configs/export_profiles/` |
 
+### DC7b -- Batch Encoder (v0.7.1)
+
+**Goal:** Standalone batch encoding system that lets broadcasters and podcasters queue multiple audio/video files and encode them all with configurable DSP processing, loudness normalization, and output format selection.
+
+| Deliverable | Details |
+|:---|:---|
+| Batch encoder engine | `BatchEncoder` queues multiple files, decodes via FFmpegCodec, applies DSP chain from YAML presets, runs EBU R128 loudness normalization, resamples, converts channels, and encodes to any supported output codec (MP3, AAC, Opus, FLAC, WAV, Vorbis) |
+| DSP preset loading | Loads and applies DSP presets from `configs/dsp_presets/` YAML files (Broadcast Chain, Podcast Voice, Music Master, Spoken Word) — instantiates NoiseGate, DeEsser, ParametricEQ, Compressor, Limiter, SonicEnhancer, AGC, and Normalizer with preset parameters |
+| Two-pass loudness normalization | Measures integrated LUFS via the Normalizer's K-weighting measurement pass, then applies linear makeup gain to hit the target (-14 streaming, -16 podcast, -23 EBU R128, -24 ATSC A/85) |
+| Sample rate conversion | Uses `AudioResampler` (libswresample / libsoxr) for high-quality rate conversion (22050, 44100, 48000, 96000 Hz) |
+| Channel conversion | Mono/stereo downmix and upmix with proper summing and gain compensation |
+| Batch encoder dialog | `BatchEncoderDialog` with drag-and-drop file queue table, per-file status/progress, output format/bitrate/sample-rate/channel settings, DSP preset selector, loudness normalization target, output directory and filename pattern, context menu, and overall batch progress bar |
+| MainWindow integration | File menu: "Batch Encoder..." (Cmd+B) opens the dialog |
+
+**Key differentiator:** Unlike general-purpose batch converters, DAWCast's batch encoder applies the same broadcast-grade DSP processing chain used in the live broadcast path — noise gate, parametric EQ, compressor, limiter, and loudness normalization — ensuring all encoded files meet broadcast loudness standards without manual per-file processing.
+
 ### DC8 -- Broadcasting (v0.8.0)
 
 **Goal:** Live broadcast output to Icecast, Mcaster1DNAS, and RTMP with broadcast clock and tally.
@@ -312,7 +328,7 @@ It is part of the Mcaster1 ecosystem and integrates natively with Mcaster1AudioP
 | Module | Directory | Files | Purpose |
 |:---|:---|:---:|:---|
 | **Core** | `core/` | 12 | Interfaces (`IModule`, `IEffectUnit`, `IVideoEffect`, `IPlugin`), data types (`AudioBuffer`, `VideoFrame`, `MediaItem`), `ModuleRegistry`, `UndoManager`, `ProjectManager` |
-| **Audio Engine** | `audio_engine/` | 10 | PortAudio stream management, 32-strip mixer, SPSC ring buffer, threaded decode worker, resampler |
+| **Audio Engine** | `audio_engine/` | 12 | PortAudio stream management, 32-strip mixer, SPSC ring buffer, threaded decode worker, resampler, batch encoder |
 | **Video Engine** | `video_engine/` | 14 | FFmpeg decode/encode, layer compositing, OpenGL/Metal preview, subtitle rendering, container mux/demux |
 | **Timeline** | `timeline/` | 18 | Non-destructive timeline model: tracks, clips, regions, markers, automation, crossfade, undoable commands |
 | **DSP** | `dsp/` | 22 | Audio effects chain: EQ (parametric + graphic), compressor, limiter, gate, de-esser, enhancer, reverb, AGC, normalizer |
@@ -321,11 +337,11 @@ It is part of the Mcaster1 ecosystem and integrates natively with Mcaster1AudioP
 | **Broadcast** | `broadcast/` | 8 | Live recording, stream encoding (Icecast/DNAS/RTMP), broadcast clock, tally light |
 | **Codec** | `codec/` | 14 | Audio codec wrappers: WAV, FLAC, MP3, AAC, Opus, Vorbis, FFmpeg generic fallback, codec registry |
 | **Graphics** | `graphics/` | 12 | Broadcast overlay engine: lower thirds, ticker crawl, callouts, watermarks, GPU renderer |
-| **Widgets** | `widgets/` | 42 | Qt 6 GUI: main window, timeline, mixer, VU meters, transport, waveform, video preview, effects rack, dialogs, custom controls, theme engine |
+| **Widgets** | `widgets/` | 44 | Qt 6 GUI: main window, timeline, mixer, VU meters, transport, waveform, video preview, effects rack, batch encoder dialog, dialogs, custom controls, theme engine |
 | **Platform** | `platform/` | 8 | OS-specific backends: macOS CoreAudio/AVFoundation/VideoToolbox, cross-platform compat, thread pool |
 | **Config** | `config/` | 6 | Application preferences, YAML preset loader, debug logger |
 
-**Total: ~198 source files across 13 modules.**
+**Total: ~202 source files across 13 modules.**
 
 ---
 

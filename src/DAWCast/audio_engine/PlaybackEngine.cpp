@@ -6,6 +6,8 @@
 #include "AudioEngine.h"
 #include "AudioMixer.h"
 #include "AudioClipReader.h"
+#include "Metronome.h"
+#include "MultitrackRecorder.h"
 #include "../core/AudioBuffer.h"
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
@@ -29,6 +31,8 @@ static constexpr int kPositionPollMs = 30;
 PlaybackEngine::PlaybackEngine(QObject* parent)
     : QObject(parent)
 {
+    m_metronome = new Metronome(this);
+
     m_positionTimer = new QTimer(this);
     m_positionTimer->setTimerType(Qt::PreciseTimer);
     connect(m_positionTimer, &QTimer::timeout,
@@ -75,6 +79,11 @@ void PlaybackEngine::setAudioEngine(AudioEngine* engine)
     if (engine) {
         m_mixer = engine->mixer();
     }
+}
+
+void PlaybackEngine::setRecorder(MultitrackRecorder* recorder)
+{
+    m_recorder = recorder;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,8 +158,15 @@ int64_t PlaybackEngine::currentPosition() const
 // Audio thread -- processBlock (RT-safe)
 // ---------------------------------------------------------------------------
 
-void PlaybackEngine::processBlock(int frames, int channels)
+void PlaybackEngine::processBlock(int frames, int channels,
+                                  const float* input, int inputChannels)
 {
+    // Forward input to the multitrack recorder if it is recording.
+    // This must happen regardless of play state so punch-in works.
+    if (m_recorder && input && inputChannels > 0) {
+        m_recorder->processInputBlock(input, frames, inputChannels);
+    }
+
     // If not playing, leave everything silent -- the mixer strips have
     // no input buffers set, so mixer->process() will output silence.
     if (!m_playing.load(std::memory_order_acquire)) {
@@ -224,6 +240,40 @@ void PlaybackEngine::processBlock(int frames, int channels)
 
         // Point the mixer strip to this track's buffer
         m_mixer->setStripBuffer(tp.mixerStrip, &tp.audioBuf);
+    }
+
+    // ── Metronome: mix click track into the first active strip buffer ──
+    // The metronome is mixed after all tracks are read and DSP-processed
+    // but before the mixer sums to master output. We pick the first strip
+    // that has audio, or if none, the first strip that exists.
+    if (m_metronome && m_metronome->isEnabled() && !m_tracks.empty()) {
+        int targetStrip = -1;
+        for (size_t i = 0; i < m_tracks.size(); ++i) {
+            if (m_tracks[i].audioBuf.data != nullptr) {
+                targetStrip = static_cast<int>(i);
+                break;
+            }
+        }
+        if (targetStrip < 0) targetStrip = 0;
+
+        auto& mtp = m_tracks[static_cast<size_t>(targetStrip)];
+        if (mtp.buffer.size() >= static_cast<size_t>(totalSamples)) {
+            if (mtp.audioBuf.data == nullptr) {
+                std::memset(mtp.buffer.data(), 0,
+                            static_cast<size_t>(totalSamples) * sizeof(float));
+                mtp.audioBuf.data       = mtp.buffer.data();
+                mtp.audioBuf.frames     = frames;
+                mtp.audioBuf.channels   = channels;
+                mtp.audioBuf.sampleRate =
+                    m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+                if (mtp.mixerStrip >= 0 && m_mixer) {
+                    m_mixer->setStripBuffer(mtp.mixerStrip, &mtp.audioBuf);
+                }
+            }
+            int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+            m_metronome->generateClick(mtp.buffer.data(), frames, channels,
+                                       sr, pos);
+        }
     }
 
     // Advance the playhead. The GUI-thread timer will detect end-of-timeline.

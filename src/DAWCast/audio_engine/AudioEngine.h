@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QList>
 
 #ifdef HAVE_PORTAUDIO
 #include <portaudio.h>
@@ -16,6 +17,17 @@ namespace dawcast { class PlaybackEngine; }
 
 namespace dawcast {
 
+/// Describes a single audio device reported by PortAudio.
+struct AudioDeviceInfo {
+    int    index             = -1;
+    QString name;
+    int    maxInputChannels  = 0;
+    int    maxOutputChannels = 0;
+    double defaultSampleRate = 44100.0;
+    bool   isDefaultInput    = false;
+    bool   isDefaultOutput   = false;
+};
+
 class AudioEngine : public QObject
 {
     Q_OBJECT
@@ -24,15 +36,29 @@ public:
     explicit AudioEngine(QObject* parent = nullptr);
     ~AudioEngine() override;
 
+    /// Enumerate all audio devices available through PortAudio.
+    static QList<AudioDeviceInfo> enumerateDevices();
+
     bool start();
     void stop();
 
     void setSampleRate(int rate);
     void setBufferSize(int size);
 
+    void setOutputDevice(int deviceIndex);
+    void setInputDevice(int deviceIndex);
+
+    [[nodiscard]] int  outputDevice() const { return m_outputDeviceIndex; }
+    [[nodiscard]] int  inputDevice()  const { return m_inputDeviceIndex; }
+
     [[nodiscard]] int  sampleRate() const { return m_sampleRate; }
     [[nodiscard]] int  bufferSize() const { return m_bufferSize; }
     [[nodiscard]] bool isRunning()  const { return m_running; }
+
+    /// Enable full-duplex mode (input + output).  When true, start()
+    /// opens a duplex stream so the callback receives input samples.
+    void setDuplexEnabled(bool enabled);
+    [[nodiscard]] bool isDuplexEnabled() const { return m_duplexEnabled; }
 
     AudioMixer* mixer() const { return m_mixer; }
     void setMixer(AudioMixer* mixer) { m_mixer = mixer; }
@@ -56,11 +82,15 @@ private:
     int processCallback(const float* input, float* output,
                         unsigned long frameCount);
 
-    int  m_sampleRate = 48000;
-    int  m_bufferSize = 512;
-    bool m_running    = false;
-    void* m_paStream  = nullptr;  // PortAudio PaStream*
-    AudioMixer* m_mixer = nullptr;
+    int  m_sampleRate        = 48000;
+    int  m_bufferSize        = 512;
+    bool m_running           = false;
+    bool m_duplexEnabled     = false;
+    int  m_outputDeviceIndex = -1;  // -1 = system default
+    int  m_inputDeviceIndex  = -1;  // -1 = system default
+    int  m_inputChannelCount = 2;   // channels opened on input side
+    void* m_paStream         = nullptr;  // PortAudio PaStream*
+    AudioMixer*     m_mixer          = nullptr;
     PlaybackEngine* m_playbackEngine = nullptr;
 };
 

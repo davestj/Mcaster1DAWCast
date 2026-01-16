@@ -9,6 +9,8 @@
 #include <atomic>
 #include <vector>
 
+#include "../codec/TagTransfer.h"
+
 namespace dawcast {
 
 class Timeline;
@@ -45,6 +47,10 @@ public:
         int     videoHeight  = 1080;
         double  videoFps     = 30.0;
         QString container;          // "mp4", "mkv", "webm", "wav", "mp3"
+
+        // Metadata to embed in the exported file (optional).
+        // If non-empty, these tags will be written after export completes.
+        AudioTags metadata;
     };
 
     /// Begin exporting the timeline with the given configuration.

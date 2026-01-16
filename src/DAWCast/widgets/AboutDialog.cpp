@@ -110,7 +110,7 @@ AboutDialog::AboutDialog(QWidget* parent)
         bool svgOk = false;
 
 #ifdef HAVE_QT6SVG
-        QSvgRenderer svg(QStringLiteral(":/icons/icons/podcast.svg"));
+        QSvgRenderer svg(QStringLiteral(":/icons/podcast.svg"));
         if (svg.isValid()) {
             svg.render(&iconPainter, QRectF(0, 0, 128, 128));
             svgOk = true;

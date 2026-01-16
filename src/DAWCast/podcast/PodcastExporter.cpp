@@ -12,8 +12,10 @@
 #include "../codec/Mp3Codec.h"
 #include "../codec/AacCodec.h"
 #include "../codec/FFmpegCodec.h"
+#include "../codec/TagTransfer.h"
 
 #include <QThread>
+#include <QFile>
 #include <QFileInfo>
 #include <QDir>
 #include <QDebug>
@@ -161,14 +163,47 @@ void PodcastExporter::exportEpisode()
 
     emit progress(60);
 
-    // --- Step 3: Write metadata ---
-    m_metadataEditor->writeToFile(m_outputPath);
+    // --- Step 3: Write metadata + chapters via TagTransfer ---
+    // Build a comprehensive AudioTags including podcast-specific fields
+    // and chapter markers — TagTransfer handles all formats uniformly.
+    {
+        AudioTags tags;
+        tags.title  = m_metadataEditor->title();
+        tags.artist = m_metadataEditor->artist();
+        tags.album  = m_metadataEditor->album();
+        tags.genre  = m_metadataEditor->genre();
 
-    emit progress(75);
+        // Load artwork from file path if set
+        const QString artworkPath = m_metadataEditor->artwork();
+        if (!artworkPath.isEmpty()) {
+            QFile artFile(artworkPath);
+            if (artFile.open(QIODevice::ReadOnly)) {
+                tags.artworkData = artFile.readAll();
+                const QString artExt = QFileInfo(artworkPath).suffix().toLower();
+                tags.artworkMimeType = (artExt == QStringLiteral("png"))
+                                           ? QStringLiteral("image/png")
+                                           : QStringLiteral("image/jpeg");
+            }
+        }
 
-    // --- Step 4: Write chapter markers (MP3 only) ---
-    if (ext == QStringLiteral("mp3") && !m_chapterEditor->chapters().isEmpty()) {
-        m_chapterEditor->exportToID3(m_outputPath);
+        // Chapter markers
+        const QList<Chapter>& chapters = m_chapterEditor->chapters();
+        for (int i = 0; i < chapters.size(); ++i) {
+            AudioTags::Chapter ch;
+            ch.startMs = chapters[i].position;
+            ch.endMs = (i + 1 < chapters.size())
+                           ? chapters[i + 1].position
+                           : 0; // 0 = until end of file
+            ch.title = chapters[i].title;
+            tags.chapters.append(ch);
+        }
+
+        tags.encoder = QStringLiteral("Mcaster1DAWCast");
+
+        if (!TagTransfer::writeTags(m_outputPath, tags)) {
+            qWarning() << "PodcastExporter: failed to write metadata to"
+                       << m_outputPath;
+        }
     }
 
     emit progress(85);

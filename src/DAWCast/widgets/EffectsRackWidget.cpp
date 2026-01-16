@@ -8,6 +8,7 @@
 #include "DspChain.h"
 #include "IEffectUnit.h"
 #include "ParametricEQ.h"
+#include "NoiseReduction.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -243,20 +244,33 @@ void EffectsRackWidget::showAddEffectMenu()
         }
 
         categories[category]->addAction(name, this, [this, name] {
-            // In a full implementation, this would instantiate the actual effect.
-            // For now, we add a placeholder slot.
-            addEffect(nullptr);
+            // Instantiate the effect if we have a concrete implementation
+            IEffectUnit* effect = nullptr;
 
-            // Update the name label of the just-added slot
-            int lastSlotIdx = m_effectCount - 1;
-            if (lastSlotIdx >= 0 && lastSlotIdx < m_slotLayout->count()) {
-                auto* slotWidget = m_slotLayout->itemAt(lastSlotIdx)->widget();
-                if (slotWidget) {
-                    auto* nameLabel = slotWidget->findChild<QLabel*>(QString(), Qt::FindDirectChildrenOnly);
-                    // Find the name label (second QLabel child, after drag handle)
-                    auto labels = slotWidget->findChildren<QLabel*>();
-                    if (labels.size() >= 2) {
-                        labels[1]->setText(name);
+            if (name == QLatin1String("Noise Reduction")) {
+                effect = new NoiseReduction();
+            }
+            // Other effect types can be instantiated here as they are implemented
+
+            if (effect) {
+                // Add to the DSP chain if we have one
+                if (m_chain) {
+                    m_chain->addEffect(effect);
+                }
+                addEffect(effect);
+            } else {
+                // Placeholder slot for effects not yet implemented
+                addEffect(nullptr);
+
+                // Update the name label of the just-added slot
+                int lastSlotIdx = m_effectCount - 1;
+                if (lastSlotIdx >= 0 && lastSlotIdx < m_slotLayout->count()) {
+                    auto* slotWidget = m_slotLayout->itemAt(lastSlotIdx)->widget();
+                    if (slotWidget) {
+                        auto labels = slotWidget->findChildren<QLabel*>();
+                        if (labels.size() >= 2) {
+                            labels[1]->setText(name);
+                        }
                     }
                 }
             }

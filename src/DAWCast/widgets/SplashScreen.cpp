@@ -125,7 +125,7 @@ void SplashScreen::paintEvent(QPaintEvent* /*event*/)
     bool iconRendered = false;
 
 #ifdef HAVE_QT6SVG
-    QSvgRenderer svgIcon(QStringLiteral(":/icons/icons/podcast.svg"));
+    QSvgRenderer svgIcon(QStringLiteral(":/icons/podcast.svg"));
     if (svgIcon.isValid()) {
         svgIcon.render(&p, iconRect);
         iconRendered = true;

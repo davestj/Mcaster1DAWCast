@@ -145,6 +145,12 @@ moc_WaveformCache.cpp: $(srcdir)/audio_engine/WaveformCache.h
 moc_PlaybackEngine.cpp: $(srcdir)/audio_engine/PlaybackEngine.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_MultitrackRecorder.cpp: $(srcdir)/audio_engine/MultitrackRecorder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_Metronome.cpp: $(srcdir)/audio_engine/Metronome.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- video_engine --
 moc_VideoDecoder.cpp: $(srcdir)/video_engine/VideoDecoder.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -329,8 +335,34 @@ moc_LUFSMeterWidget.cpp: $(srcdir)/widgets/LUFSMeterWidget.h
 moc_SplashScreen.cpp: $(srcdir)/widgets/SplashScreen.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
-# -- audio_engine (ExportEngine) --
+moc_TimeStretchDialog.cpp: $(srcdir)/widgets/TimeStretchDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_CrossfadeEditorDialog.cpp: $(srcdir)/widgets/CrossfadeEditorDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- audio_engine (ExportEngine, BatchEncoder) --
 moc_ExportEngine.cpp: $(srcdir)/audio_engine/ExportEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_BatchEncoder.cpp: $(srcdir)/audio_engine/BatchEncoder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- widgets (BatchEncoderDialog) --
+moc_BatchEncoderDialog.cpp: $(srcdir)/widgets/BatchEncoderDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- widgets (MassTagEditor) --
+moc_MassTagEditor.cpp: $(srcdir)/widgets/MassTagEditor.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TagTableModel.cpp: $(srcdir)/widgets/TagTableModel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_FilenameToTagDialog.cpp: $(srcdir)/widgets/FilenameToTagDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TagToFilenameDialog.cpp: $(srcdir)/widgets/TagToFilenameDialog.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # -- config --
@@ -374,10 +406,16 @@ mcaster1dawcast_SOURCES = \
     audio_engine/WaveformCache.cpp \
     audio_engine/PlaybackEngine.h \
     audio_engine/PlaybackEngine.cpp \
+    audio_engine/MultitrackRecorder.h \
+    audio_engine/MultitrackRecorder.cpp \
     audio_engine/AudioClipReader.h \
     audio_engine/AudioClipReader.cpp \
     audio_engine/ExportEngine.h \
     audio_engine/ExportEngine.cpp \
+    audio_engine/BatchEncoder.h \
+    audio_engine/BatchEncoder.cpp \
+    audio_engine/Metronome.h \
+    audio_engine/Metronome.cpp \
     video_engine/VideoDecoder.h \
     video_engine/VideoDecoder.cpp \
     video_engine/VideoEncoder.h \
@@ -439,6 +477,11 @@ mcaster1dawcast_SOURCES = \
     dsp/AGC.cpp \
     dsp/Normalizer.h \
     dsp/Normalizer.cpp \
+    dsp/FFT.h \
+    dsp/NoiseReduction.h \
+    dsp/NoiseReduction.cpp \
+    dsp/TimeStretch.h \
+    dsp/TimeStretch.cpp \
     vfx/VideoEffectChain.h \
     vfx/VideoEffectChain.cpp \
     vfx/CrossDissolve.h \
@@ -495,6 +538,8 @@ mcaster1dawcast_SOURCES = \
     codec/VorbisCodec.cpp \
     codec/FFmpegCodec.h \
     codec/FFmpegCodec.cpp \
+    codec/TagTransfer.h \
+    codec/TagTransfer.cpp \
     graphics/OverlayEngine.h \
     graphics/OverlayEngine.cpp \
     graphics/LowerThird.h \
@@ -537,6 +582,8 @@ mcaster1dawcast_SOURCES = \
     widgets/MetadataPanel.cpp \
     widgets/ExportDialog.h \
     widgets/ExportDialog.cpp \
+    widgets/BatchEncoderDialog.h \
+    widgets/BatchEncoderDialog.cpp \
     widgets/PreferencesDialog.h \
     widgets/PreferencesDialog.cpp \
     widgets/ProjectSettingsDialog.h \
@@ -559,6 +606,18 @@ mcaster1dawcast_SOURCES = \
     widgets/LUFSMeterWidget.cpp \
     widgets/SplashScreen.h \
     widgets/SplashScreen.cpp \
+    widgets/TimeStretchDialog.h \
+    widgets/TimeStretchDialog.cpp \
+    widgets/CrossfadeEditorDialog.h \
+    widgets/CrossfadeEditorDialog.cpp \
+    widgets/MassTagEditor.h \
+    widgets/MassTagEditor.cpp \
+    widgets/TagTableModel.h \
+    widgets/TagTableModel.cpp \
+    widgets/FilenameToTagDialog.h \
+    widgets/FilenameToTagDialog.cpp \
+    widgets/TagToFilenameDialog.h \
+    widgets/TagToFilenameDialog.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -592,7 +651,10 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_AudioWorker.cpp \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
+    moc_Metronome.cpp \
+    moc_MultitrackRecorder.cpp \
     moc_ExportEngine.cpp \
+    moc_BatchEncoder.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
@@ -640,6 +702,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_ChapterWidget.cpp \
     moc_MetadataPanel.cpp \
     moc_ExportDialog.cpp \
+    moc_BatchEncoderDialog.cpp \
     moc_PreferencesDialog.cpp \
     moc_ProjectSettingsDialog.cpp \
     moc_SpectrumWidget.cpp \
@@ -651,6 +714,12 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_ParametricEQDialog.cpp \
     moc_LUFSMeterWidget.cpp \
     moc_SplashScreen.cpp \
+    moc_TimeStretchDialog.cpp \
+    moc_CrossfadeEditorDialog.cpp \
+    moc_MassTagEditor.cpp \
+    moc_TagTableModel.cpp \
+    moc_FilenameToTagDialog.cpp \
+    moc_TagToFilenameDialog.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 
@@ -665,7 +734,10 @@ BUILT_SOURCES = \
     moc_AudioWorker.cpp \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
+    moc_Metronome.cpp \
+    moc_MultitrackRecorder.cpp \
     moc_ExportEngine.cpp \
+    moc_BatchEncoder.cpp \
     moc_VideoDecoder.cpp \
     moc_VideoEncoder.cpp \
     moc_VideoMixer.cpp \
@@ -713,6 +785,7 @@ BUILT_SOURCES = \
     moc_ChapterWidget.cpp \
     moc_MetadataPanel.cpp \
     moc_ExportDialog.cpp \
+    moc_BatchEncoderDialog.cpp \
     moc_PreferencesDialog.cpp \
     moc_ProjectSettingsDialog.cpp \
     moc_SpectrumWidget.cpp \
@@ -724,6 +797,12 @@ BUILT_SOURCES = \
     moc_ParametricEQDialog.cpp \
     moc_LUFSMeterWidget.cpp \
     moc_SplashScreen.cpp \
+    moc_TimeStretchDialog.cpp \
+    moc_CrossfadeEditorDialog.cpp \
+    moc_MassTagEditor.cpp \
+    moc_TagTableModel.cpp \
+    moc_FilenameToTagDialog.cpp \
+    moc_TagToFilenameDialog.cpp \
     moc_AppConfig.cpp \
     qrc_mcaster1dawcast.cpp
 

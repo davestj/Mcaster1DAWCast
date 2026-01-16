@@ -5,6 +5,7 @@
 #include "ExportEngine.h"
 #include "AudioClipReader.h"
 #include "../core/AudioBuffer.h"
+#include "../codec/TagTransfer.h"
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
 #include "../timeline/VideoTrack.h"
@@ -204,6 +205,14 @@ void ExportEngine::exportAudioOnly(Timeline* timeline, const ExportConfig& confi
     muxer.close();
     freeTrackStates(trackStates);
 
+    // 6. Write metadata tags to the exported file
+    if (!config.metadata.isEmpty() && TagTransfer::isSupported(config.outputPath)) {
+        if (!TagTransfer::writeTags(config.outputPath, config.metadata)) {
+            qWarning() << "ExportEngine: failed to write metadata tags to"
+                       << config.outputPath;
+        }
+    }
+
     qDebug() << "ExportEngine: audio-only export complete ->"
              << config.outputPath;
 
@@ -388,6 +397,14 @@ void ExportEngine::exportAudioVideo(Timeline* timeline, const ExportConfig& conf
     // Finalize
     muxer.close();
     freeTrackStates(trackStates);
+
+    // Write metadata tags (for containers that support it)
+    if (!config.metadata.isEmpty() && TagTransfer::isSupported(config.outputPath)) {
+        if (!TagTransfer::writeTags(config.outputPath, config.metadata)) {
+            qWarning() << "ExportEngine: failed to write metadata tags to"
+                       << config.outputPath;
+        }
+    }
 
     qDebug() << "ExportEngine: audio+video export complete ->"
              << config.outputPath;

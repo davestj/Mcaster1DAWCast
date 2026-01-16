@@ -20,6 +20,8 @@ class AudioMixer;
 class AudioTrack;
 class AudioClipReader;
 class Clip;
+class Metronome;
+class MultitrackRecorder;
 
 /// Orchestrates real-time audio playback from the Timeline through
 /// the AudioMixer to the AudioEngine (PortAudio) output.
@@ -40,6 +42,13 @@ public:
     void setTimeline(Timeline* timeline);
     void setAudioEngine(AudioEngine* engine);
 
+    /// Set the multitrack recorder that receives input during recording.
+    void setRecorder(MultitrackRecorder* recorder);
+    [[nodiscard]] MultitrackRecorder* recorder() const { return m_recorder; }
+
+    /// Accessor for the built-in metronome / click track.
+    [[nodiscard]] Metronome* metronome() const { return m_metronome; }
+
     void play();
     void pause();
     void stop();
@@ -59,8 +68,13 @@ public:
     /// chains, sets mixer strip input pointers, then advances the
     /// playhead. The caller (AudioEngine) calls mixer->process()
     /// immediately after this returns.
+    ///
+    /// @param input         Raw PortAudio input buffer (may be nullptr)
+    /// @param inputChannels Number of interleaved channels in input buffer
+    ///
     /// RT-safe: no allocations, no locks, no Qt signals.
-    void processBlock(int frames, int channels);
+    void processBlock(int frames, int channels,
+                      const float* input = nullptr, int inputChannels = 0);
 
 private slots:
     void onPositionTimer();
@@ -76,9 +90,11 @@ private:
     /// Pre-allocate per-track audio buffers for the current buffer size.
     void ensureTrackBuffers(int frames, int channels);
 
-    Timeline*    m_timeline    = nullptr;
-    AudioEngine* m_audioEngine = nullptr;
-    AudioMixer*  m_mixer       = nullptr;
+    Timeline*            m_timeline    = nullptr;
+    AudioEngine*         m_audioEngine = nullptr;
+    AudioMixer*          m_mixer       = nullptr;
+    Metronome*           m_metronome   = nullptr;
+    MultitrackRecorder*  m_recorder    = nullptr;
 
     // Playhead state -- shared between audio thread and GUI thread
     std::atomic<int64_t> m_playheadPos{0};

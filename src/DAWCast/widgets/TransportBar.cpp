@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QFont>
 #include <QFrame>
+#include <QTimer>
 
 namespace dawcast::widgets {
 
@@ -87,6 +88,41 @@ TransportBar::TransportBar(QWidget* parent)
 
     layout->addWidget(m_loopBtn);
 
+    // ── Metronome ───────────────────────────────────────────────────────
+
+    m_metronomeBtn = new BevelButton(QStringLiteral("\u266A"), this);  // musical note
+    m_metronomeBtn->setFixedSize(btnSize);
+    m_metronomeBtn->setCheckable(true);
+    m_metronomeBtn->setToolTip(tr("Metronome"));
+    layout->addWidget(m_metronomeBtn);
+
+    // Tempo spinner
+    m_tempoSpin = new QDoubleSpinBox(this);
+    m_tempoSpin->setRange(20.0, 300.0);
+    m_tempoSpin->setValue(120.0);
+    m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
+    m_tempoSpin->setDecimals(1);
+    m_tempoSpin->setSingleStep(1.0);
+    m_tempoSpin->setFixedWidth(100);
+    m_tempoSpin->setToolTip(tr("Tempo (BPM)"));
+    layout->addWidget(m_tempoSpin);
+
+    // Beat indicator (small dot that flashes on each beat)
+    m_beatIndicator = new QLabel(QStringLiteral("\u25CF"), this);  // filled circle
+    m_beatIndicator->setFixedSize(18, 18);
+    m_beatIndicator->setAlignment(Qt::AlignCenter);
+    m_beatIndicator->setStyleSheet(
+        QStringLiteral("QLabel { color: #555555; font-size: 14px; }"));
+    m_beatIndicator->setToolTip(tr("Beat indicator"));
+    layout->addWidget(m_beatIndicator);
+
+    // Small separator before time display
+    auto* sep2 = new QFrame(this);
+    sep2->setFrameShape(QFrame::VLine);
+    sep2->setFrameShadow(QFrame::Sunken);
+    sep2->setFixedWidth(2);
+    layout->addWidget(sep2);
+
     // ── Time Display ────────────────────────────────────────────────────
 
     layout->addSpacing(12);
@@ -122,7 +158,20 @@ TransportBar::TransportBar(QWidget* parent)
     connect(m_stopBtn,   &BevelButton::clicked, this, &TransportBar::stopClicked);
     connect(m_recordBtn, &BevelButton::clicked, this, &TransportBar::recordClicked);
     connect(m_ffBtn,     &BevelButton::clicked, this, &TransportBar::fastForwardClicked);
-    connect(m_loopBtn,   &BevelButton::toggled, this, &TransportBar::loopToggled);
+    connect(m_loopBtn,       &BevelButton::toggled, this, &TransportBar::loopToggled);
+    connect(m_metronomeBtn,  &BevelButton::toggled, this, &TransportBar::metronomeToggled);
+    connect(m_tempoSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, &TransportBar::tempoChanged);
+
+    // Metronome button highlight: orange when checked
+    connect(m_metronomeBtn, &BevelButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            m_metronomeBtn->setHighlightColor(QColor(255, 180, 40, 200));
+        } else {
+            m_metronomeBtn->setHighlightColor(QColor(255, 255, 255, 120));
+        }
+        m_metronomeBtn->update();
+    });
 
     // Play button highlight: green when checked
     connect(m_playBtn, &BevelButton::toggled, this, [this](bool checked) {
@@ -177,6 +226,24 @@ void TransportBar::setDuration(int64_t samples, int sampleRate)
     m_duration   = samples;
     m_sampleRate = sampleRate > 0 ? sampleRate : m_sampleRate;
     updateTimeDisplay();
+}
+
+void TransportBar::flashBeat(int /*beatNumber*/, bool isDownbeat)
+{
+    // Flash the beat indicator: bright color for 80ms, then dim
+    if (isDownbeat) {
+        m_beatIndicator->setStyleSheet(
+            QStringLiteral("QLabel { color: #ff6600; font-size: 14px; }"));
+    } else {
+        m_beatIndicator->setStyleSheet(
+            QStringLiteral("QLabel { color: #ffcc00; font-size: 14px; }"));
+    }
+
+    // Reset after 80ms
+    QTimer::singleShot(80, this, [this]() {
+        m_beatIndicator->setStyleSheet(
+            QStringLiteral("QLabel { color: #555555; font-size: 14px; }"));
+    });
 }
 
 void TransportBar::updateTimeDisplay()

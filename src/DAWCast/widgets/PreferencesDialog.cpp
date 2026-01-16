@@ -4,6 +4,7 @@
 
 #include "PreferencesDialog.h"
 #include "AppConfig.h"
+#include "../audio_engine/AudioEngine.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -78,13 +79,21 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     audioLayout->setContentsMargins(12, 12, 12, 12);
     audioLayout->setSpacing(8);
 
-    m_audioDeviceCombo = new QComboBox(audioTab);
-    m_audioDeviceCombo->addItem(tr("System Default"));
-    // In a real implementation, this would enumerate PortAudio devices
-    // For now, add placeholder devices
-    m_audioDeviceCombo->addItem(tr("Built-in Output"));
-    m_audioDeviceCombo->addItem(tr("Built-in Input"));
-    audioLayout->addRow(tr("Audio Device:"), m_audioDeviceCombo);
+    // Output device selector
+    m_outputDeviceCombo = new QComboBox(audioTab);
+    m_outputDeviceCombo->addItem(tr("System Default"), -1);
+    audioLayout->addRow(tr("Output Device:"), m_outputDeviceCombo);
+
+    // Input device selector
+    m_inputDeviceCombo = new QComboBox(audioTab);
+    m_inputDeviceCombo->addItem(tr("System Default"), -1);
+    audioLayout->addRow(tr("Input Device:"), m_inputDeviceCombo);
+
+    // Keep m_audioDeviceCombo as an alias for backward compatibility
+    m_audioDeviceCombo = m_outputDeviceCombo;
+
+    // Populate the device combos with real PortAudio devices
+    populateAudioDevices();
 
     m_bufferSizeCombo = new QComboBox(audioTab);
     m_bufferSizeCombo->addItems({
@@ -269,10 +278,23 @@ void PreferencesDialog::loadSettings()
     int autoSave = cfg->value(QStringLiteral("general/autoSaveInterval"), 5).toInt();
     m_autoSaveIntervalSpin->setValue(autoSave);
 
-    // Audio
-    QString device = cfg->value(QStringLiteral("audio/device"), tr("System Default")).toString();
-    idx = m_audioDeviceCombo->findText(device);
-    if (idx >= 0) m_audioDeviceCombo->setCurrentIndex(idx);
+    // Audio — output device
+    int outIdx = cfg->value(QStringLiteral("audio/outputDeviceIndex"), -1).toInt();
+    for (int i = 0; i < m_outputDeviceCombo->count(); ++i) {
+        if (m_outputDeviceCombo->itemData(i).toInt() == outIdx) {
+            m_outputDeviceCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // Audio — input device
+    int inIdx = cfg->value(QStringLiteral("audio/inputDeviceIndex"), -1).toInt();
+    for (int i = 0; i < m_inputDeviceCombo->count(); ++i) {
+        if (m_inputDeviceCombo->itemData(i).toInt() == inIdx) {
+            m_inputDeviceCombo->setCurrentIndex(i);
+            break;
+        }
+    }
 
     QString bufSize = cfg->value(QStringLiteral("audio/bufferSize"), QStringLiteral("512")).toString();
     idx = m_bufferSizeCombo->findText(bufSize);
@@ -307,10 +329,25 @@ void PreferencesDialog::saveSettings()
     cfg->setValue(QStringLiteral("general/defaultBitDepth"), m_defaultBitDepthCombo->currentText());
     cfg->setValue(QStringLiteral("general/autoSaveInterval"), m_autoSaveIntervalSpin->value());
 
-    // Audio
-    cfg->setValue(QStringLiteral("audio/device"), m_audioDeviceCombo->currentText());
+    // Audio — device indices
+    int outDevIdx = m_outputDeviceCombo->currentData().toInt();
+    int inDevIdx  = m_inputDeviceCombo->currentData().toInt();
+    cfg->setValue(QStringLiteral("audio/outputDeviceIndex"), outDevIdx);
+    cfg->setValue(QStringLiteral("audio/inputDeviceIndex"),  inDevIdx);
     cfg->setValue(QStringLiteral("audio/bufferSize"), m_bufferSizeCombo->currentText());
     cfg->setValue(QStringLiteral("audio/sampleRate"), m_sampleRateCombo->currentText());
+
+    // Apply device selection to the AudioEngine if available
+    if (m_audioEngine) {
+        m_audioEngine->setOutputDevice(outDevIdx);
+        m_audioEngine->setInputDevice(inDevIdx);
+
+        int sr = m_sampleRateCombo->currentText().toInt();
+        if (sr > 0) m_audioEngine->setSampleRate(sr);
+
+        int bs = m_bufferSizeCombo->currentText().toInt();
+        if (bs > 0) m_audioEngine->setBufferSize(bs);
+    }
 
     // Video
     cfg->setValue(QStringLiteral("video/defaultResolution"), m_videoResolutionCombo->currentIndex());
@@ -333,6 +370,34 @@ void PreferencesDialog::updateLatencyLabel()
     if (sampleRate > 0 && bufferSize > 0) {
         double latencyMs = static_cast<double>(bufferSize) / sampleRate * 1000.0;
         m_latencyLabel->setText(QString::number(latencyMs, 'f', 1) + tr(" ms"));
+    }
+}
+
+// ── Audio Device Enumeration ───────────────────────────────────────────────
+
+void PreferencesDialog::setAudioEngine(dawcast::AudioEngine* engine)
+{
+    m_audioEngine = engine;
+}
+
+void PreferencesDialog::populateAudioDevices()
+{
+    QList<dawcast::AudioDeviceInfo> devices = dawcast::AudioEngine::enumerateDevices();
+
+    for (const auto& dev : devices) {
+        // Add devices with output channels to the output combo
+        if (dev.maxOutputChannels > 0) {
+            QString label = dev.name;
+            if (dev.isDefaultOutput) label += tr(" (default)");
+            m_outputDeviceCombo->addItem(label, dev.index);
+        }
+
+        // Add devices with input channels to the input combo
+        if (dev.maxInputChannels > 0) {
+            QString label = dev.name;
+            if (dev.isDefaultInput) label += tr(" (default)");
+            m_inputDeviceCombo->addItem(label, dev.index);
+        }
     }
 }
 
