@@ -42,6 +42,9 @@ m4/
 .deps/
 .dirstamp
 
+# ── Test media (copies of audio files for testing) ──────────────────
+test_media/
+
 # ── IDE / Editor ────────────────────────────────────────────────────
 .vscode/
 .idea/
