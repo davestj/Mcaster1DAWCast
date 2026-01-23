@@ -12,6 +12,7 @@
 #include <QCloseEvent>
 #include <QList>
 #include <QMenu>
+#include <QLabel>
 
 namespace dawcast {
 class Timeline;
@@ -21,7 +22,10 @@ class PlaybackEngine;
 class MultitrackRecorder;
 class VideoPlaybackController;
 class ExportEngine;
+class RTMPStreamer;
 }
+
+namespace dawcast::ai { class AIPanel; }
 
 namespace dawcast::widgets {
 
@@ -32,6 +36,7 @@ class MediaBrowser;
 class EffectsRackWidget;
 class TransportBar;
 class LUFSMeterWidget;
+class StreamingDialog;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -70,6 +75,7 @@ private slots:
     void toggleVideoPreview();
     void toggleMediaBrowser();
     void toggleEffectsRack();
+    void toggleAIPanel();
 
     // Track
     void addAudioTrack();
@@ -88,6 +94,7 @@ private slots:
     void stopRecording();
     void startStreaming();
     void stopStreaming();
+    void openStreamingDialog();
 
     // Tools
     void openMassTagEditor();
@@ -129,6 +136,7 @@ private:
     EffectsRackWidget*  m_effectsRack   = nullptr;
     TransportBar*       m_transportBar  = nullptr;
     LUFSMeterWidget*    m_lufsMeter     = nullptr;
+    dawcast::ai::AIPanel* m_aiPanel     = nullptr;
 
     // Menu bar & toolbar
     QMenuBar*   m_menuBar   = nullptr;
@@ -140,6 +148,7 @@ private:
     QDockWidget* m_mediaBrowserDock = nullptr;
     QDockWidget* m_effectsDock      = nullptr;
     QDockWidget* m_lufsDock         = nullptr;
+    QDockWidget* m_aiDock           = nullptr;
 
     // View menu toggle actions (to sync checkmarks with dock visibility)
     QAction* m_actToggleMixer        = nullptr;
@@ -147,6 +156,7 @@ private:
     QAction* m_actToggleMediaBrowser = nullptr;
     QAction* m_actToggleEffectsRack  = nullptr;
     QAction* m_actToggleLUFS         = nullptr;
+    QAction* m_actToggleAI           = nullptr;
 
     // Recent files menu
     QMenu*          m_recentFilesMenu = nullptr;
@@ -169,6 +179,14 @@ private:
     bool hasArmedTracks() const;
 
     ExportEngine* m_exportEngine = nullptr;
+
+    // RTMP streaming
+    RTMPStreamer*     m_rtmpStreamer      = nullptr;
+    StreamingDialog*  m_streamingDialog   = nullptr;
+    QLabel*           m_onAirStatusLabel  = nullptr;
+
+    void setupRTMPStreamer();
+    void updateOnAirStatus(bool live);
 };
 
 } // namespace dawcast::widgets

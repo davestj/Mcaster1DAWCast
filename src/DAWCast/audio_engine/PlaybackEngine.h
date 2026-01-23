@@ -22,6 +22,7 @@ class AudioClipReader;
 class Clip;
 class Metronome;
 class MultitrackRecorder;
+class RTMPStreamer;
 
 /// Orchestrates real-time audio playback from the Timeline through
 /// the AudioMixer to the AudioEngine (PortAudio) output.
@@ -45,6 +46,12 @@ public:
     /// Set the multitrack recorder that receives input during recording.
     void setRecorder(MultitrackRecorder* recorder);
     [[nodiscard]] MultitrackRecorder* recorder() const { return m_recorder; }
+
+    /// Set the RTMP streamer to receive mixed audio output for live streaming.
+    /// When set and streaming, processBlock() feeds the mixed output to the
+    /// streamer via its lock-free pushAudioFrame() method.
+    void setRTMPStreamer(RTMPStreamer* streamer);
+    [[nodiscard]] RTMPStreamer* rtmpStreamer() const { return m_rtmpStreamer; }
 
     /// Accessor for the built-in metronome / click track.
     [[nodiscard]] Metronome* metronome() const { return m_metronome; }
@@ -90,11 +97,12 @@ private:
     /// Pre-allocate per-track audio buffers for the current buffer size.
     void ensureTrackBuffers(int frames, int channels);
 
-    Timeline*            m_timeline    = nullptr;
-    AudioEngine*         m_audioEngine = nullptr;
-    AudioMixer*          m_mixer       = nullptr;
-    Metronome*           m_metronome   = nullptr;
-    MultitrackRecorder*  m_recorder    = nullptr;
+    Timeline*            m_timeline      = nullptr;
+    AudioEngine*         m_audioEngine   = nullptr;
+    AudioMixer*          m_mixer         = nullptr;
+    Metronome*           m_metronome     = nullptr;
+    MultitrackRecorder*  m_recorder      = nullptr;
+    RTMPStreamer*         m_rtmpStreamer  = nullptr;
 
     // Playhead state -- shared between audio thread and GUI thread
     std::atomic<int64_t> m_playheadPos{0};

@@ -24,6 +24,7 @@ AM_CPPFLAGS = \
     -I$(srcdir)/plugins \
     -I$(srcdir)/platform \
     -I$(srcdir)/config \
+    -I$(srcdir)/ai \
     -std=c++17 \
     -DHAVE_PORTAUDIO \
     -DHAVE_TAGLIB \
@@ -239,6 +240,9 @@ moc_BroadcastClock.cpp: $(srcdir)/broadcast/BroadcastClock.h
 moc_TallyLight.cpp: $(srcdir)/broadcast/TallyLight.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_RTMPStreamer.cpp: $(srcdir)/broadcast/RTMPStreamer.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- codec --
 moc_CodecRegistry.cpp: $(srcdir)/codec/CodecRegistry.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -365,8 +369,24 @@ moc_FilenameToTagDialog.cpp: $(srcdir)/widgets/FilenameToTagDialog.h
 moc_TagToFilenameDialog.cpp: $(srcdir)/widgets/TagToFilenameDialog.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_StreamingDialog.cpp: $(srcdir)/widgets/StreamingDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- ai --
+moc_AIEngine.cpp: $(srcdir)/ai/AIEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TranscriptionEngine.cpp: $(srcdir)/ai/TranscriptionEngine.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AIAssistant.cpp: $(srcdir)/ai/AIAssistant.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_AIPanel.cpp: $(srcdir)/ai/AIPanel.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # ── RCC rules (Qt Resource Compiler) ─────────────────────────────────────────
@@ -522,6 +542,8 @@ mcaster1dawcast_SOURCES = \
     broadcast/BroadcastClock.cpp \
     broadcast/TallyLight.h \
     broadcast/TallyLight.cpp \
+    broadcast/RTMPStreamer.h \
+    broadcast/RTMPStreamer.cpp \
     codec/CodecRegistry.h \
     codec/CodecRegistry.cpp \
     codec/WavCodec.h \
@@ -618,6 +640,8 @@ mcaster1dawcast_SOURCES = \
     widgets/FilenameToTagDialog.cpp \
     widgets/TagToFilenameDialog.h \
     widgets/TagToFilenameDialog.cpp \
+    widgets/StreamingDialog.h \
+    widgets/StreamingDialog.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -626,7 +650,15 @@ mcaster1dawcast_SOURCES = \
     config/YamlPresets.h \
     config/YamlPresets.cpp \
     config/DebugLogger.h \
-    config/DebugLogger.cpp
+    config/DebugLogger.cpp \
+    ai/AIEngine.h \
+    ai/AIEngine.cpp \
+    ai/TranscriptionEngine.h \
+    ai/TranscriptionEngine.cpp \
+    ai/AIAssistant.h \
+    ai/AIAssistant.cpp \
+    ai/AIPanel.h \
+    ai/AIPanel.cpp
 
 # ── Conditional macOS platform sources ──────────────────────────────────────
 if ENABLE_MACOS_GUI
@@ -682,6 +714,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_StreamEncoder.cpp \
     moc_BroadcastClock.cpp \
     moc_TallyLight.cpp \
+    moc_RTMPStreamer.cpp \
     moc_CodecRegistry.cpp \
     moc_OverlayEngine.cpp \
     moc_LowerThird.cpp \
@@ -720,7 +753,12 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_TagTableModel.cpp \
     moc_FilenameToTagDialog.cpp \
     moc_TagToFilenameDialog.cpp \
+    moc_StreamingDialog.cpp \
     moc_AppConfig.cpp \
+    moc_AIEngine.cpp \
+    moc_TranscriptionEngine.cpp \
+    moc_AIAssistant.cpp \
+    moc_AIPanel.cpp \
     qrc_mcaster1dawcast.cpp
 
 # ── Build ordering ───────────────────────────────────────────────────────────
@@ -765,6 +803,7 @@ BUILT_SOURCES = \
     moc_StreamEncoder.cpp \
     moc_BroadcastClock.cpp \
     moc_TallyLight.cpp \
+    moc_RTMPStreamer.cpp \
     moc_CodecRegistry.cpp \
     moc_OverlayEngine.cpp \
     moc_LowerThird.cpp \
@@ -803,7 +842,12 @@ BUILT_SOURCES = \
     moc_TagTableModel.cpp \
     moc_FilenameToTagDialog.cpp \
     moc_TagToFilenameDialog.cpp \
+    moc_StreamingDialog.cpp \
     moc_AppConfig.cpp \
+    moc_AIEngine.cpp \
+    moc_TranscriptionEngine.cpp \
+    moc_AIAssistant.cpp \
+    moc_AIPanel.cpp \
     qrc_mcaster1dawcast.cpp
 
 # ── Clean generated files ────────────────────────────────────────────────────

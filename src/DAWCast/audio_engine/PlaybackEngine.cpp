@@ -8,6 +8,7 @@
 #include "AudioClipReader.h"
 #include "Metronome.h"
 #include "MultitrackRecorder.h"
+#include "../broadcast/RTMPStreamer.h"
 #include "../core/AudioBuffer.h"
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
@@ -84,6 +85,11 @@ void PlaybackEngine::setAudioEngine(AudioEngine* engine)
 void PlaybackEngine::setRecorder(MultitrackRecorder* recorder)
 {
     m_recorder = recorder;
+}
+
+void PlaybackEngine::setRTMPStreamer(RTMPStreamer* streamer)
+{
+    m_rtmpStreamer = streamer;
 }
 
 // ---------------------------------------------------------------------------

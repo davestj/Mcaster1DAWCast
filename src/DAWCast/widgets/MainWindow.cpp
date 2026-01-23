@@ -10,6 +10,7 @@
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
 #include "LUFSMeterWidget.h"
+#include "../ai/AIPanel.h"
 
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
@@ -26,6 +27,8 @@
 #include "BatchEncoderDialog.h"
 #include "MassTagEditor.h"
 #include "AboutDialog.h"
+#include "StreamingDialog.h"
+#include "../broadcast/RTMPStreamer.h"
 
 #include <QAction>
 #include <QMenu>
@@ -58,6 +61,7 @@ MainWindow::MainWindow(QWidget* parent)
     setupStatusBar();
     setupAudioPipeline();
     setupVideoPlayback();
+    setupRTMPStreamer();
     setupConnections();
 
     // Restore window geometry, dock layout, and splitter state from last session
@@ -190,6 +194,11 @@ void MainWindow::setupMenus()
         if (m_lufsDock) m_lufsDock->setVisible(!m_lufsDock->isVisible());
     });
 
+    m_actToggleAI = viewMenu->addAction(tr("&AI Assistant"));
+    m_actToggleAI->setCheckable(true);
+    m_actToggleAI->setChecked(true);
+    connect(m_actToggleAI, &QAction::triggered, this, &MainWindow::toggleAIPanel);
+
     // ── Track ───────────────────────────────────────────────────────────
     auto* trackMenu = m_menuBar->addMenu(tr("&Track"));
 
@@ -231,6 +240,12 @@ void MainWindow::setupMenus()
 
     auto* actStopRec = broadcastMenu->addAction(tr("Stop R&ecording"));
     connect(actStopRec, &QAction::triggered, this, &MainWindow::stopRecording);
+
+    broadcastMenu->addSeparator();
+
+    auto* actStreamLive = broadcastMenu->addAction(tr("Stream &Live..."));
+    actStreamLive->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
+    connect(actStreamLive, &QAction::triggered, this, &MainWindow::openStreamingDialog);
 
     broadcastMenu->addSeparator();
 
@@ -354,6 +369,15 @@ void MainWindow::setupDockWidgets()
     m_lufsMeter = new LUFSMeterWidget(m_lufsDock);
     m_lufsDock->setWidget(m_lufsMeter);
     addDockWidget(Qt::RightDockWidgetArea, m_lufsDock);
+
+    // Right dock — AI Panel (tabified with Effects Rack)
+    m_aiDock = new QDockWidget(tr("AI Assistant"), this);
+    m_aiDock->setObjectName(QStringLiteral("AIDock"));
+    m_aiDock->setMinimumSize(240, 180);
+    m_aiPanel = new dawcast::ai::AIPanel(m_aiDock);
+    m_aiDock->setWidget(m_aiPanel);
+    addDockWidget(Qt::RightDockWidgetArea, m_aiDock);
+    tabifyDockWidget(m_effectsDock, m_aiDock);
 
     // Raise Video Preview as the default visible tab on the right
     m_videoDock->raise();
@@ -509,6 +533,8 @@ void MainWindow::setupConnections()
             m_actToggleEffectsRack, &QAction::setChecked);
     connect(m_lufsDock, &QDockWidget::visibilityChanged,
             m_actToggleLUFS, &QAction::setChecked);
+    connect(m_aiDock, &QDockWidget::visibilityChanged,
+            m_actToggleAI, &QAction::setChecked);
 
     // LUFS metering — feed from audio engine buffer-processed signal
     if (m_audioEngine && m_lufsMeter) {
@@ -679,6 +705,11 @@ void MainWindow::toggleEffectsRack()
     m_effectsDock->setVisible(!m_effectsDock->isVisible());
 }
 
+void MainWindow::toggleAIPanel()
+{
+    m_aiDock->setVisible(!m_aiDock->isVisible());
+}
+
 // ── Track Slots ─────────────────────────────────────────────────────────────
 
 void MainWindow::addAudioTrack()
@@ -751,12 +782,86 @@ void MainWindow::stopRecording()
 
 void MainWindow::startStreaming()
 {
+    if (m_rtmpStreamer && !m_rtmpStreamer->isStreaming()) {
+        m_rtmpStreamer->startStreaming();
+    }
     statusBar()->showMessage(tr("Streaming started"), 3000);
 }
 
 void MainWindow::stopStreaming()
 {
+    if (m_rtmpStreamer && m_rtmpStreamer->isStreaming()) {
+        m_rtmpStreamer->stopStreaming();
+    }
     statusBar()->showMessage(tr("Streaming stopped"), 3000);
+}
+
+void MainWindow::openStreamingDialog()
+{
+    if (!m_rtmpStreamer) {
+        QMessageBox::warning(this, tr("Streaming"),
+                             tr("RTMP streaming engine is not available.\n"
+                                "Ensure FFmpeg (libavformat) support is enabled."));
+        return;
+    }
+
+    if (!m_streamingDialog) {
+        m_streamingDialog = new StreamingDialog(m_rtmpStreamer, this);
+        m_streamingDialog->setAttribute(Qt::WA_DeleteOnClose);
+
+        connect(m_streamingDialog, &StreamingDialog::streamingStarted,
+                this, [this]() {
+            updateOnAirStatus(true);
+            statusBar()->showMessage(tr("LIVE -- Streaming"), 0);
+        });
+
+        connect(m_streamingDialog, &StreamingDialog::streamingStopped,
+                this, [this]() {
+            updateOnAirStatus(false);
+            statusBar()->showMessage(tr("Stream ended"), 5000);
+        });
+
+        connect(m_streamingDialog, &QDialog::destroyed,
+                this, [this]() {
+            m_streamingDialog = nullptr;
+        });
+    }
+
+    m_streamingDialog->show();
+    m_streamingDialog->raise();
+    m_streamingDialog->activateWindow();
+}
+
+// ── RTMP Streamer Setup ───────────────────────────────────────────────────
+
+void MainWindow::setupRTMPStreamer()
+{
+    m_rtmpStreamer = new dawcast::RTMPStreamer(this);
+
+    // Wire streamer to PlaybackEngine so the audio callback feeds it
+    if (m_playbackEngine) {
+        m_playbackEngine->setRTMPStreamer(m_rtmpStreamer);
+    }
+
+    // On-air status label for the status bar
+    m_onAirStatusLabel = new QLabel(this);
+    m_onAirStatusLabel->setStyleSheet(
+        QStringLiteral("QLabel { color: #ff2020; font-weight: bold; "
+                        "padding: 0 8px; }"));
+    m_onAirStatusLabel->hide();
+    statusBar()->addPermanentWidget(m_onAirStatusLabel);
+}
+
+void MainWindow::updateOnAirStatus(bool live)
+{
+    if (!m_onAirStatusLabel) return;
+
+    if (live) {
+        m_onAirStatusLabel->setText(tr("LIVE"));
+        m_onAirStatusLabel->show();
+    } else {
+        m_onAirStatusLabel->hide();
+    }
 }
 
 // ── Tools Slots ────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@
 #include "AudioEngine.h"
 #include "AudioMixer.h"
 #include "PlaybackEngine.h"
+#include "../broadcast/RTMPStreamer.h"
 #include "../core/AudioBuffer.h"
 
 #include <cstring>
@@ -258,6 +259,16 @@ int AudioEngine::processCallback(const float* input, float* output,
         buf.sampleRate = m_sampleRate;
 
         m_mixer->process(buf);
+    }
+
+    // Feed the mixed output to the RTMP streamer if it is active.
+    // This tap runs after the mixer has written to the output buffer,
+    // so the streamer receives the final stereo mix.
+    if (m_playbackEngine) {
+        RTMPStreamer* streamer = m_playbackEngine->rtmpStreamer();
+        if (streamer && streamer->isStreaming()) {
+            streamer->pushAudioFrame(output, frames, kOutputChannels, m_sampleRate);
+        }
     }
 
     emit bufferProcessed();
