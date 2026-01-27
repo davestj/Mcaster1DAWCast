@@ -10,6 +10,7 @@
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
 #include "LUFSMeterWidget.h"
+#include "PreferencesDialog.h"
 #include "../ai/AIPanel.h"
 
 #include "../timeline/Timeline.h"
@@ -36,6 +37,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QInputDialog>
 #include <QStatusBar>
 #include <QSplitter>
 #include <QApplication>
@@ -94,6 +96,25 @@ void MainWindow::setupMenus()
     auto* actOpen = fileMenu->addAction(tr("&Open Project..."));
     actOpen->setShortcut(QKeySequence::Open);
     connect(actOpen, &QAction::triggered, this, qOverload<>(&MainWindow::openProject));
+
+    auto* actClose = fileMenu->addAction(tr("&Close Project"));
+    actClose->setShortcut(QKeySequence(tr("Ctrl+W")));
+    connect(actClose, &QAction::triggered, this, [this] {
+        if (m_playbackEngine && m_playbackEngine->isPlaying())
+            m_playbackEngine->stop();
+        if (m_timelineModel) {
+            while (m_timelineModel->trackCount() > 0)
+                m_timelineModel->removeTrack(0);
+            m_timelineModel->setPlayhead(0);
+        }
+        m_projectPath.clear();
+        m_projectName.clear();
+        setWindowTitle(QStringLiteral("Mcaster1DAWCast"));
+        if (m_timeline) m_timeline->update();
+        statusBar()->showMessage(tr("Project closed"), 3000);
+    });
+
+    fileMenu->addSeparator();
 
     auto* actSave = fileMenu->addAction(tr("&Save Project"));
     actSave->setShortcut(QKeySequence::Save);
@@ -163,6 +184,19 @@ void MainWindow::setupMenus()
     auto* actDelete = editMenu->addAction(tr("&Delete"));
     actDelete->setShortcut(QKeySequence::Delete);
     connect(actDelete, &QAction::triggered, this, &MainWindow::deleteSelected);
+
+    editMenu->addSeparator();
+
+    auto* actPreferences = editMenu->addAction(tr("&Preferences..."));
+    actPreferences->setShortcut(QKeySequence::Preferences);
+    actPreferences->setMenuRole(QAction::PreferencesRole);  // macOS puts this in app menu
+    connect(actPreferences, &QAction::triggered, this, [this] {
+        auto* dlg = new PreferencesDialog(this);
+        if (m_audioEngine)
+            dlg->setAudioEngine(m_audioEngine);
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->exec();
+    });
 
     // ── View ────────────────────────────────────────────────────────────
     auto* viewMenu = m_menuBar->addMenu(tr("&View"));
@@ -571,9 +605,50 @@ void MainWindow::setupConnections()
 
 void MainWindow::newProject()
 {
+    // Prompt for project name
+    bool ok = false;
+    QString projectName = QInputDialog::getText(
+        this, tr("New Project"),
+        tr("Project name:"),
+        QLineEdit::Normal,
+        tr("Untitled Project"),
+        &ok);
+
+    if (!ok || projectName.trimmed().isEmpty())
+        return;
+
+    projectName = projectName.trimmed();
+
+    // Stop playback if running
+    if (m_playbackEngine && m_playbackEngine->isPlaying())
+        m_playbackEngine->stop();
+
+    // Clear existing timeline
+    if (m_timelineModel) {
+        while (m_timelineModel->trackCount() > 0)
+            m_timelineModel->removeTrack(0);
+        m_timelineModel->setPlayhead(0);
+    }
+
+    // Add a default audio track so the user has something to work with
+    if (m_timelineModel) {
+        dawcast::AudioTrack* track = m_timelineModel->addAudioTrack();
+        if (track)
+            track->setName(tr("Audio 1"));
+    }
+
     m_projectPath.clear();
-    setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 Untitled Project"));
-    statusBar()->showMessage(tr("New project created"), 3000);
+    m_projectName = projectName;
+    setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 ") + projectName);
+
+    // Update UI
+    if (m_timeline) m_timeline->update();
+    if (m_transportBar) {
+        m_transportBar->setPosition(0, m_timelineModel ? m_timelineModel->sampleRate() : 48000);
+        m_transportBar->setDuration(0, m_timelineModel ? m_timelineModel->sampleRate() : 48000);
+    }
+
+    statusBar()->showMessage(tr("New project created — Audio 1 track ready"), 3000);
 }
 
 void MainWindow::openProject()

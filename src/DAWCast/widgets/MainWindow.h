@@ -125,6 +125,8 @@ private:
     void saveWindowState();
     void restoreWindowState();
 
+    QString m_projectName;
+
     // Central
     QSplitter*          m_centralSplitter = nullptr;
     TimelineWidget*     m_timeline        = nullptr;

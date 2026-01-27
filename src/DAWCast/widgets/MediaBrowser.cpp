@@ -5,7 +5,9 @@
 #include "MediaBrowser.h"
 
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QTreeView>
+#include <QDir>
 #include <QFileSystemModel>
 #include <QPushButton>
 #include <QDrag>
@@ -70,10 +72,38 @@ MediaBrowser::MediaBrowser(QWidget* parent)
     });
     m_fileModel->setNameFilterDisables(false);
 
+    // Start at home directory, allow browsing full filesystem
+    QString homePath = QDir::homePath();
+    m_fileModel->setRootPath(homePath);
+
     m_treeView = new DraggableTreeView(this);
     m_treeView->setModel(m_fileModel);
+    m_treeView->setRootIndex(m_fileModel->index(homePath));
     m_treeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_treeView->setColumnWidth(0, 250);  // Name column wider
+    m_treeView->hideColumn(2);  // Hide Type column
     layout->addWidget(m_treeView);
+
+    // Navigation bar: Home, Root /, custom path
+    auto* navLayout = new QHBoxLayout;
+    auto* btnHome = new QPushButton(tr("Home"), this);
+    auto* btnRoot = new QPushButton(tr("/"), this);
+    auto* btnMusic = new QPushButton(tr("Music"), this);
+    navLayout->addWidget(btnHome);
+    navLayout->addWidget(btnRoot);
+    navLayout->addWidget(btnMusic);
+    navLayout->addStretch();
+    layout->insertLayout(0, navLayout);
+
+    connect(btnHome, &QPushButton::clicked, this, [this] {
+        setRootPath(QDir::homePath());
+    });
+    connect(btnRoot, &QPushButton::clicked, this, [this] {
+        setRootPath(QStringLiteral("/"));
+    });
+    connect(btnMusic, &QPushButton::clicked, this, [this] {
+        setRootPath(QDir::homePath() + QStringLiteral("/Music"));
+    });
 
     auto* importBtn = new QPushButton(tr("Import Selected"), this);
     layout->addWidget(importBtn);
