@@ -276,6 +276,9 @@ moc_TimelineWidget.cpp: $(srcdir)/widgets/TimelineWidget.h
 moc_TrackHeaderWidget.cpp: $(srcdir)/widgets/TrackHeaderWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_TrackHeaderPanel.cpp: $(srcdir)/widgets/TrackHeaderPanel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 moc_WaveformView.cpp: $(srcdir)/widgets/WaveformView.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
@@ -370,6 +373,15 @@ moc_TagToFilenameDialog.cpp: $(srcdir)/widgets/TagToFilenameDialog.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 moc_StreamingDialog.cpp: $(srcdir)/widgets/StreamingDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ActionBar.cpp: $(srcdir)/widgets/ActionBar.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MasterStrip.cpp: $(srcdir)/widgets/MasterStrip.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_SidebarNav.cpp: $(srcdir)/widgets/SidebarNav.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # -- config --
@@ -584,6 +596,8 @@ mcaster1dawcast_SOURCES = \
     widgets/TimelineWidget.cpp \
     widgets/TrackHeaderWidget.h \
     widgets/TrackHeaderWidget.cpp \
+    widgets/TrackHeaderPanel.h \
+    widgets/TrackHeaderPanel.cpp \
     widgets/WaveformView.h \
     widgets/WaveformView.cpp \
     widgets/VideoPreview.h \
@@ -642,6 +656,12 @@ mcaster1dawcast_SOURCES = \
     widgets/TagToFilenameDialog.cpp \
     widgets/StreamingDialog.h \
     widgets/StreamingDialog.cpp \
+    widgets/ActionBar.h \
+    widgets/ActionBar.cpp \
+    widgets/MasterStrip.h \
+    widgets/MasterStrip.cpp \
+    widgets/SidebarNav.h \
+    widgets/SidebarNav.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -725,6 +745,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_MainWindow.cpp \
     moc_TimelineWidget.cpp \
     moc_TrackHeaderWidget.cpp \
+    moc_TrackHeaderPanel.cpp \
     moc_WaveformView.cpp \
     moc_VideoPreview.cpp \
     moc_MixerWidget.cpp \
@@ -754,6 +775,9 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_FilenameToTagDialog.cpp \
     moc_TagToFilenameDialog.cpp \
     moc_StreamingDialog.cpp \
+    moc_ActionBar.cpp \
+    moc_MasterStrip.cpp \
+    moc_SidebarNav.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \
@@ -814,6 +838,7 @@ BUILT_SOURCES = \
     moc_MainWindow.cpp \
     moc_TimelineWidget.cpp \
     moc_TrackHeaderWidget.cpp \
+    moc_TrackHeaderPanel.cpp \
     moc_WaveformView.cpp \
     moc_VideoPreview.cpp \
     moc_MixerWidget.cpp \
@@ -843,6 +868,9 @@ BUILT_SOURCES = \
     moc_FilenameToTagDialog.cpp \
     moc_TagToFilenameDialog.cpp \
     moc_StreamingDialog.cpp \
+    moc_ActionBar.cpp \
+    moc_MasterStrip.cpp \
+    moc_SidebarNav.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \

@@ -43,15 +43,15 @@ namespace dawcast::widgets {
 
 namespace {
 constexpr int kRulerHeight     = 28;
-constexpr int kTrackHeight     = 60;
+constexpr int kTrackHeight     = 80;
 constexpr int kMarkerSize      = 8;
 constexpr float kMinZoom       = 0.001f;
 constexpr float kMaxZoom       = 100.0f;
 constexpr float kZoomFactor    = 1.15f;
 
-// Alternating track lane colors
-const QColor kTrackEven(42, 42, 48);
-const QColor kTrackOdd(48, 48, 54);
+// Alternating track lane colors — subtle dark gray matching web version
+const QColor kTrackEven(38, 42, 56);
+const QColor kTrackOdd(42, 46, 62);
 const QColor kRulerBg(30, 30, 36);
 const QColor kRulerText(180, 180, 180);
 const QColor kRulerTick(100, 100, 100);
@@ -155,8 +155,8 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
     const int w = width();
     const int h = height();
 
-    // Background
-    p.fillRect(rect(), QColor(36, 36, 42));
+    // Background — slightly darker than track headers
+    p.fillRect(rect(), QColor(30, 34, 48));
 
     // --- Time ruler ---
     drawRuler(p, w);
@@ -175,26 +175,16 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
         QColor laneBg = (t % 2 == 0) ? kTrackEven : kTrackOdd;
         p.fillRect(0, yTop, w, kTrackHeight, laneBg);
 
-        // Lane separator line
-        p.setPen(QPen(QColor(60, 60, 66), 1));
+        // Lane separator line — subtle dark gray
+        p.setPen(QPen(QColor(42, 46, 62), 1));
         p.drawLine(0, yTop + kTrackHeight - 1, w, yTop + kTrackHeight - 1);
 
-        // Track name
+        // Track name is now rendered by TrackHeaderPanel (left of timeline).
+        // Resolve track pointers for clip and automation drawing below.
         QObject* trackObj = m_timeline->track(t);
-        QString trackName;
         auto* audioTrack = qobject_cast<AudioTrack*>(trackObj);
         auto* videoTrack = qobject_cast<VideoTrack*>(trackObj);
         auto* midiTrack  = qobject_cast<MidiTrack*>(trackObj);
-        if (audioTrack) trackName = audioTrack->name();
-        else if (videoTrack) trackName = videoTrack->name();
-        else if (midiTrack) trackName = midiTrack->name();
-        if (trackName.isEmpty()) trackName = tr("Track %1").arg(t + 1);
-
-        p.setPen(QColor(160, 160, 170));
-        QFont nameFont = font();
-        nameFont.setPointSize(9);
-        p.setFont(nameFont);
-        p.drawText(4, yTop + 14, trackName);
 
         // Draw clips on this track
         if (midiTrack) {
@@ -336,8 +326,8 @@ void TimelineWidget::drawClip(QPainter& p, Clip* clip, int trackIndex, int clipI
     int x2 = sampleToPixel(clip->endPosition(), m_scroll, m_zoom);
     if (x2 < 0 || x1 > width()) return;
 
-    int clipY = yTop + 18;
-    int clipH = kTrackHeight - 22;
+    int clipY = yTop + 4;
+    int clipH = kTrackHeight - 8;
     int clipW = qMax(4, x2 - x1);
 
     QColor baseColor = kClipColors[(trackIndex * 3 + clipIndex) % kClipColorCount];
@@ -406,8 +396,8 @@ void TimelineWidget::drawMidiClip(QPainter& p, MidiClip* clip, int trackIndex, i
     int x2 = sampleToPixel(clipEndSample, m_scroll, m_zoom);
     if (x2 < 0 || x1 > width()) return;
 
-    int clipY = yTop + 18;
-    int clipH = kTrackHeight - 22;
+    int clipY = yTop + 4;
+    int clipH = kTrackHeight - 8;
     int clipW = qMax(4, x2 - x1);
 
     // MIDI clips use a purple/teal color scheme

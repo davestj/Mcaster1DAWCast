@@ -10,6 +10,7 @@
 #include <QDir>
 #include <QFile>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QStyleFactory>
 
 namespace dawcast::widgets {
@@ -135,6 +136,10 @@ bool ThemeEngine::loadTheme(const QString& name)
         // No QSS file — clear any previous stylesheet
         qApp->setStyleSheet(QString());
     }
+
+    // Persist the choice so it survives restarts
+    QSettings settings;
+    settings.setValue(QStringLiteral("appearance/theme"), name);
 
     emit themeChanged(name);
     return true;

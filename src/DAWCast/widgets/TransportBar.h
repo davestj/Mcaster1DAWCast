@@ -6,6 +6,10 @@
 #include <QWidget>
 #include <QLabel>
 #include <QDoubleSpinBox>
+#include <QSlider>
+#include <QComboBox>
+#include <QElapsedTimer>
+#include <QVector>
 #include <cstdint>
 
 namespace dawcast::widgets {
@@ -38,9 +42,22 @@ signals:
     void loopToggled(bool enabled);
     void metronomeToggled(bool enabled);
     void tempoChanged(double bpm);
+    void zoomChanged(int pixelsPerSecond);
+    void automationWriteToggled(bool enabled);
+    void crossfadeModeChanged(int mode);
+    void busesClicked();
+    void prevMarkerClicked();
+    void nextMarkerClicked();
+    void markerViewToggled(bool enabled);
+    void listViewToggled(bool enabled);
+    void gridViewToggled(bool enabled);
+
+private slots:
+    void onTapTempo();
 
 private:
     void updateTimeDisplay();
+    void updateZoomLabel(int value);
 
     bool    m_playing    = false;
     bool    m_recording  = false;
@@ -48,6 +65,7 @@ private:
     int64_t m_duration   = 0;
     int     m_sampleRate = 44100;
 
+    // Transport buttons
     BevelButton* m_rewindBtn  = nullptr;
     BevelButton* m_playBtn    = nullptr;
     BevelButton* m_pauseBtn   = nullptr;
@@ -57,10 +75,35 @@ private:
     BevelButton* m_loopBtn       = nullptr;
     BevelButton* m_metronomeBtn  = nullptr;
 
-    QDoubleSpinBox* m_tempoSpin  = nullptr;
+    // Tempo
+    QDoubleSpinBox* m_tempoSpin     = nullptr;
     QLabel*         m_beatIndicator = nullptr;
+    BevelButton*    m_tapBtn        = nullptr;
 
+    // TAP tempo state
+    QElapsedTimer   m_tapTimer;
+    QVector<qint64> m_tapIntervals;
+    static constexpr int kMaxTapSamples = 4;
+
+    // Time display
     QLabel* m_timeDisplay = nullptr;
+
+    // Zoom
+    QSlider* m_zoomSlider = nullptr;
+    QLabel*  m_zoomLabel  = nullptr;
+
+    // Automation / Crossfade
+    BevelButton* m_autoBtn  = nullptr;
+    QComboBox*   m_xfCombo  = nullptr;
+
+    // Secondary row
+    BevelButton* m_busesBtn    = nullptr;
+    BevelButton* m_flagBtn     = nullptr;
+    BevelButton* m_prevBtn     = nullptr;
+    BevelButton* m_nextBtn     = nullptr;
+    BevelButton* m_listBtn     = nullptr;
+    BevelButton* m_gridBtn     = nullptr;
+    QComboBox*   m_zoomPreset  = nullptr;
 };
 
 } // namespace dawcast::widgets

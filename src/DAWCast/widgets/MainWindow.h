@@ -30,6 +30,7 @@ namespace dawcast::ai { class AIPanel; }
 namespace dawcast::widgets {
 
 class TimelineWidget;
+class TrackHeaderPanel;
 class MixerWidget;
 class VideoPreview;
 class MediaBrowser;
@@ -37,6 +38,9 @@ class EffectsRackWidget;
 class TransportBar;
 class LUFSMeterWidget;
 class StreamingDialog;
+class SidebarNav;
+class ActionBar;
+class MasterStrip;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -96,6 +100,10 @@ private slots:
     void stopStreaming();
     void openStreamingDialog();
 
+    // Action bar
+    void loadFromLibrary();
+    void openProjectBrowser();
+
     // Tools
     void openMassTagEditor();
 
@@ -111,6 +119,7 @@ private slots:
 private:
     void setupMenus();
     void setupToolbars();
+    void setupSidebar();
     void setupCentralWidget();
     void setupDockWidgets();
     void setupStatusBar();
@@ -129,7 +138,9 @@ private:
 
     // Central
     QSplitter*          m_centralSplitter = nullptr;
-    TimelineWidget*     m_timeline        = nullptr;
+    QSplitter*          m_timelineSplitter = nullptr;
+    TrackHeaderPanel*   m_trackHeaders     = nullptr;
+    TimelineWidget*     m_timeline         = nullptr;
 
     // Dock widget contents
     MixerWidget*        m_mixer         = nullptr;
@@ -139,6 +150,9 @@ private:
     TransportBar*       m_transportBar  = nullptr;
     LUFSMeterWidget*    m_lufsMeter     = nullptr;
     dawcast::ai::AIPanel* m_aiPanel     = nullptr;
+    SidebarNav*         m_sidebarNav    = nullptr;
+    ActionBar*          m_actionBar     = nullptr;
+    MasterStrip*        m_masterStrip   = nullptr;
 
     // Menu bar & toolbar
     QMenuBar*   m_menuBar   = nullptr;

@@ -4,12 +4,16 @@
 
 #include "MainWindow.h"
 #include "TimelineWidget.h"
+#include "TrackHeaderPanel.h"
 #include "MixerWidget.h"
 #include "VideoPreview.h"
 #include "MediaBrowser.h"
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
 #include "LUFSMeterWidget.h"
+#include "SidebarNav.h"
+#include "ActionBar.h"
+#include "MasterStrip.h"
 #include "PreferencesDialog.h"
 #include "../ai/AIPanel.h"
 
@@ -39,7 +43,10 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QStatusBar>
+#include <QScrollBar>
 #include <QSplitter>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QApplication>
 #include <QKeySequence>
 #include <QDesktopServices>
@@ -58,6 +65,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     setupMenus();
     setupToolbars();
+    setupSidebar();
     setupCentralWidget();
     setupDockWidgets();
     setupStatusBar();
@@ -342,20 +350,117 @@ void MainWindow::setupToolbars()
     m_toolBar->addWidget(m_transportBar);
 }
 
+// ── Sidebar Navigation ─────────────────────────────────────────────────────
+
+void MainWindow::setupSidebar()
+{
+    m_sidebarNav = new SidebarNav(this);
+
+    // Sidebar section clicks -> show/hide relevant dock widgets or panels
+    connect(m_sidebarNav, &SidebarNav::sectionSelected, this, [this](const QString& section) {
+        if (section == QStringLiteral("Dashboard")) {
+            // Default view: show timeline, hide specialty panels
+            statusBar()->showMessage(tr("Dashboard"), 2000);
+        } else if (section == QStringLiteral("Encoders")) {
+            openBatchEncoder();
+        } else if (section == QStringLiteral("Media Library")) {
+            if (m_mediaBrowserDock) {
+                m_mediaBrowserDock->setVisible(true);
+                m_mediaBrowserDock->raise();
+            }
+        } else if (section == QStringLiteral("Playlists")) {
+            if (m_mediaBrowserDock) {
+                m_mediaBrowserDock->setVisible(true);
+                m_mediaBrowserDock->raise();
+            }
+            statusBar()->showMessage(tr("Playlists view"), 2000);
+        } else if (section == QStringLiteral("Media Player")) {
+            statusBar()->showMessage(tr("Media Player"), 2000);
+        } else if (section == QStringLiteral("Crossfader")) {
+            statusBar()->showMessage(tr("Crossfader"), 2000);
+        } else if (section == QStringLiteral("Effects Rack")) {
+            if (m_effectsDock) {
+                m_effectsDock->setVisible(true);
+                m_effectsDock->raise();
+            }
+        } else if (section == QStringLiteral("Mixer")) {
+            if (m_mixerDock) {
+                m_mixerDock->setVisible(true);
+                m_mixerDock->raise();
+            }
+        } else if (section == QStringLiteral("JACK Audio")) {
+            statusBar()->showMessage(tr("JACK Audio routing"), 2000);
+        } else if (section == QStringLiteral("VoicTune")) {
+            statusBar()->showMessage(tr("VoicTune voice processing"), 2000);
+        } else if (section == QStringLiteral("Video Producer")) {
+            if (m_videoDock) {
+                m_videoDock->setVisible(true);
+                m_videoDock->raise();
+            }
+        }
+    });
+
+    // Popup items open in separate windows
+    connect(m_sidebarNav, &SidebarNav::popupRequested, this, [this](const QString& section) {
+        if (section == QStringLiteral("Pro Player")) {
+            statusBar()->showMessage(tr("Pro Player popup — not yet implemented"), 3000);
+        } else if (section == QStringLiteral("Dual Deck")) {
+            statusBar()->showMessage(tr("Dual Deck popup — not yet implemented"), 3000);
+        }
+    });
+}
+
 // ── Central Widget ──────────────────────────────────────────────────────────
 
 void MainWindow::setupCentralWidget()
 {
-    m_centralSplitter = new QSplitter(Qt::Vertical, this);
+    // Top-level container: [SidebarNav | Right content area]
+    auto* outerContainer = new QWidget(this);
+    auto* outerHBox = new QHBoxLayout(outerContainer);
+    outerHBox->setContentsMargins(0, 0, 0, 0);
+    outerHBox->setSpacing(0);
+
+    // Sidebar nav on the left (fixed 200px width)
+    outerHBox->addWidget(m_sidebarNav);
+
+    // Right content area: timeline (stretch) + master strip + action bar (fixed)
+    auto* centralContainer = new QWidget(outerContainer);
+    auto* centralLayout = new QVBoxLayout(centralContainer);
+    centralLayout->setContentsMargins(0, 0, 0, 0);
+    centralLayout->setSpacing(0);
+
+    m_centralSplitter = new QSplitter(Qt::Vertical, centralContainer);
     m_centralSplitter->setChildrenCollapsible(false);
 
-    m_timeline = new TimelineWidget(this);
+    // Horizontal splitter: track headers (left) + timeline waveform area (right)
+    m_timelineSplitter = new QSplitter(Qt::Horizontal, m_centralSplitter);
+    m_timelineSplitter->setChildrenCollapsible(false);
+
+    m_trackHeaders = new TrackHeaderPanel(m_timelineSplitter);
+    m_timeline = new TimelineWidget(m_timelineSplitter);
     m_timeline->setMinimumHeight(200);
 
-    m_centralSplitter->addWidget(m_timeline);
+    m_timelineSplitter->addWidget(m_trackHeaders);
+    m_timelineSplitter->addWidget(m_timeline);
+    m_timelineSplitter->setStretchFactor(0, 0);  // headers: fixed width
+    m_timelineSplitter->setStretchFactor(1, 1);  // timeline: stretches
+
+    m_centralSplitter->addWidget(m_timelineSplitter);
     m_centralSplitter->setStretchFactor(0, 1);
 
-    setCentralWidget(m_centralSplitter);
+    centralLayout->addWidget(m_centralSplitter, 1);
+
+    // Master strip — full width between timeline and action bar
+    m_masterStrip = new MasterStrip(centralContainer);
+    centralLayout->addWidget(m_masterStrip);
+
+    // Action bar — full width at the bottom of the central area
+    m_actionBar = new ActionBar(centralContainer);
+    centralLayout->addWidget(m_actionBar);
+
+    outerHBox->addWidget(centralContainer, 1);
+
+    setCentralWidget(outerContainer);
 }
 
 // ── Dock Widgets ────────────────────────────────────────────────────────────
@@ -432,8 +537,13 @@ void MainWindow::setupAudioPipeline()
     m_timelineModel = new dawcast::Timeline(this);
     m_timelineModel->setSampleRate(48000);
 
-    // Give the TimelineWidget its data model
+    // Give the TimelineWidget and TrackHeaderPanel their data model
     m_timeline->setTimeline(m_timelineModel);
+    m_trackHeaders->setTimeline(m_timelineModel);
+
+    // Wire "+" button in the track header panel to add an audio track
+    connect(m_trackHeaders, &TrackHeaderPanel::addTrackRequested,
+            this, &MainWindow::addAudioTrack);
 
     // Audio mixer (volume / pan / mute / solo per strip)
     m_audioMixer = new dawcast::AudioMixer(this);
@@ -500,6 +610,37 @@ void MainWindow::setupConnections()
             m_playbackEngine->seekTo(0);
             if (m_timelineModel) m_timelineModel->setPlayhead(0);
         }
+    });
+
+    // Zoom slider -> TimelineWidget
+    connect(m_transportBar, &TransportBar::zoomChanged, this, [this](int pxPerSec) {
+        if (m_timeline) {
+            m_timeline->setZoom(static_cast<float>(pxPerSec) / 100.0f);
+        }
+    });
+
+    // Automation write mode (status bar feedback for now)
+    connect(m_transportBar, &TransportBar::automationWriteToggled, this, [this](bool on) {
+        statusBar()->showMessage(on ? tr("Automation write enabled")
+                                    : tr("Automation write disabled"), 2000);
+    });
+
+    // Crossfade mode
+    connect(m_transportBar, &TransportBar::crossfadeModeChanged, this, [this](int mode) {
+        static const char* modeNames[] = { "Auto", "Manual", "Off" };
+        if (mode >= 0 && mode <= 2) {
+            statusBar()->showMessage(
+                tr("Crossfade mode: %1").arg(QString::fromLatin1(modeNames[mode])), 2000);
+        }
+    });
+
+    // Buses button
+    connect(m_transportBar, &TransportBar::busesClicked, this, [this]() {
+        if (m_mixerDock) {
+            m_mixerDock->setVisible(true);
+            m_mixerDock->raise();
+        }
+        statusBar()->showMessage(tr("Audio buses"), 2000);
     });
 
     // Metronome toggle and tempo from TransportBar -> PlaybackEngine::Metronome
@@ -586,6 +727,29 @@ void MainWindow::setupConnections()
         connect(m_playbackEngine, &dawcast::PlaybackEngine::playbackStarted,
                 m_lufsMeter, &LUFSMeterWidget::reset);
     }
+
+    // ── Action Bar signals ───────────────────────────────────────────────
+    connect(m_actionBar, &ActionBar::addTrackClicked,
+            this, &MainWindow::addAudioTrack);
+    connect(m_actionBar, &ActionBar::loadFromLibraryClicked,
+            this, &MainWindow::loadFromLibrary);
+    connect(m_actionBar, &ActionBar::exportMixdownClicked,
+            this, &MainWindow::exportProject);
+    connect(m_actionBar, &ActionBar::projectsClicked,
+            this, &MainWindow::openProjectBrowser);
+    connect(m_actionBar, &ActionBar::saveProjectClicked,
+            this, &MainWindow::saveProject);
+
+    // ── Master Strip signals ───────────────────────────────────────────
+    // Feed master fader changes to the AudioMixer (strip 0 reserved for master
+    // output in a future update; for now we log the value)
+    connect(m_masterStrip, &MasterStrip::levelChanged,
+            this, [this](float db) {
+        Q_UNUSED(db)
+        // TODO: route to AudioMixer master volume once the mixer exposes
+        // a dedicated master bus.  For now, the fader value is stored in
+        // the MasterStrip widget itself.
+    });
 
     // Pre-cache waveforms when files are imported or double-clicked in Media Browser
     connect(m_mediaBrowser, &MediaBrowser::fileDoubleClicked,
@@ -783,6 +947,24 @@ void MainWindow::toggleEffectsRack()
 void MainWindow::toggleAIPanel()
 {
     m_aiDock->setVisible(!m_aiDock->isVisible());
+}
+
+// ── Action Bar Slots ───────────────────────────────────────────────────────
+
+void MainWindow::loadFromLibrary()
+{
+    // Show the media browser if hidden, then let the user pick files
+    if (m_mediaBrowserDock && !m_mediaBrowserDock->isVisible()) {
+        m_mediaBrowserDock->show();
+        m_mediaBrowserDock->raise();
+    }
+    statusBar()->showMessage(tr("Media Browser opened — drag files to the timeline"), 3000);
+}
+
+void MainWindow::openProjectBrowser()
+{
+    // Open the project directory via a standard file dialog for now
+    openProject();
 }
 
 // ── Track Slots ─────────────────────────────────────────────────────────────
