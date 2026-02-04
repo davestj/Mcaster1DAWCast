@@ -65,7 +65,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     setupMenus();
     setupToolbars();
-    setupSidebar();
+    // Sidebar nav removed — view modes will handle workspace layouts
     setupCentralWidget();
     setupDockWidgets();
     setupStatusBar();
@@ -350,81 +350,21 @@ void MainWindow::setupToolbars()
     m_toolBar->addWidget(m_transportBar);
 }
 
-// ── Sidebar Navigation ─────────────────────────────────────────────────────
+// ── Sidebar Navigation (removed — replaced by View Mode system) ────────────
 
 void MainWindow::setupSidebar()
 {
-    m_sidebarNav = new SidebarNav(this);
-
-    // Sidebar section clicks -> show/hide relevant dock widgets or panels
-    connect(m_sidebarNav, &SidebarNav::sectionSelected, this, [this](const QString& section) {
-        if (section == QStringLiteral("Dashboard")) {
-            // Default view: show timeline, hide specialty panels
-            statusBar()->showMessage(tr("Dashboard"), 2000);
-        } else if (section == QStringLiteral("Encoders")) {
-            openBatchEncoder();
-        } else if (section == QStringLiteral("Media Library")) {
-            if (m_mediaBrowserDock) {
-                m_mediaBrowserDock->setVisible(true);
-                m_mediaBrowserDock->raise();
-            }
-        } else if (section == QStringLiteral("Playlists")) {
-            if (m_mediaBrowserDock) {
-                m_mediaBrowserDock->setVisible(true);
-                m_mediaBrowserDock->raise();
-            }
-            statusBar()->showMessage(tr("Playlists view"), 2000);
-        } else if (section == QStringLiteral("Media Player")) {
-            statusBar()->showMessage(tr("Media Player"), 2000);
-        } else if (section == QStringLiteral("Crossfader")) {
-            statusBar()->showMessage(tr("Crossfader"), 2000);
-        } else if (section == QStringLiteral("Effects Rack")) {
-            if (m_effectsDock) {
-                m_effectsDock->setVisible(true);
-                m_effectsDock->raise();
-            }
-        } else if (section == QStringLiteral("Mixer")) {
-            if (m_mixerDock) {
-                m_mixerDock->setVisible(true);
-                m_mixerDock->raise();
-            }
-        } else if (section == QStringLiteral("JACK Audio")) {
-            statusBar()->showMessage(tr("JACK Audio routing"), 2000);
-        } else if (section == QStringLiteral("VoicTune")) {
-            statusBar()->showMessage(tr("VoicTune voice processing"), 2000);
-        } else if (section == QStringLiteral("Video Producer")) {
-            if (m_videoDock) {
-                m_videoDock->setVisible(true);
-                m_videoDock->raise();
-            }
-        }
-    });
-
-    // Popup items open in separate windows
-    connect(m_sidebarNav, &SidebarNav::popupRequested, this, [this](const QString& section) {
-        if (section == QStringLiteral("Pro Player")) {
-            statusBar()->showMessage(tr("Pro Player popup — not yet implemented"), 3000);
-        } else if (section == QStringLiteral("Dual Deck")) {
-            statusBar()->showMessage(tr("Dual Deck popup — not yet implemented"), 3000);
-        }
-    });
+    // Sidebar removed. View Modes will handle workspace layouts:
+    // - Podcaster, Producer, DJ/Live, Studio, Voice Over, Guitar FX
+    // Each mode configures visible panels, dock layout, and tool focus.
 }
 
 // ── Central Widget ──────────────────────────────────────────────────────────
 
 void MainWindow::setupCentralWidget()
 {
-    // Top-level container: [SidebarNav | Right content area]
-    auto* outerContainer = new QWidget(this);
-    auto* outerHBox = new QHBoxLayout(outerContainer);
-    outerHBox->setContentsMargins(0, 0, 0, 0);
-    outerHBox->setSpacing(0);
-
-    // Sidebar nav on the left (fixed 200px width)
-    outerHBox->addWidget(m_sidebarNav);
-
-    // Right content area: timeline (stretch) + master strip + action bar (fixed)
-    auto* centralContainer = new QWidget(outerContainer);
+    // Central content: timeline + track headers + master strip + action bar
+    auto* centralContainer = new QWidget(this);
     auto* centralLayout = new QVBoxLayout(centralContainer);
     centralLayout->setContentsMargins(0, 0, 0, 0);
     centralLayout->setSpacing(0);
@@ -458,9 +398,7 @@ void MainWindow::setupCentralWidget()
     m_actionBar = new ActionBar(centralContainer);
     centralLayout->addWidget(m_actionBar);
 
-    outerHBox->addWidget(centralContainer, 1);
-
-    setCentralWidget(outerContainer);
+    setCentralWidget(centralContainer);
 }
 
 // ── Dock Widgets ────────────────────────────────────────────────────────────
