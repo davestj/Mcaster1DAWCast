@@ -8,6 +8,8 @@
 #include "MixerWidget.h"
 #include "VideoPreview.h"
 #include "MediaBrowser.h"
+#include "MediaLibraryWidget.h"
+#include "LibraryTableModel.h"
 #include "EffectsRackWidget.h"
 #include "TransportBar.h"
 #include "LUFSMeterWidget.h"
@@ -15,7 +17,16 @@
 #include "ActionBar.h"
 #include "MasterStrip.h"
 #include "PreferencesDialog.h"
+#include "ViewModeSwitcher.h"
+#include "ChapterWidget.h"
+#include "MetadataPanel.h"
+#include "SpectrumWidget.h"
+#include "PianoRollWidget.h"
+#include "ScriptReaderPanel.h"
+#include "PedalboardWidget.h"
+#include "StreamMonitorPanel.h"
 #include "../ai/AIPanel.h"
+#include "../core/ViewModeManager.h"
 
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
@@ -27,6 +38,7 @@
 #include "../audio_engine/WaveformCache.h"
 #include "../audio_engine/ExportEngine.h"
 #include "../video_engine/VideoPlaybackController.h"
+#include "../core/MediaLibrary.h"
 #include "../config/AppConfig.h"
 #include "ExportDialog.h"
 #include "BatchEncoderDialog.h"
@@ -36,6 +48,7 @@
 #include "../broadcast/RTMPStreamer.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QMenu>
 #include <QMenuBar>
 #include <QFileDialog>
@@ -73,6 +86,7 @@ MainWindow::MainWindow(QWidget* parent)
     setupVideoPlayback();
     setupRTMPStreamer();
     setupConnections();
+    setupViewModes();
 
     // Restore window geometry, dock layout, and splitter state from last session
     restoreWindowState();
@@ -219,7 +233,7 @@ void MainWindow::setupMenus()
     m_actToggleVideo->setChecked(true);
     connect(m_actToggleVideo, &QAction::triggered, this, &MainWindow::toggleVideoPreview);
 
-    m_actToggleMediaBrowser = viewMenu->addAction(tr("Media &Browser"));
+    m_actToggleMediaBrowser = viewMenu->addAction(tr("Media &Library"));
     m_actToggleMediaBrowser->setCheckable(true);
     m_actToggleMediaBrowser->setChecked(false); // initially hidden
     connect(m_actToggleMediaBrowser, &QAction::triggered, this, &MainWindow::toggleMediaBrowser);
@@ -240,6 +254,48 @@ void MainWindow::setupMenus()
     m_actToggleAI->setCheckable(true);
     m_actToggleAI->setChecked(true);
     connect(m_actToggleAI, &QAction::triggered, this, &MainWindow::toggleAIPanel);
+
+    viewMenu->addSeparator();
+
+    // ── View > Mode submenu ────────────────────────────────────────────
+    m_viewModeMenu = viewMenu->addMenu(tr("&Mode"));
+
+    auto* mgr = dawcast::ViewModeManager::instance();
+
+    struct ModeEntry {
+        dawcast::ViewModeManager::Mode mode;
+        const char* shortcut;
+    };
+    static const ModeEntry modes[] = {
+        { dawcast::ViewModeManager::Podcaster,    "Ctrl+1" },
+        { dawcast::ViewModeManager::Producer,     "Ctrl+2" },
+        { dawcast::ViewModeManager::DJLive,       "Ctrl+3" },
+        { dawcast::ViewModeManager::StudioArtist, "Ctrl+4" },
+        { dawcast::ViewModeManager::VoiceOver,    "Ctrl+5" },
+        { dawcast::ViewModeManager::GuitarFX,     "Ctrl+6" },
+    };
+
+    auto* modeGroup = new QActionGroup(this);
+    modeGroup->setExclusive(true);
+
+    for (const auto& entry : modes) {
+        QAction* act = m_viewModeMenu->addAction(mgr->modeName(entry.mode));
+        act->setCheckable(true);
+        act->setShortcut(QKeySequence(QString::fromLatin1(entry.shortcut)));
+        act->setStatusTip(mgr->modeDescription(entry.mode));
+        act->setData(static_cast<int>(entry.mode));
+        modeGroup->addAction(act);
+
+        connect(act, &QAction::triggered, this, [this, entry]() {
+            dawcast::ViewModeManager::instance()->setMode(entry.mode);
+        });
+
+        // Check the currently active mode
+        if (entry.mode == mgr->currentMode())
+            act->setChecked(true);
+
+        m_viewModeActions.append(act);
+    }
 
     // ── Track ───────────────────────────────────────────────────────────
     auto* trackMenu = m_menuBar->addMenu(tr("&Track"));
@@ -348,6 +404,17 @@ void MainWindow::setupToolbars()
 
     m_transportBar = new TransportBar(this);
     m_toolBar->addWidget(m_transportBar);
+
+    // View Mode switcher toolbar — below the transport bar
+    m_viewModeToolBar = addToolBar(tr("View Mode"));
+    m_viewModeToolBar->setMovable(false);
+    m_viewModeToolBar->setFloatable(false);
+    m_viewModeToolBar->setStyleSheet(QStringLiteral(
+        "QToolBar { background: #1a2228; border-top: 1px solid #2a3a42; "
+        "border-bottom: 1px solid #2a3a42; spacing: 0; padding: 0; }"));
+
+    m_viewModeSwitcher = new ViewModeSwitcher(this);
+    m_viewModeToolBar->addWidget(m_viewModeSwitcher);
 }
 
 // ── Sidebar Navigation (removed — replaced by View Mode system) ────────────
@@ -421,12 +488,13 @@ void MainWindow::setupDockWidgets()
     m_videoDock->setWidget(m_videoPreview);
     addDockWidget(Qt::RightDockWidgetArea, m_videoDock);
 
-    // Left dock — Media Browser (initially hidden)
-    m_mediaBrowserDock = new QDockWidget(tr("Media Browser"), this);
+    // Left dock — Media Library (replaces basic Media Browser)
+    m_mediaBrowserDock = new QDockWidget(tr("Media Library"), this);
     m_mediaBrowserDock->setObjectName(QStringLiteral("MediaBrowserDock"));
-    m_mediaBrowserDock->setMinimumWidth(200);
-    m_mediaBrowser = new MediaBrowser(m_mediaBrowserDock);
-    m_mediaBrowserDock->setWidget(m_mediaBrowser);
+    m_mediaBrowserDock->setMinimumWidth(280);
+    m_mediaLibrary = new MediaLibraryWidget(m_mediaBrowserDock);
+    m_mediaBrowser = m_mediaLibrary->fileBrowser();  // keep ref for backward compat
+    m_mediaBrowserDock->setWidget(m_mediaLibrary);
     addDockWidget(Qt::LeftDockWidgetArea, m_mediaBrowserDock);
     m_mediaBrowserDock->hide();
 
@@ -458,6 +526,72 @@ void MainWindow::setupDockWidgets()
 
     // Raise Video Preview as the default visible tab on the right
     m_videoDock->raise();
+
+    // ── Mode-specific dock widgets (initially hidden) ──────────────────
+
+    // Right dock — Chapter Widget (Podcaster mode)
+    m_chapterDock = new QDockWidget(tr("Chapters"), this);
+    m_chapterDock->setObjectName(QStringLiteral("ChapterDock"));
+    m_chapterDock->setMinimumSize(200, 150);
+    m_chapterWidget = new ChapterWidget(m_chapterDock);
+    m_chapterDock->setWidget(m_chapterWidget);
+    addDockWidget(Qt::RightDockWidgetArea, m_chapterDock);
+    m_chapterDock->hide();
+
+    // Right dock — Metadata Panel (Podcaster mode)
+    m_metadataDock = new QDockWidget(tr("Metadata"), this);
+    m_metadataDock->setObjectName(QStringLiteral("MetadataDock"));
+    m_metadataDock->setMinimumSize(200, 150);
+    m_metadataPanel = new MetadataPanel(m_metadataDock);
+    m_metadataDock->setWidget(m_metadataPanel);
+    addDockWidget(Qt::RightDockWidgetArea, m_metadataDock);
+    tabifyDockWidget(m_chapterDock, m_metadataDock);
+    m_metadataDock->hide();
+
+    // Bottom dock — Spectrum Analyzer (Producer / Guitar FX modes)
+    m_spectrumDock = new QDockWidget(tr("Spectrum Analyzer"), this);
+    m_spectrumDock->setObjectName(QStringLiteral("SpectrumDock"));
+    m_spectrumDock->setMinimumSize(200, 120);
+    m_spectrumWidget = new SpectrumWidget(m_spectrumDock);
+    m_spectrumDock->setWidget(m_spectrumWidget);
+    addDockWidget(Qt::BottomDockWidgetArea, m_spectrumDock);
+    m_spectrumDock->hide();
+
+    // Bottom dock — Piano Roll (Studio Artist mode)
+    m_pianoRollDock = new QDockWidget(tr("Piano Roll"), this);
+    m_pianoRollDock->setObjectName(QStringLiteral("PianoRollDock"));
+    m_pianoRollDock->setMinimumSize(300, 150);
+    m_pianoRoll = new PianoRollWidget(m_pianoRollDock);
+    m_pianoRollDock->setWidget(m_pianoRoll);
+    addDockWidget(Qt::BottomDockWidgetArea, m_pianoRollDock);
+    m_pianoRollDock->hide();
+
+    // Left dock — Script Reader (Voice Over mode)
+    m_scriptReaderDock = new QDockWidget(tr("Script Reader"), this);
+    m_scriptReaderDock->setObjectName(QStringLiteral("ScriptReaderDock"));
+    m_scriptReaderDock->setMinimumSize(280, 200);
+    m_scriptReader = new ScriptReaderPanel(m_scriptReaderDock);
+    m_scriptReaderDock->setWidget(m_scriptReader);
+    addDockWidget(Qt::LeftDockWidgetArea, m_scriptReaderDock);
+    m_scriptReaderDock->hide();
+
+    // Bottom dock — Pedalboard (Guitar FX mode)
+    m_pedalboardDock = new QDockWidget(tr("Pedalboard"), this);
+    m_pedalboardDock->setObjectName(QStringLiteral("PedalboardDock"));
+    m_pedalboardDock->setMinimumSize(400, 280);
+    m_pedalboard = new PedalboardWidget(m_pedalboardDock);
+    m_pedalboardDock->setWidget(m_pedalboard);
+    addDockWidget(Qt::BottomDockWidgetArea, m_pedalboardDock);
+    m_pedalboardDock->hide();
+
+    // Right dock — Stream Monitor (DJ/Live mode)
+    m_streamMonitorDock = new QDockWidget(tr("Stream Monitor"), this);
+    m_streamMonitorDock->setObjectName(QStringLiteral("StreamMonitorDock"));
+    m_streamMonitorDock->setMinimumSize(240, 300);
+    m_streamMonitor = new StreamMonitorPanel(m_streamMonitorDock);
+    m_streamMonitorDock->setWidget(m_streamMonitor);
+    addDockWidget(Qt::RightDockWidgetArea, m_streamMonitorDock);
+    m_streamMonitorDock->hide();
 }
 
 // ── Status Bar ──────────────────────────────────────────────────────────────
@@ -689,13 +823,13 @@ void MainWindow::setupConnections()
         // the MasterStrip widget itself.
     });
 
-    // Pre-cache waveforms when files are imported or double-clicked in Media Browser
-    connect(m_mediaBrowser, &MediaBrowser::fileDoubleClicked,
+    // Pre-cache waveforms when files are double-clicked in Media Library
+    connect(m_mediaLibrary, &MediaLibraryWidget::fileDoubleClicked,
             this, [](const QString& path) {
         dawcast::WaveformCache::instance()->requestWaveform(path);
     });
 
-    connect(m_mediaBrowser, &MediaBrowser::importRequested,
+    connect(m_mediaLibrary, &MediaLibraryWidget::importRequested,
             this, [](const QStringList& paths) {
         for (const QString& path : paths) {
             dawcast::WaveformCache::instance()->requestWaveform(path);
@@ -891,12 +1025,12 @@ void MainWindow::toggleAIPanel()
 
 void MainWindow::loadFromLibrary()
 {
-    // Show the media browser if hidden, then let the user pick files
+    // Show the media library if hidden, then let the user pick files
     if (m_mediaBrowserDock && !m_mediaBrowserDock->isVisible()) {
         m_mediaBrowserDock->show();
         m_mediaBrowserDock->raise();
     }
-    statusBar()->showMessage(tr("Media Browser opened — drag files to the timeline"), 3000);
+    statusBar()->showMessage(tr("Media Library opened — drag files to the timeline"), 3000);
 }
 
 void MainWindow::openProjectBrowser()
@@ -1057,6 +1191,145 @@ void MainWindow::updateOnAirStatus(bool live)
     } else {
         m_onAirStatusLabel->hide();
     }
+}
+
+// ── View Mode System ──────────────────────────────────────────────────────
+
+void MainWindow::setupViewModes()
+{
+    auto* mgr = dawcast::ViewModeManager::instance();
+
+    // Wire the ViewModeSwitcher button clicks to the manager
+    connect(m_viewModeSwitcher, &ViewModeSwitcher::modeSelected,
+            mgr, &dawcast::ViewModeManager::setMode);
+
+    // Wire the manager's mode changes to the workspace layout applicator
+    connect(mgr, &dawcast::ViewModeManager::modeChanged,
+            this, &MainWindow::applyViewMode);
+
+    // Wire the stream monitor panel to the RTMP streamer
+    if (m_rtmpStreamer && m_streamMonitor)
+        m_streamMonitor->setRTMPStreamer(m_rtmpStreamer);
+
+    // Wire stream monitor start/stop to the existing streaming methods
+    connect(m_streamMonitor, &StreamMonitorPanel::startStreamRequested,
+            this, &MainWindow::startStreaming);
+    connect(m_streamMonitor, &StreamMonitorPanel::stopStreamRequested,
+            this, &MainWindow::stopStreaming);
+
+    // Wire chapter widget to the timeline model
+    if (m_chapterWidget && m_timelineModel)
+        m_chapterWidget->setTimeline(m_timelineModel);
+
+    // Apply the current (persisted) mode immediately
+    applyViewMode(mgr->currentMode());
+}
+
+void MainWindow::applyViewMode(dawcast::ViewModeManager::Mode mode)
+{
+    auto* mgr = dawcast::ViewModeManager::instance();
+    auto layout = mgr->layoutForMode(mode);
+
+    // ── Show/hide existing dock widgets ────────────────────────────────
+    if (m_mixerDock)          m_mixerDock->setVisible(layout.showMixer);
+    if (m_videoDock)          m_videoDock->setVisible(layout.showVideoPreview);
+    if (m_mediaBrowserDock)   m_mediaBrowserDock->setVisible(layout.showMediaBrowser);
+    if (m_effectsDock)        m_effectsDock->setVisible(layout.showEffectsRack);
+    if (m_lufsDock)           m_lufsDock->setVisible(layout.showLUFSMeter);
+    if (m_aiDock)             m_aiDock->setVisible(layout.showAIPanel);
+
+    // ── Show/hide mode-specific dock widgets ───────────────────────────
+    if (m_chapterDock)        m_chapterDock->setVisible(layout.showChapterWidget);
+    if (m_metadataDock)       m_metadataDock->setVisible(layout.showMetadataPanel);
+    if (m_spectrumDock)       m_spectrumDock->setVisible(layout.showSpectrumWidget);
+    if (m_pianoRollDock)      m_pianoRollDock->setVisible(layout.showPianoRoll);
+    if (m_scriptReaderDock)   m_scriptReaderDock->setVisible(layout.showScriptReader);
+    if (m_pedalboardDock)     m_pedalboardDock->setVisible(layout.showPedalboard);
+    if (m_streamMonitorDock)  m_streamMonitorDock->setVisible(layout.showStreamMonitor);
+
+    // ── Sync View menu toggle actions with actual dock visibility ──────
+    if (m_actToggleMixer)        m_actToggleMixer->setChecked(layout.showMixer);
+    if (m_actToggleVideo)        m_actToggleVideo->setChecked(layout.showVideoPreview);
+    if (m_actToggleMediaBrowser) m_actToggleMediaBrowser->setChecked(layout.showMediaBrowser);
+    if (m_actToggleEffectsRack)  m_actToggleEffectsRack->setChecked(layout.showEffectsRack);
+    if (m_actToggleLUFS)         m_actToggleLUFS->setChecked(layout.showLUFSMeter);
+    if (m_actToggleAI)           m_actToggleAI->setChecked(layout.showAIPanel);
+
+    // ── Sync View > Mode menu radio buttons ────────────────────────────
+    for (QAction* act : m_viewModeActions) {
+        act->setChecked(act->data().toInt() == static_cast<int>(mode));
+    }
+
+    // ── Arrange docks for specific modes ───────────────────────────────
+    switch (mode) {
+
+    case dawcast::ViewModeManager::Podcaster:
+        // Chapters + Metadata on the right, LUFS alongside
+        if (m_chapterDock && m_lufsDock) {
+            addDockWidget(Qt::RightDockWidgetArea, m_chapterDock);
+            addDockWidget(Qt::RightDockWidgetArea, m_metadataDock);
+            tabifyDockWidget(m_chapterDock, m_metadataDock);
+            m_chapterDock->raise();
+        }
+        break;
+
+    case dawcast::ViewModeManager::Producer:
+        // Full layout — spectrum at bottom, tabified with mixer
+        if (m_spectrumDock && m_mixerDock) {
+            addDockWidget(Qt::BottomDockWidgetArea, m_spectrumDock);
+            tabifyDockWidget(m_mixerDock, m_spectrumDock);
+            m_mixerDock->raise();
+        }
+        break;
+
+    case dawcast::ViewModeManager::DJLive:
+        // Stream monitor on the right
+        if (m_streamMonitorDock) {
+            addDockWidget(Qt::RightDockWidgetArea, m_streamMonitorDock);
+        }
+        break;
+
+    case dawcast::ViewModeManager::StudioArtist:
+        // Piano roll at the bottom, tabified with mixer
+        if (m_pianoRollDock && m_mixerDock) {
+            addDockWidget(Qt::BottomDockWidgetArea, m_pianoRollDock);
+            tabifyDockWidget(m_mixerDock, m_pianoRollDock);
+            m_mixerDock->raise();
+        }
+        break;
+
+    case dawcast::ViewModeManager::VoiceOver:
+        // Script reader on the left, effects rack on the right
+        if (m_scriptReaderDock) {
+            addDockWidget(Qt::LeftDockWidgetArea, m_scriptReaderDock);
+        }
+        break;
+
+    case dawcast::ViewModeManager::GuitarFX:
+        // Pedalboard at the bottom, spectrum analyzer alongside
+        if (m_pedalboardDock) {
+            addDockWidget(Qt::BottomDockWidgetArea, m_pedalboardDock);
+        }
+        if (m_spectrumDock && m_pedalboardDock) {
+            addDockWidget(Qt::BottomDockWidgetArea, m_spectrumDock);
+            tabifyDockWidget(m_pedalboardDock, m_spectrumDock);
+            m_pedalboardDock->raise();
+        }
+        break;
+    }
+
+    // ── Update window title to include the mode name ───────────────────
+    QString modeLabel = mgr->modeName(mode);
+    QString projectLabel = m_projectName.isEmpty()
+        ? QStringLiteral("Untitled Project") : m_projectName;
+    setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1 [%2]")
+                       .arg(projectLabel, modeLabel));
+
+    // ── Update status bar ──────────────────────────────────────────────
+    statusBar()->showMessage(
+        tr("View mode: %1 \u2014 %2")
+            .arg(modeLabel, mgr->modeDescription(mode)),
+        5000);
 }
 
 // ── Tools Slots ────────────────────────────────────────────────────────────

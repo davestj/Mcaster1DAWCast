@@ -130,6 +130,12 @@ moc_UndoManager.cpp: $(srcdir)/core/UndoManager.h
 moc_ProjectManager.cpp: $(srcdir)/core/ProjectManager.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_ViewModeManager.cpp: $(srcdir)/core/ViewModeManager.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_MediaLibrary.cpp: $(srcdir)/core/MediaLibrary.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- audio_engine --
 moc_AudioEngine.cpp: $(srcdir)/audio_engine/AudioEngine.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -300,6 +306,12 @@ moc_EffectsRackWidget.cpp: $(srcdir)/widgets/EffectsRackWidget.h
 moc_MediaBrowser.cpp: $(srcdir)/widgets/MediaBrowser.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_MediaLibraryWidget.cpp: $(srcdir)/widgets/MediaLibraryWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_LibraryTableModel.cpp: $(srcdir)/widgets/LibraryTableModel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 moc_ChapterWidget.cpp: $(srcdir)/widgets/ChapterWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
@@ -384,6 +396,18 @@ moc_MasterStrip.cpp: $(srcdir)/widgets/MasterStrip.h
 moc_SidebarNav.cpp: $(srcdir)/widgets/SidebarNav.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_ViewModeSwitcher.cpp: $(srcdir)/widgets/ViewModeSwitcher.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_ScriptReaderPanel.cpp: $(srcdir)/widgets/ScriptReaderPanel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_PedalboardWidget.cpp: $(srcdir)/widgets/PedalboardWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_StreamMonitorPanel.cpp: $(srcdir)/widgets/StreamMonitorPanel.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -425,6 +449,10 @@ mcaster1dawcast_SOURCES = \
     core/UndoManager.cpp \
     core/ProjectManager.h \
     core/ProjectManager.cpp \
+    core/MediaLibrary.h \
+    core/MediaLibrary.cpp \
+    core/ViewModeManager.h \
+    core/ViewModeManager.cpp \
     audio_engine/AudioEngine.h \
     audio_engine/AudioEngine.cpp \
     audio_engine/AudioMixer.h \
@@ -612,6 +640,10 @@ mcaster1dawcast_SOURCES = \
     widgets/EffectsRackWidget.cpp \
     widgets/MediaBrowser.h \
     widgets/MediaBrowser.cpp \
+    widgets/MediaLibraryWidget.h \
+    widgets/MediaLibraryWidget.cpp \
+    widgets/LibraryTableModel.h \
+    widgets/LibraryTableModel.cpp \
     widgets/ChapterWidget.h \
     widgets/ChapterWidget.cpp \
     widgets/MetadataPanel.h \
@@ -662,6 +694,14 @@ mcaster1dawcast_SOURCES = \
     widgets/MasterStrip.cpp \
     widgets/SidebarNav.h \
     widgets/SidebarNav.cpp \
+    widgets/ViewModeSwitcher.h \
+    widgets/ViewModeSwitcher.cpp \
+    widgets/ScriptReaderPanel.h \
+    widgets/ScriptReaderPanel.cpp \
+    widgets/PedalboardWidget.h \
+    widgets/PedalboardWidget.cpp \
+    widgets/StreamMonitorPanel.h \
+    widgets/StreamMonitorPanel.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -698,6 +738,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_ModuleRegistry.cpp \
     moc_UndoManager.cpp \
     moc_ProjectManager.cpp \
+    moc_MediaLibrary.cpp \
     moc_AudioEngine.cpp \
     moc_AudioMixer.cpp \
     moc_AudioWorker.cpp \
@@ -753,6 +794,8 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_TransportBar.cpp \
     moc_EffectsRackWidget.cpp \
     moc_MediaBrowser.cpp \
+    moc_MediaLibraryWidget.cpp \
+    moc_LibraryTableModel.cpp \
     moc_ChapterWidget.cpp \
     moc_MetadataPanel.cpp \
     moc_ExportDialog.cpp \
@@ -778,6 +821,11 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_ActionBar.cpp \
     moc_MasterStrip.cpp \
     moc_SidebarNav.cpp \
+    moc_ViewModeManager.cpp \
+    moc_ViewModeSwitcher.cpp \
+    moc_ScriptReaderPanel.cpp \
+    moc_PedalboardWidget.cpp \
+    moc_StreamMonitorPanel.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \
@@ -791,6 +839,7 @@ BUILT_SOURCES = \
     moc_ModuleRegistry.cpp \
     moc_UndoManager.cpp \
     moc_ProjectManager.cpp \
+    moc_MediaLibrary.cpp \
     moc_AudioEngine.cpp \
     moc_AudioMixer.cpp \
     moc_AudioWorker.cpp \
@@ -846,6 +895,8 @@ BUILT_SOURCES = \
     moc_TransportBar.cpp \
     moc_EffectsRackWidget.cpp \
     moc_MediaBrowser.cpp \
+    moc_MediaLibraryWidget.cpp \
+    moc_LibraryTableModel.cpp \
     moc_ChapterWidget.cpp \
     moc_MetadataPanel.cpp \
     moc_ExportDialog.cpp \
@@ -871,6 +922,11 @@ BUILT_SOURCES = \
     moc_ActionBar.cpp \
     moc_MasterStrip.cpp \
     moc_SidebarNav.cpp \
+    moc_ViewModeManager.cpp \
+    moc_ViewModeSwitcher.cpp \
+    moc_ScriptReaderPanel.cpp \
+    moc_PedalboardWidget.cpp \
+    moc_StreamMonitorPanel.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \

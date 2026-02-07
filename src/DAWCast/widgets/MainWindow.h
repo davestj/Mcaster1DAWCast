@@ -14,6 +14,8 @@
 #include <QMenu>
 #include <QLabel>
 
+#include "../core/ViewModeManager.h"
+
 namespace dawcast {
 class Timeline;
 class AudioEngine;
@@ -23,6 +25,7 @@ class MultitrackRecorder;
 class VideoPlaybackController;
 class ExportEngine;
 class RTMPStreamer;
+class ViewModeManager;
 }
 
 namespace dawcast::ai { class AIPanel; }
@@ -34,6 +37,7 @@ class TrackHeaderPanel;
 class MixerWidget;
 class VideoPreview;
 class MediaBrowser;
+class MediaLibraryWidget;
 class EffectsRackWidget;
 class TransportBar;
 class LUFSMeterWidget;
@@ -41,6 +45,14 @@ class StreamingDialog;
 class SidebarNav;
 class ActionBar;
 class MasterStrip;
+class ViewModeSwitcher;
+class ChapterWidget;
+class MetadataPanel;
+class SpectrumWidget;
+class PianoRollWidget;
+class ScriptReaderPanel;
+class PedalboardWidget;
+class StreamMonitorPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -80,6 +92,9 @@ private slots:
     void toggleMediaBrowser();
     void toggleEffectsRack();
     void toggleAIPanel();
+
+    // View Modes
+    void applyViewMode(dawcast::ViewModeManager::Mode mode);
 
     // Track
     void addAudioTrack();
@@ -124,6 +139,7 @@ private:
     void setupDockWidgets();
     void setupStatusBar();
     void setupConnections();
+    void setupViewModes();
 
     // Recent files
     void updateRecentFilesMenu();
@@ -143,10 +159,11 @@ private:
     TimelineWidget*     m_timeline         = nullptr;
 
     // Dock widget contents
-    MixerWidget*        m_mixer         = nullptr;
-    VideoPreview*       m_videoPreview  = nullptr;
-    MediaBrowser*       m_mediaBrowser  = nullptr;
-    EffectsRackWidget*  m_effectsRack   = nullptr;
+    MixerWidget*        m_mixer            = nullptr;
+    VideoPreview*       m_videoPreview     = nullptr;
+    MediaBrowser*       m_mediaBrowser     = nullptr;
+    MediaLibraryWidget* m_mediaLibrary     = nullptr;
+    EffectsRackWidget*  m_effectsRack      = nullptr;
     TransportBar*       m_transportBar  = nullptr;
     LUFSMeterWidget*    m_lufsMeter     = nullptr;
     dawcast::ai::AIPanel* m_aiPanel     = nullptr;
@@ -165,6 +182,30 @@ private:
     QDockWidget* m_effectsDock      = nullptr;
     QDockWidget* m_lufsDock         = nullptr;
     QDockWidget* m_aiDock           = nullptr;
+
+    // View Mode system
+    ViewModeSwitcher*    m_viewModeSwitcher   = nullptr;
+    QToolBar*            m_viewModeToolBar    = nullptr;
+    QMenu*               m_viewModeMenu       = nullptr;
+    QList<QAction*>      m_viewModeActions;
+
+    // Mode-specific dock widgets
+    QDockWidget* m_chapterDock       = nullptr;
+    QDockWidget* m_metadataDock      = nullptr;
+    QDockWidget* m_spectrumDock      = nullptr;
+    QDockWidget* m_pianoRollDock     = nullptr;
+    QDockWidget* m_scriptReaderDock  = nullptr;
+    QDockWidget* m_pedalboardDock    = nullptr;
+    QDockWidget* m_streamMonitorDock = nullptr;
+
+    // Mode-specific widget contents
+    ChapterWidget*       m_chapterWidget     = nullptr;
+    MetadataPanel*       m_metadataPanel     = nullptr;
+    SpectrumWidget*      m_spectrumWidget    = nullptr;
+    PianoRollWidget*     m_pianoRoll         = nullptr;
+    ScriptReaderPanel*   m_scriptReader      = nullptr;
+    PedalboardWidget*    m_pedalboard        = nullptr;
+    StreamMonitorPanel*  m_streamMonitor     = nullptr;
 
     // View menu toggle actions (to sync checkmarks with dock visibility)
     QAction* m_actToggleMixer        = nullptr;

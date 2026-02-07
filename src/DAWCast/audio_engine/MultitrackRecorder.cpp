@@ -5,6 +5,7 @@
 #include "MultitrackRecorder.h"
 #include "AudioEngine.h"
 #include "WaveformCache.h"
+#include "../core/MediaLibrary.h"
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
 #include "../timeline/Clip.h"
@@ -244,6 +245,12 @@ void MultitrackRecorder::stopRecording()
 
             // Request waveform decode for the new clip
             WaveformCache::instance()->requestWaveform(m_targets[i].tempFilePath);
+
+            // Auto-import into the Media Library with "Recording" category
+            int libId = MediaLibrary::instance()->importFile(m_targets[i].tempFilePath);
+            if (libId > 0) {
+                MediaLibrary::instance()->setCategory(libId, QStringLiteral("Recording"));
+            }
         }
 
         delete file;
@@ -254,6 +261,9 @@ void MultitrackRecorder::stopRecording()
         delete p;
     }
     m_peaks.clear();
+
+    // Persist library after importing all recordings
+    MediaLibrary::instance()->saveDatabase();
 
     qDebug() << "MultitrackRecorder: recording stopped,"
              << m_samplesRecorded << "samples recorded";
