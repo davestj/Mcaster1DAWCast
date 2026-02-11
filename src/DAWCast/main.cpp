@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QSettings>
 #include <QStyleFactory>
+#include <QThread>
 
 #include "app.h"
 #include "widgets/MainWindow.h"
@@ -27,11 +28,14 @@ int main(int argc, char* argv[])
     // Show the splash screen immediately
     auto* splash = new dawcast::widgets::SplashScreen();
     splash->show();
-    splash->showMessage(QStringLiteral("Initializing"));
+    splash->showMessage(QStringLiteral("Initializing..."));
     app.processEvents();
+    QThread::msleep(400);
 
     // Initialize debug logger — write to <appDir>/logs/mcaster1dawcast.log
-    splash->showMessage(QStringLiteral("Starting debug logger"));
+    splash->showMessage(QStringLiteral("Starting debug logger..."));
+    app.processEvents();
+    QThread::msleep(300);
     QString appDir = QCoreApplication::applicationDirPath();
     QDir logDir(appDir + QStringLiteral("/logs"));
     if (!logDir.exists()) {
@@ -43,7 +47,9 @@ int main(int argc, char* argv[])
         QStringLiteral("Mcaster1DAWCast 1.0.0-alpha starting"));
 
     // Load theme — honour user preference, default to DarkStudio on first launch
-    splash->showMessage(QStringLiteral("Loading theme"));
+    splash->showMessage(QStringLiteral("Loading theme..."));
+    app.processEvents();
+    QThread::msleep(300);
     {
         QSettings settings;
         QString themeName = settings.value(
@@ -62,11 +68,18 @@ int main(int argc, char* argv[])
     }
 
     // Create the main window (this initializes audio engine, timeline, etc.)
-    splash->showMessage(QStringLiteral("Loading audio engine"));
+    splash->showMessage(QStringLiteral("Loading audio engine..."));
+    app.processEvents();
+    QThread::msleep(400);
     auto* mainWindow = new dawcast::widgets::MainWindow();
 
-    splash->showMessage(QStringLiteral("Preparing workspace"));
+    splash->showMessage(QStringLiteral("Preparing workspace..."));
     app.processEvents();
+    QThread::msleep(500);
+
+    splash->showMessage(QStringLiteral("Ready"));
+    app.processEvents();
+    QThread::msleep(600);
 
     // Show the main window and fade out the splash
     mainWindow->showMaximized();
