@@ -304,6 +304,30 @@ void MultitrackRecorder::processInputBlock(const float* input, int frames,
     if (!m_recording.load(std::memory_order_acquire)) return;
     if (!input || inputChannels <= 0) return;
 
+    // ── Punch-In / Punch-Out: only record within the punch range ──
+    if (m_timeline) {
+        int64_t pos = m_currentPosition;
+        int64_t blockEnd = pos + frames;
+
+        // If punch-in is enabled and we haven't reached the punch-in point yet,
+        // skip this block entirely (silence).
+        if (m_timeline->punchInEnabled() && pos < m_timeline->punchIn()) {
+            if (blockEnd <= m_timeline->punchIn()) {
+                return;  // entire block is before punch-in
+            }
+        }
+
+        // If punch-out is enabled and we've passed the punch-out point,
+        // stop recording.
+        if (m_timeline->punchOutEnabled() && pos >= m_timeline->punchOut()) {
+            // Auto-stop recording after punch-out
+            // Note: stopRecording() is not RT-safe, so we set a flag and
+            // let the GUI thread handle the actual stop.
+            m_recording.store(false, std::memory_order_release);
+            return;
+        }
+    }
+
     for (int t = 0; t < m_targets.size() && t < m_tempFiles.size(); ++t) {
         QFile* file = m_tempFiles[t];
         if (!file || !file->isOpen()) continue;

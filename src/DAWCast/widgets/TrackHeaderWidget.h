@@ -59,6 +59,10 @@ signals:
     void automationToggled(bool visible);
     void settingsRequested(int trackIndex);
     void trackNameEdited(const QString& name);
+    void inputMonitorToggled(bool enabled);
+    void colorChangeRequested(int trackIndex);
+    void bounceRequested(int trackIndex);
+    void freezeRequested(int trackIndex);
 
 private:
     void buildUI();
@@ -81,6 +85,7 @@ private:
     QPushButton* m_muteBtn    = nullptr;
     QPushButton* m_soloBtn    = nullptr;
     QPushButton* m_recBtn     = nullptr;
+    QPushButton* m_monitorBtn = nullptr;
     QPushButton* m_eqBtn      = nullptr;
     QPushButton* m_splitBtn   = nullptr;
     QPushButton* m_autoBtn    = nullptr;

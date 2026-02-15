@@ -8,6 +8,7 @@
 #include "../broadcast/RTMPStreamer.h"
 #include "../core/AudioBuffer.h"
 
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -261,6 +262,25 @@ int AudioEngine::processCallback(const float* input, float* output,
         m_mixer->process(buf);
     }
 
+    // Input monitoring: mix the live input into the output so the user
+    // can hear their microphone through headphones/speakers.
+    if (m_inputMonitoring && input && m_duplexEnabled) {
+        float monitorGain = std::pow(10.0f, m_monitorLevelDb / 20.0f);
+        // Mix input channels into the stereo output.
+        // Handle mono or stereo input mapped to stereo output.
+        for (int f = 0; f < frames; ++f) {
+            float sL = 0.0f, sR = 0.0f;
+            if (m_inputChannelCount >= 2) {
+                sL = input[f * m_inputChannelCount + 0];
+                sR = input[f * m_inputChannelCount + 1];
+            } else if (m_inputChannelCount == 1) {
+                sL = sR = input[f];
+            }
+            output[f * kOutputChannels + 0] += sL * monitorGain;
+            output[f * kOutputChannels + 1] += sR * monitorGain;
+        }
+    }
+
     // Feed the mixed output to the RTMP streamer if it is active.
     // This tap runs after the mixer has written to the output buffer,
     // so the streamer receives the final stereo mix.
@@ -317,6 +337,24 @@ void AudioEngine::setDuplexEnabled(bool enabled)
     if (wasRunning) stop();
     m_duplexEnabled = enabled;
     if (wasRunning) start();
+}
+
+void AudioEngine::setInputMonitoring(bool enabled)
+{
+    if (m_inputMonitoring == enabled) return;
+    m_inputMonitoring = enabled;
+
+    // Automatically enable duplex when monitoring is turned on
+    if (enabled && !m_duplexEnabled) {
+        setDuplexEnabled(true);
+    }
+
+    emit inputMonitoringChanged(enabled);
+}
+
+void AudioEngine::setMonitorLevel(float db)
+{
+    m_monitorLevelDb = db;
 }
 
 } // namespace dawcast

@@ -40,6 +40,17 @@ public:
     void   setTempo(double bpm) { m_bpm = bpm; }
     [[nodiscard]] double tempo() const { return m_bpm; }
 
+    // ── Punch-In / Punch-Out markers ──────────────────────────────────
+    void setPunchIn(int64_t samples)  { m_punchIn = samples; }
+    void setPunchOut(int64_t samples) { m_punchOut = samples; }
+    [[nodiscard]] int64_t punchIn()  const { return m_punchIn; }
+    [[nodiscard]] int64_t punchOut() const { return m_punchOut; }
+
+    void setPunchInEnabled(bool enabled)  { m_punchInEnabled = enabled; }
+    void setPunchOutEnabled(bool enabled) { m_punchOutEnabled = enabled; }
+    [[nodiscard]] bool punchInEnabled()  const { return m_punchInEnabled; }
+    [[nodiscard]] bool punchOutEnabled() const { return m_punchOutEnabled; }
+
 signals:
     void trackAdded(int index);
     void trackRemoved(int index);
@@ -50,6 +61,12 @@ private:
     int64_t m_playhead   = 0;
     int     m_sampleRate = 48000;
     double  m_bpm        = 120.0;
+
+    // Punch-In / Punch-Out
+    int64_t m_punchIn        = 0;
+    int64_t m_punchOut       = 0;
+    bool    m_punchInEnabled = false;
+    bool    m_punchOutEnabled = false;
 };
 
 } // namespace dawcast

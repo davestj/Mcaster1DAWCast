@@ -36,8 +36,10 @@ extern "C" {
 }
 #endif
 
+#include <climits>
 #include <cmath>
 #include <algorithm>
+#include <functional>
 
 namespace dawcast::widgets {
 
@@ -161,6 +163,10 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
     // --- Time ruler ---
     drawRuler(p, w);
 
+    // --- Snap grid (drawn behind clips) ---
+    if (m_snapMode != SnapOff)
+        drawSnapGrid(p, w);
+
     // --- Track lanes ---
     int trackCount = 0;
     if (m_timeline) {
@@ -234,6 +240,9 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
             p.drawPath(tri);
         }
     }
+
+    // --- Punch-In / Punch-Out markers ---
+    drawPunchMarkers(p, h);
 
     // --- Rubber-band selection ---
     if (m_dragging && !m_rubberBand.isNull()) {
@@ -316,6 +325,80 @@ void TimelineWidget::drawRuler(QPainter& p, int viewWidth)
                 p.setPen(QPen(kRulerTick, 1));
                 p.drawLine(mpx, kRulerHeight - 5, mpx, kRulerHeight - 1);
             }
+        }
+    }
+}
+
+void TimelineWidget::drawPunchMarkers(QPainter& painter, int viewHeight)
+{
+    if (!m_timeline) return;
+
+    const int w = width();
+    static const QColor kPunchInColor(60, 200, 60);     // green
+    static const QColor kPunchOutColor(220, 60, 60);    // red
+    static const QColor kPunchRegionFill(60, 200, 60, 25);
+
+    // Draw the punch region (shaded area between punch-in and punch-out)
+    if (m_timeline->punchInEnabled() && m_timeline->punchOutEnabled()) {
+        int piX = sampleToPixel(m_timeline->punchIn(), m_scroll, m_zoom);
+        int poX = sampleToPixel(m_timeline->punchOut(), m_scroll, m_zoom);
+        if (piX < w && poX > 0 && poX > piX) {
+            painter.fillRect(piX, kRulerHeight, poX - piX, viewHeight - kRulerHeight,
+                             kPunchRegionFill);
+        }
+    }
+
+    // Punch-In marker (green vertical line + "I" flag)
+    if (m_timeline->punchInEnabled()) {
+        int piX = sampleToPixel(m_timeline->punchIn(), m_scroll, m_zoom);
+        if (piX >= 0 && piX <= w) {
+            painter.setPen(QPen(kPunchInColor, 2, Qt::DashLine));
+            painter.drawLine(piX, kRulerHeight, piX, viewHeight);
+
+            // Flag at the top of the ruler
+            QPainterPath flag;
+            flag.moveTo(piX, 2);
+            flag.lineTo(piX + 16, 2);
+            flag.lineTo(piX + 16, 14);
+            flag.lineTo(piX, 14);
+            flag.closeSubpath();
+            painter.setBrush(kPunchInColor);
+            painter.setPen(Qt::NoPen);
+            painter.drawPath(flag);
+
+            painter.setPen(Qt::white);
+            QFont flagFont = font();
+            flagFont.setPointSize(8);
+            flagFont.setBold(true);
+            painter.setFont(flagFont);
+            painter.drawText(piX + 4, 12, QStringLiteral("I"));
+        }
+    }
+
+    // Punch-Out marker (red vertical line + "O" flag)
+    if (m_timeline->punchOutEnabled()) {
+        int poX = sampleToPixel(m_timeline->punchOut(), m_scroll, m_zoom);
+        if (poX >= 0 && poX <= w) {
+            painter.setPen(QPen(kPunchOutColor, 2, Qt::DashLine));
+            painter.drawLine(poX, kRulerHeight, poX, viewHeight);
+
+            // Flag at the top of the ruler
+            QPainterPath flag;
+            flag.moveTo(poX - 16, 2);
+            flag.lineTo(poX, 2);
+            flag.lineTo(poX, 14);
+            flag.lineTo(poX - 16, 14);
+            flag.closeSubpath();
+            painter.setBrush(kPunchOutColor);
+            painter.setPen(Qt::NoPen);
+            painter.drawPath(flag);
+
+            painter.setPen(Qt::white);
+            QFont flagFont = font();
+            flagFont.setPointSize(8);
+            flagFont.setBold(true);
+            painter.setFont(flagFont);
+            painter.drawText(poX - 12, 12, QStringLiteral("O"));
         }
     }
 }
@@ -663,15 +746,38 @@ void TimelineWidget::wheelEvent(QWheelEvent* event)
 void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
 {
     QMenu menu(this);
-    menu.addAction(tr("Cut"), this, []{});
-    menu.addAction(tr("Copy"), this, []{});
-    menu.addAction(tr("Paste"), this, []{});
+    menu.addAction(tr("Cut"), this, [this]{ cutSelectedClips(); });
+    menu.addAction(tr("Copy"), this, [this]{ copySelectedClips(); });
+    menu.addAction(tr("Paste"), this, [this]{ pasteClips(); });
     menu.addSeparator();
-    menu.addAction(tr("Delete"), this, [this]{
-        m_selectedClips.clear();
-        update();
-    });
+    menu.addAction(tr("Delete"), this, [this]{ deleteSelectedClips(); });
     menu.addSeparator();
+
+    // ── Punch-In / Punch-Out markers ──────────────────────────────────
+    if (m_timeline) {
+        int64_t clickSamplePos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+        clickSamplePos = qMax(int64_t(0), clickSamplePos);
+
+        menu.addAction(tr("Set Punch In Here"), this, [this, clickSamplePos]() {
+            m_timeline->setPunchIn(clickSamplePos);
+            m_timeline->setPunchInEnabled(true);
+            update();
+        });
+        menu.addAction(tr("Set Punch Out Here"), this, [this, clickSamplePos]() {
+            m_timeline->setPunchOut(clickSamplePos);
+            m_timeline->setPunchOutEnabled(true);
+            update();
+        });
+
+        if (m_timeline->punchInEnabled() || m_timeline->punchOutEnabled()) {
+            menu.addAction(tr("Clear Punch Markers"), this, [this]() {
+                m_timeline->setPunchInEnabled(false);
+                m_timeline->setPunchOutEnabled(false);
+                update();
+            });
+        }
+        menu.addSeparator();
+    }
 
     // ── Edit Crossfade — shown when two clips overlap or are adjacent ──
     if (m_timeline && event->pos().y() >= kRulerHeight) {
@@ -1132,6 +1238,46 @@ int64_t TimelineWidget::probeDuration(const QString& filePath) const
 #endif
 }
 
+void TimelineWidget::probeStreams(const QString& filePath, bool& hasAudio, bool& hasVideo)
+{
+    hasAudio = false;
+    hasVideo = false;
+
+#ifdef HAVE_AVFORMAT
+    AVFormatContext* fmtCtx = nullptr;
+    QByteArray pathUtf8 = filePath.toUtf8();
+    if (avformat_open_input(&fmtCtx, pathUtf8.constData(), nullptr, nullptr) < 0)
+        return;
+
+    if (avformat_find_stream_info(fmtCtx, nullptr) < 0) {
+        avformat_close_input(&fmtCtx);
+        return;
+    }
+
+    for (unsigned i = 0; i < fmtCtx->nb_streams; ++i) {
+        if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
+            hasAudio = true;
+        else if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+            hasVideo = true;
+    }
+
+    avformat_close_input(&fmtCtx);
+#else
+    // Without FFmpeg, infer from file extension
+    QFileInfo fi(filePath);
+    QString ext = fi.suffix().toLower();
+    QStringList vidExts = supportedVideoExtensions();
+    QStringList audExts = supportedAudioExtensions();
+
+    if (vidExts.contains(ext)) {
+        hasVideo = true;
+        hasAudio = true;  // Most video files have audio
+    } else if (audExts.contains(ext)) {
+        hasAudio = true;
+    }
+#endif
+}
+
 void TimelineWidget::dragEnterEvent(QDragEnterEvent* event)
 {
     if (!event->mimeData()->hasUrls()) return;
@@ -1178,55 +1324,110 @@ void TimelineWidget::dropEvent(QDropEvent* event)
         const QString filePath = url.toLocalFile();
         if (!isSupportedMediaFile(filePath)) continue;
 
-        bool video = isVideoFile(filePath);
+        // Probe the file to determine if it has audio, video, or both
+        bool hasAudio = false;
+        bool hasVideo = false;
+        probeStreams(filePath, hasAudio, hasVideo);
 
-        // Find or create the target track
-        int targetTrackIdx = dropTrackIdx;
-        if (targetTrackIdx < 0) {
-            // No valid track at drop position: create a new one
-            if (video)
-                m_timeline->addVideoTrack();
-            else
-                m_timeline->addAudioTrack();
-            targetTrackIdx = m_timeline->trackCount() - 1;
-        }
-
-        // Verify the target track type is compatible, otherwise create new
-        QObject* trackObj = m_timeline->track(targetTrackIdx);
-        auto* audioTrack = qobject_cast<AudioTrack*>(trackObj);
-        auto* videoTrack = qobject_cast<VideoTrack*>(trackObj);
-
-        if (video && !videoTrack) {
-            m_timeline->addVideoTrack();
-            targetTrackIdx = m_timeline->trackCount() - 1;
-            trackObj = m_timeline->track(targetTrackIdx);
-            videoTrack = qobject_cast<VideoTrack*>(trackObj);
-        } else if (!video && !audioTrack) {
-            m_timeline->addAudioTrack();
-            targetTrackIdx = m_timeline->trackCount() - 1;
-            trackObj = m_timeline->track(targetTrackIdx);
-            audioTrack = qobject_cast<AudioTrack*>(trackObj);
+        // Fallback: if probing didn't detect streams, use extension
+        if (!hasAudio && !hasVideo) {
+            if (isVideoFile(filePath)) {
+                hasVideo = true;
+                hasAudio = true;  // assume video files have audio
+            } else {
+                hasAudio = true;
+            }
         }
 
         // Probe file duration
         int64_t durationSamples = probeDuration(filePath);
 
-        // Create the clip
-        auto* clip = new Clip(trackObj);
-        clip->setSourcePath(filePath);
-        clip->setSourceIn(0);
-        clip->setSourceOut(durationSamples);
-        clip->setTimelinePosition(cursorPos);
+        // ── A/V Split: when a video file has both streams, create
+        //    a VideoTrack + AudioTrack with linked clips ──
+        if (hasVideo && hasAudio) {
+            // Create or find video track
+            VideoTrack* videoTrack = nullptr;
+            int videoTrackIdx = dropTrackIdx;
 
-        // Add clip to the appropriate track
-        if (audioTrack)
-            audioTrack->addClip(clip);
-        else if (videoTrack)
-            videoTrack->addClip(clip);
+            if (videoTrackIdx >= 0) {
+                videoTrack = qobject_cast<VideoTrack*>(m_timeline->track(videoTrackIdx));
+            }
+            if (!videoTrack) {
+                m_timeline->addVideoTrack();
+                videoTrackIdx = m_timeline->trackCount() - 1;
+                videoTrack = qobject_cast<VideoTrack*>(m_timeline->track(videoTrackIdx));
+            }
 
-        // Request waveform decode for audio files
-        if (!video) {
-            WaveformCache::instance()->requestWaveform(filePath);
+            // Create a video clip
+            if (videoTrack) {
+                auto* vClip = new Clip(videoTrack);
+                vClip->setSourcePath(filePath);
+                vClip->setSourceIn(0);
+                vClip->setSourceOut(durationSamples);
+                vClip->setTimelinePosition(cursorPos);
+                videoTrack->addClip(vClip);
+            }
+
+            // Create a companion audio track for the audio stream
+            AudioTrack* audioTrack = m_timeline->addAudioTrack();
+            if (audioTrack) {
+                QFileInfo fi(filePath);
+                audioTrack->setName(fi.baseName() + QStringLiteral(" (Audio)"));
+
+                auto* aClip = new Clip(audioTrack);
+                aClip->setSourcePath(filePath);  // FFmpeg decodes audio from video
+                aClip->setSourceIn(0);
+                aClip->setSourceOut(durationSamples);
+                aClip->setTimelinePosition(cursorPos);
+                audioTrack->addClip(aClip);
+
+                // Request waveform decode for the audio portion
+                WaveformCache::instance()->requestWaveform(filePath);
+            }
+
+        } else if (hasVideo) {
+            // Video-only: create just a video track
+            VideoTrack* videoTrack = nullptr;
+            int targetIdx = dropTrackIdx;
+            if (targetIdx >= 0) {
+                videoTrack = qobject_cast<VideoTrack*>(m_timeline->track(targetIdx));
+            }
+            if (!videoTrack) {
+                m_timeline->addVideoTrack();
+                targetIdx = m_timeline->trackCount() - 1;
+                videoTrack = qobject_cast<VideoTrack*>(m_timeline->track(targetIdx));
+            }
+            if (videoTrack) {
+                auto* clip = new Clip(videoTrack);
+                clip->setSourcePath(filePath);
+                clip->setSourceIn(0);
+                clip->setSourceOut(durationSamples);
+                clip->setTimelinePosition(cursorPos);
+                videoTrack->addClip(clip);
+            }
+
+        } else {
+            // Audio-only: create just an audio track (existing behavior)
+            AudioTrack* audioTrack = nullptr;
+            int targetIdx = dropTrackIdx;
+            if (targetIdx >= 0) {
+                audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(targetIdx));
+            }
+            if (!audioTrack) {
+                m_timeline->addAudioTrack();
+                targetIdx = m_timeline->trackCount() - 1;
+                audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(targetIdx));
+            }
+            if (audioTrack) {
+                auto* clip = new Clip(audioTrack);
+                clip->setSourcePath(filePath);
+                clip->setSourceIn(0);
+                clip->setSourceOut(durationSamples);
+                clip->setTimelinePosition(cursorPos);
+                audioTrack->addClip(clip);
+
+                WaveformCache::instance()->requestWaveform(filePath);
+            }
         }
 
         // Advance cursor for the next dropped file so they don't overlap
@@ -1234,6 +1435,291 @@ void TimelineWidget::dropEvent(QDropEvent* event)
     }
 
     event->acceptProposedAction();
+    update();
+}
+
+// ── Snap-to-Grid ─────────────────────────────────────────────────────────────
+
+void TimelineWidget::setSnapMode(SnapMode mode)
+{
+    if (m_snapMode == mode) return;
+    m_snapMode = mode;
+    emit snapModeChanged(mode);
+    update();
+}
+
+int64_t TimelineWidget::snapPosition(int64_t raw) const
+{
+    if (m_snapMode == SnapOff || !m_timeline)
+        return raw;
+
+    int sampleRate = m_timeline->sampleRate();
+    if (sampleRate <= 0) sampleRate = 48000;
+    double bpm = m_timeline->tempo();
+    if (bpm <= 0.0) bpm = 120.0;
+
+    int64_t gridInterval = 0;
+
+    switch (m_snapMode) {
+    case SnapOff:
+        return raw;
+    case SnapBeat:
+        // One beat = 60/bpm seconds
+        gridInterval = static_cast<int64_t>((60.0 / bpm) * sampleRate);
+        break;
+    case SnapBar:
+        // Assume 4/4 time: 1 bar = 4 beats
+        gridInterval = static_cast<int64_t>((60.0 / bpm) * 4.0 * sampleRate);
+        break;
+    case SnapSecond:
+        gridInterval = sampleRate;
+        break;
+    case SnapHalfSecond:
+        gridInterval = sampleRate / 2;
+        break;
+    case SnapFrame:
+        // 30 fps video frame grid
+        gridInterval = sampleRate / 30;
+        break;
+    }
+
+    if (gridInterval <= 0)
+        return raw;
+
+    // Snap to nearest grid line
+    int64_t lower = (raw / gridInterval) * gridInterval;
+    int64_t upper = lower + gridInterval;
+    return (raw - lower <= upper - raw) ? lower : upper;
+}
+
+void TimelineWidget::drawSnapGrid(QPainter& painter, int viewWidth)
+{
+    if (m_snapMode == SnapOff || !m_timeline)
+        return;
+
+    int sampleRate = m_timeline->sampleRate();
+    if (sampleRate <= 0) sampleRate = 48000;
+    double bpm = m_timeline->tempo();
+    if (bpm <= 0.0) bpm = 120.0;
+
+    int64_t gridInterval = 0;
+    switch (m_snapMode) {
+    case SnapOff:     return;
+    case SnapBeat:    gridInterval = static_cast<int64_t>((60.0 / bpm) * sampleRate); break;
+    case SnapBar:     gridInterval = static_cast<int64_t>((60.0 / bpm) * 4.0 * sampleRate); break;
+    case SnapSecond:  gridInterval = sampleRate; break;
+    case SnapHalfSecond: gridInterval = sampleRate / 2; break;
+    case SnapFrame:   gridInterval = sampleRate / 30; break;
+    }
+
+    if (gridInterval <= 0) return;
+
+    int trackCount = m_timeline->trackCount();
+    int totalH = kRulerHeight + trackCount * kTrackHeight;
+    if (totalH < kRulerHeight) totalH = height();
+
+    // Subtle dotted grid lines
+    QPen gridPen(QColor(100, 100, 120, 50), 1, Qt::DotLine);
+    painter.setPen(gridPen);
+
+    // First visible grid line
+    int64_t firstSample = (m_scroll / gridInterval) * gridInterval;
+    if (firstSample < m_scroll) firstSample += gridInterval;
+
+    for (int64_t sample = firstSample; ; sample += gridInterval) {
+        int px = sampleToPixel(sample, m_scroll, m_zoom);
+        if (px > viewWidth) break;
+        if (px >= 0) {
+            painter.drawLine(px, kRulerHeight, px, totalH);
+        }
+    }
+}
+
+// ── Clipboard Operations ─────────────────────────────────────────────────────
+
+void TimelineWidget::copySelectedClips()
+{
+    m_clipboard.clear();
+
+    if (!m_timeline || m_selectedClips.isEmpty())
+        return;
+
+    // Gather clip data from all tracks; find the earliest position
+    int64_t earliest = INT64_MAX;
+
+    // For now, selected clips are indices within the first track that has them.
+    // We scan all tracks to find clips whose index matches the selection list.
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            if (!m_selectedClips.contains(c)) continue;
+            Clip* clip = audioTrack->clip(c);
+            if (!clip) continue;
+
+            if (clip->timelinePosition() < earliest)
+                earliest = clip->timelinePosition();
+        }
+    }
+
+    // Build clipboard entries with positions relative to the earliest clip
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            if (!m_selectedClips.contains(c)) continue;
+            Clip* clip = audioTrack->clip(c);
+            if (!clip) continue;
+
+            ClipData cd;
+            cd.sourcePath = clip->sourcePath();
+            cd.sourceIn   = clip->sourceIn();
+            cd.sourceOut  = clip->sourceOut();
+            cd.gain       = clip->gain();
+            cd.fadeIn     = clip->fadeIn();
+            cd.fadeOut    = clip->fadeOut();
+            cd.trackIndex = t;
+            cd.relativePosition = clip->timelinePosition() - earliest;
+            m_clipboard.append(cd);
+        }
+    }
+}
+
+void TimelineWidget::cutSelectedClips()
+{
+    copySelectedClips();
+    deleteSelectedClips();
+}
+
+void TimelineWidget::pasteClips()
+{
+    if (!m_timeline || m_clipboard.isEmpty())
+        return;
+
+    int64_t playhead = m_timeline->playhead();
+    int trackCount = m_timeline->trackCount();
+
+    for (const ClipData& cd : std::as_const(m_clipboard)) {
+        int targetTrack = cd.trackIndex;
+        if (targetTrack < 0 || targetTrack >= trackCount) {
+            // Create a new audio track if needed
+            m_timeline->addAudioTrack();
+            targetTrack = m_timeline->trackCount() - 1;
+            trackCount = m_timeline->trackCount();
+        }
+
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(targetTrack));
+        if (!audioTrack) continue;
+
+        auto* clip = new Clip(audioTrack);
+        clip->setSourcePath(cd.sourcePath);
+        clip->setSourceIn(cd.sourceIn);
+        clip->setSourceOut(cd.sourceOut);
+        clip->setGain(cd.gain);
+        clip->setFadeIn(cd.fadeIn);
+        clip->setFadeOut(cd.fadeOut);
+
+        int64_t pastePos = playhead + cd.relativePosition;
+        if (m_snapMode != SnapOff)
+            pastePos = snapPosition(pastePos);
+        clip->setTimelinePosition(pastePos);
+
+        audioTrack->addClip(clip);
+    }
+
+    update();
+}
+
+void TimelineWidget::deleteSelectedClips()
+{
+    if (!m_timeline || m_selectedClips.isEmpty())
+        return;
+
+    // Delete selected clips from all audio tracks
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        // Remove in reverse order to keep indices valid
+        QList<int> toRemove;
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            if (m_selectedClips.contains(c))
+                toRemove.append(c);
+        }
+
+        std::sort(toRemove.begin(), toRemove.end(), std::greater<int>());
+        for (int idx : toRemove) {
+            audioTrack->removeClip(idx);
+        }
+    }
+
+    m_selectedClips.clear();
+    update();
+}
+
+// ── Zoom Operations ──────────────────────────────────────────────────────────
+
+void TimelineWidget::zoomIn()
+{
+    setZoom(m_zoom * kZoomFactor);
+}
+
+void TimelineWidget::zoomOut()
+{
+    setZoom(m_zoom / kZoomFactor);
+}
+
+void TimelineWidget::zoomToFit()
+{
+    if (m_timeline && m_timeline->duration() > 0) {
+        m_scroll = 0;
+        m_zoom = static_cast<float>(width()) / static_cast<float>(m_timeline->duration());
+        m_zoom = qBound(kMinZoom, m_zoom, kMaxZoom);
+        update();
+    }
+}
+
+void TimelineWidget::zoomToSelection()
+{
+    if (!m_timeline || m_selectedClips.isEmpty())
+        return;
+
+    // Find the time range spanned by all selected clips
+    int64_t minPos = INT64_MAX;
+    int64_t maxEnd = 0;
+
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            if (!m_selectedClips.contains(c)) continue;
+            Clip* clip = audioTrack->clip(c);
+            if (!clip) continue;
+
+            if (clip->timelinePosition() < minPos)
+                minPos = clip->timelinePosition();
+            if (clip->endPosition() > maxEnd)
+                maxEnd = clip->endPosition();
+        }
+    }
+
+    if (minPos >= maxEnd) return;
+
+    // Add some padding (5% on each side)
+    int64_t range = maxEnd - minPos;
+    int64_t padding = range / 20;
+    minPos = qMax(int64_t(0), minPos - padding);
+    maxEnd += padding;
+
+    m_scroll = minPos;
+    m_zoom = static_cast<float>(width()) / static_cast<float>(maxEnd - minPos);
+    m_zoom = qBound(kMinZoom, m_zoom, kMaxZoom);
     update();
 }
 

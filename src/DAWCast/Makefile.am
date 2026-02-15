@@ -133,6 +133,9 @@ moc_ProjectManager.cpp: $(srcdir)/core/ProjectManager.h
 moc_ViewModeManager.cpp: $(srcdir)/core/ViewModeManager.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_WorkspaceManager.cpp: $(srcdir)/core/WorkspaceManager.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 moc_MediaLibrary.cpp: $(srcdir)/core/MediaLibrary.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
@@ -153,6 +156,9 @@ moc_PlaybackEngine.cpp: $(srcdir)/audio_engine/PlaybackEngine.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 moc_MultitrackRecorder.cpp: $(srcdir)/audio_engine/MultitrackRecorder.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TrackBouncer.cpp: $(srcdir)/audio_engine/TrackBouncer.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 moc_Metronome.cpp: $(srcdir)/audio_engine/Metronome.h
@@ -408,6 +414,9 @@ moc_PedalboardWidget.cpp: $(srcdir)/widgets/PedalboardWidget.h
 moc_StreamMonitorPanel.cpp: $(srcdir)/widgets/StreamMonitorPanel.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_TrackColorDialog.cpp: $(srcdir)/widgets/TrackColorDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -453,6 +462,8 @@ mcaster1dawcast_SOURCES = \
     core/MediaLibrary.cpp \
     core/ViewModeManager.h \
     core/ViewModeManager.cpp \
+    core/WorkspaceManager.h \
+    core/WorkspaceManager.cpp \
     audio_engine/AudioEngine.h \
     audio_engine/AudioEngine.cpp \
     audio_engine/AudioMixer.h \
@@ -468,6 +479,8 @@ mcaster1dawcast_SOURCES = \
     audio_engine/PlaybackEngine.cpp \
     audio_engine/MultitrackRecorder.h \
     audio_engine/MultitrackRecorder.cpp \
+    audio_engine/TrackBouncer.h \
+    audio_engine/TrackBouncer.cpp \
     audio_engine/AudioClipReader.h \
     audio_engine/AudioClipReader.cpp \
     audio_engine/ExportEngine.h \
@@ -702,6 +715,8 @@ mcaster1dawcast_SOURCES = \
     widgets/PedalboardWidget.cpp \
     widgets/StreamMonitorPanel.h \
     widgets/StreamMonitorPanel.cpp \
+    widgets/TrackColorDialog.h \
+    widgets/TrackColorDialog.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -746,6 +761,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_PlaybackEngine.cpp \
     moc_Metronome.cpp \
     moc_MultitrackRecorder.cpp \
+    moc_TrackBouncer.cpp \
     moc_ExportEngine.cpp \
     moc_BatchEncoder.cpp \
     moc_VideoDecoder.cpp \
@@ -822,10 +838,12 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_MasterStrip.cpp \
     moc_SidebarNav.cpp \
     moc_ViewModeManager.cpp \
+    moc_WorkspaceManager.cpp \
     moc_ViewModeSwitcher.cpp \
     moc_ScriptReaderPanel.cpp \
     moc_PedalboardWidget.cpp \
     moc_StreamMonitorPanel.cpp \
+    moc_TrackColorDialog.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \
@@ -847,6 +865,7 @@ BUILT_SOURCES = \
     moc_PlaybackEngine.cpp \
     moc_Metronome.cpp \
     moc_MultitrackRecorder.cpp \
+    moc_TrackBouncer.cpp \
     moc_ExportEngine.cpp \
     moc_BatchEncoder.cpp \
     moc_VideoDecoder.cpp \
@@ -923,10 +942,12 @@ BUILT_SOURCES = \
     moc_MasterStrip.cpp \
     moc_SidebarNav.cpp \
     moc_ViewModeManager.cpp \
+    moc_WorkspaceManager.cpp \
     moc_ViewModeSwitcher.cpp \
     moc_ScriptReaderPanel.cpp \
     moc_PedalboardWidget.cpp \
     moc_StreamMonitorPanel.cpp \
+    moc_TrackColorDialog.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \

@@ -60,6 +60,15 @@ public:
     void setDuplexEnabled(bool enabled);
     [[nodiscard]] bool isDuplexEnabled() const { return m_duplexEnabled; }
 
+    /// Input monitoring: mix the live input into the output so the user
+    /// can hear their microphone in real-time (with or without recording).
+    void setInputMonitoring(bool enabled);
+    [[nodiscard]] bool inputMonitoring() const { return m_inputMonitoring; }
+
+    /// Monitor level in dB (default 0 dB = unity gain).
+    void setMonitorLevel(float db);
+    [[nodiscard]] float monitorLevel() const { return m_monitorLevelDb; }
+
     AudioMixer* mixer() const { return m_mixer; }
     void setMixer(AudioMixer* mixer) { m_mixer = mixer; }
 
@@ -69,6 +78,7 @@ public:
 signals:
     void bufferProcessed();
     void engineError(const QString& message);
+    void inputMonitoringChanged(bool enabled);
 
 private:
 #ifdef HAVE_PORTAUDIO
@@ -86,6 +96,8 @@ private:
     int  m_bufferSize        = 512;
     bool m_running           = false;
     bool m_duplexEnabled     = false;
+    bool m_inputMonitoring   = false;
+    float m_monitorLevelDb   = 0.0f;   // dB, 0 = unity gain
     int  m_outputDeviceIndex = -1;  // -1 = system default
     int  m_inputDeviceIndex  = -1;  // -1 = system default
     int  m_inputChannelCount = 2;   // channels opened on input side

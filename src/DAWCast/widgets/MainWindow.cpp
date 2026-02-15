@@ -46,6 +46,8 @@
 #include "AboutDialog.h"
 #include "StreamingDialog.h"
 #include "../broadcast/RTMPStreamer.h"
+#include "../core/UndoManager.h"
+#include "../core/WorkspaceManager.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -87,6 +89,7 @@ MainWindow::MainWindow(QWidget* parent)
     setupRTMPStreamer();
     setupConnections();
     setupViewModes();
+    setupUndoRedo();
 
     // Restore window geometry, dock layout, and splitter state from last session
     restoreWindowState();
@@ -181,13 +184,13 @@ void MainWindow::setupMenus()
     // ── Edit ────────────────────────────────────────────────────────────
     auto* editMenu = m_menuBar->addMenu(tr("&Edit"));
 
-    auto* actUndo = editMenu->addAction(tr("&Undo"));
-    actUndo->setShortcut(QKeySequence::Undo);
-    connect(actUndo, &QAction::triggered, this, &MainWindow::undo);
+    m_actUndo = editMenu->addAction(tr("&Undo"));
+    m_actUndo->setShortcut(QKeySequence::Undo);
+    connect(m_actUndo, &QAction::triggered, this, &MainWindow::undo);
 
-    auto* actRedo = editMenu->addAction(tr("&Redo"));
-    actRedo->setShortcut(QKeySequence::Redo);
-    connect(actRedo, &QAction::triggered, this, &MainWindow::redo);
+    m_actRedo = editMenu->addAction(tr("&Redo"));
+    m_actRedo->setShortcut(QKeySequence::Redo);
+    connect(m_actRedo, &QAction::triggered, this, &MainWindow::redo);
 
     editMenu->addSeparator();
 
@@ -206,6 +209,33 @@ void MainWindow::setupMenus()
     auto* actDelete = editMenu->addAction(tr("&Delete"));
     actDelete->setShortcut(QKeySequence::Delete);
     connect(actDelete, &QAction::triggered, this, &MainWindow::deleteSelected);
+
+    editMenu->addSeparator();
+
+    // ── Edit > Zoom ────────────────────────────────────────────────────
+    auto* actZoomIn = editMenu->addAction(tr("Zoom &In"));
+    actZoomIn->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal));
+    connect(actZoomIn, &QAction::triggered, this, [this] {
+        if (m_timeline) m_timeline->zoomIn();
+    });
+
+    auto* actZoomOut = editMenu->addAction(tr("Zoom &Out"));
+    actZoomOut->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+    connect(actZoomOut, &QAction::triggered, this, [this] {
+        if (m_timeline) m_timeline->zoomOut();
+    });
+
+    auto* actZoomFit = editMenu->addAction(tr("Zoom to &Fit"));
+    actZoomFit->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+    connect(actZoomFit, &QAction::triggered, this, [this] {
+        if (m_timeline) m_timeline->zoomToFit();
+    });
+
+    auto* actZoomSel = editMenu->addAction(tr("Zoom to &Selection"));
+    actZoomSel->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z));
+    connect(actZoomSel, &QAction::triggered, this, [this] {
+        if (m_timeline) m_timeline->zoomToSelection();
+    });
 
     editMenu->addSeparator();
 
@@ -295,6 +325,47 @@ void MainWindow::setupMenus()
             act->setChecked(true);
 
         m_viewModeActions.append(act);
+    }
+
+    viewMenu->addSeparator();
+
+    // ── View > Workspace Profiles ──────────────────────────────────────
+    auto* actSaveWorkspace = viewMenu->addAction(tr("Save Workspace..."));
+    actSaveWorkspace->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_S));
+    connect(actSaveWorkspace, &QAction::triggered, this, &MainWindow::saveWorkspace);
+
+    m_workspaceLoadMenu = viewMenu->addMenu(tr("Load Workspace"));
+    rebuildWorkspaceMenu();
+
+    auto* actManageWorkspaces = viewMenu->addAction(tr("Manage Workspaces..."));
+    connect(actManageWorkspaces, &QAction::triggered, this, &MainWindow::manageWorkspaces);
+
+    // Factory preset shortcuts: Cmd+Shift+1..6
+    {
+        auto* wsMgr = dawcast::WorkspaceManager::instance();
+        QStringList names = wsMgr->profileNames();
+        int shortcutIdx = 0;
+        static const Qt::Key shortcutKeys[] = {
+            Qt::Key_1, Qt::Key_2, Qt::Key_3,
+            Qt::Key_4, Qt::Key_5, Qt::Key_6
+        };
+        for (const QString& name : names) {
+            if (!wsMgr->profile(name).isFactory) continue;
+            if (shortcutIdx >= 6) break;
+
+            auto* wsAct = new QAction(name, this);
+            wsAct->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | shortcutKeys[shortcutIdx]));
+            connect(wsAct, &QAction::triggered, this, [this, name] {
+                loadWorkspaceProfile(name);
+            });
+            addAction(wsAct);  // Register shortcut globally on the window
+            m_workspaceShortcuts.append(wsAct);
+            ++shortcutIdx;
+        }
+
+        // Rebuild menu whenever profiles change
+        connect(wsMgr, &dawcast::WorkspaceManager::profilesChanged,
+                this, &MainWindow::rebuildWorkspaceMenu);
     }
 
     // ── Track ───────────────────────────────────────────────────────────
@@ -706,6 +777,18 @@ void MainWindow::setupConnections()
         }
     });
 
+    // Snap mode selector -> TimelineWidget
+    connect(m_transportBar, &TransportBar::snapModeChanged, this, [this](int mode) {
+        if (m_timeline) {
+            m_timeline->setSnapMode(static_cast<TimelineWidget::SnapMode>(mode));
+        }
+        static const char* snapNames[] = { "Off", "Beat", "Bar", "Second", "Half Second", "Frame" };
+        if (mode >= 0 && mode <= 5) {
+            statusBar()->showMessage(
+                tr("Snap: %1").arg(QString::fromLatin1(snapNames[mode])), 2000);
+        }
+    });
+
     // Buses button
     connect(m_transportBar, &TransportBar::busesClicked, this, [this]() {
         if (m_mixerDock) {
@@ -966,31 +1049,49 @@ void MainWindow::openBatchEncoder()
 
 void MainWindow::undo()
 {
+    if (m_undoManager) {
+        m_undoManager->undo();
+    }
     statusBar()->showMessage(tr("Undo"), 2000);
 }
 
 void MainWindow::redo()
 {
+    if (m_undoManager) {
+        m_undoManager->redo();
+    }
     statusBar()->showMessage(tr("Redo"), 2000);
 }
 
 void MainWindow::cut()
 {
+    if (m_timeline) {
+        m_timeline->cutSelectedClips();
+    }
     statusBar()->showMessage(tr("Cut"), 2000);
 }
 
 void MainWindow::copy()
 {
+    if (m_timeline) {
+        m_timeline->copySelectedClips();
+    }
     statusBar()->showMessage(tr("Copy"), 2000);
 }
 
 void MainWindow::paste()
 {
+    if (m_timeline) {
+        m_timeline->pasteClips();
+    }
     statusBar()->showMessage(tr("Paste"), 2000);
 }
 
 void MainWindow::deleteSelected()
 {
+    if (m_timeline) {
+        m_timeline->deleteSelectedClips();
+    }
     statusBar()->showMessage(tr("Delete"), 2000);
 }
 
@@ -1646,6 +1747,171 @@ void MainWindow::runExportPipeline()
     // Start the export
     statusBar()->showMessage(tr("Exporting..."));
     m_exportEngine->startExport(m_timelineModel, config);
+}
+
+// ── Undo/Redo Wiring ─────────────────────────────────────────────────────────
+
+void MainWindow::setupUndoRedo()
+{
+    m_undoManager = new dawcast::UndoManager(this);
+
+    // Update menu text when the undo/redo stack description changes
+    connect(m_undoManager, &dawcast::UndoManager::undoTextChanged,
+            this, [this](const QString& text) {
+        if (m_actUndo) {
+            m_actUndo->setText(text.isEmpty() ? tr("&Undo")
+                                              : tr("&Undo %1").arg(text));
+            m_actUndo->setEnabled(m_undoManager->canUndo());
+        }
+    });
+
+    connect(m_undoManager, &dawcast::UndoManager::redoTextChanged,
+            this, [this](const QString& text) {
+        if (m_actRedo) {
+            m_actRedo->setText(text.isEmpty() ? tr("&Redo")
+                                              : tr("&Redo %1").arg(text));
+            m_actRedo->setEnabled(m_undoManager->canRedo());
+        }
+    });
+
+    // Initial state: disable if nothing to undo/redo
+    if (m_actUndo) m_actUndo->setEnabled(m_undoManager->canUndo());
+    if (m_actRedo) m_actRedo->setEnabled(m_undoManager->canRedo());
+}
+
+// ── Workspace Profile Methods ───────────────────────────────────────────────
+
+void MainWindow::rebuildWorkspaceMenu()
+{
+    if (!m_workspaceLoadMenu) return;
+
+    m_workspaceLoadMenu->clear();
+
+    auto* wsMgr = dawcast::WorkspaceManager::instance();
+    QStringList names = wsMgr->profileNames();
+
+    bool addedFactory = false;
+    for (const QString& name : names) {
+        auto p = wsMgr->profile(name);
+
+        if (addedFactory && !p.isFactory) {
+            // Add separator between factory and user profiles
+            m_workspaceLoadMenu->addSeparator();
+            addedFactory = false;  // Only once
+        }
+
+        auto* act = m_workspaceLoadMenu->addAction(name);
+        if (p.isFactory) {
+            QFont f = act->font();
+            f.setItalic(true);
+            act->setFont(f);
+            addedFactory = true;
+        }
+
+        connect(act, &QAction::triggered, this, [this, name] {
+            loadWorkspaceProfile(name);
+        });
+    }
+
+    m_workspaceLoadMenu->setEnabled(!names.isEmpty());
+}
+
+void MainWindow::saveWorkspace()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(
+        this, tr("Save Workspace"),
+        tr("Workspace name:"),
+        QLineEdit::Normal,
+        QString(), &ok);
+
+    if (!ok || name.trimmed().isEmpty())
+        return;
+
+    name = name.trimmed();
+
+    auto* wsMgr = dawcast::WorkspaceManager::instance();
+    wsMgr->saveProfile(name, this);
+
+    statusBar()->showMessage(
+        tr("Workspace \"%1\" saved").arg(name), 3000);
+}
+
+void MainWindow::loadWorkspaceProfile(const QString& name)
+{
+    auto* wsMgr = dawcast::WorkspaceManager::instance();
+    wsMgr->loadProfile(name, this);
+
+    statusBar()->showMessage(
+        tr("Workspace \"%1\" loaded").arg(name), 3000);
+}
+
+void MainWindow::manageWorkspaces()
+{
+    auto* wsMgr = dawcast::WorkspaceManager::instance();
+    QStringList names = wsMgr->profileNames();
+
+    // Simple management dialog: list profiles with rename/delete options
+    QStringList items;
+    for (const QString& name : names) {
+        auto p = wsMgr->profile(name);
+        items << (p.isFactory ? name + tr(" [Factory]") : name);
+    }
+
+    bool ok = false;
+    QString selected = QInputDialog::getItem(
+        this, tr("Manage Workspaces"),
+        tr("Select a workspace to manage:"),
+        items, 0, false, &ok);
+
+    if (!ok || selected.isEmpty())
+        return;
+
+    // Strip " [Factory]" suffix to get the real name
+    QString realName = selected;
+    realName.remove(tr(" [Factory]"));
+
+    auto profile = wsMgr->profile(realName);
+
+    if (profile.isFactory) {
+        QMessageBox::information(this, tr("Factory Preset"),
+            tr("Factory presets cannot be renamed or deleted."));
+        return;
+    }
+
+    // Show action choices
+    QStringList actions;
+    actions << tr("Rename") << tr("Delete") << tr("Cancel");
+    bool actionOk = false;
+    QString action = QInputDialog::getItem(
+        this, tr("Manage \"%1\"").arg(realName),
+        tr("Action:"), actions, 0, false, &actionOk);
+
+    if (!actionOk || action == tr("Cancel"))
+        return;
+
+    if (action == tr("Rename")) {
+        bool renameOk = false;
+        QString newName = QInputDialog::getText(
+            this, tr("Rename Workspace"),
+            tr("New name:"), QLineEdit::Normal,
+            realName, &renameOk);
+        if (renameOk && !newName.trimmed().isEmpty()) {
+            wsMgr->renameProfile(realName, newName.trimmed());
+            statusBar()->showMessage(
+                tr("Workspace renamed to \"%1\"").arg(newName.trimmed()), 3000);
+        }
+    } else if (action == tr("Delete")) {
+        auto confirm = QMessageBox::question(
+            this, tr("Delete Workspace"),
+            tr("Delete workspace \"%1\"?").arg(realName),
+            QMessageBox::Yes | QMessageBox::No);
+        if (confirm == QMessageBox::Yes) {
+            wsMgr->deleteProfile(realName);
+            statusBar()->showMessage(
+                tr("Workspace \"%1\" deleted").arg(realName), 3000);
+        }
+    }
 }
 
 } // namespace dawcast::widgets

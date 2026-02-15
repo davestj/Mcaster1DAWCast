@@ -170,6 +170,8 @@ void PlaybackEngine::processBlock(int frames, int channels,
     // Forward input to the multitrack recorder if it is recording.
     // This must happen regardless of play state so punch-in works.
     if (m_recorder && input && inputChannels > 0) {
+        // Provide current playhead position for punch-in/out evaluation
+        m_recorder->setCurrentPosition(m_playheadPos.load(std::memory_order_acquire));
         m_recorder->processInputBlock(input, frames, inputChannels);
     }
 

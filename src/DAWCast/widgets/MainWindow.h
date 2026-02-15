@@ -26,6 +26,8 @@ class VideoPlaybackController;
 class ExportEngine;
 class RTMPStreamer;
 class ViewModeManager;
+class UndoManager;
+class WorkspaceManager;
 }
 
 namespace dawcast::ai { class AIPanel; }
@@ -96,6 +98,11 @@ private slots:
     // View Modes
     void applyViewMode(dawcast::ViewModeManager::Mode mode);
 
+    // Workspace Profiles
+    void saveWorkspace();
+    void manageWorkspaces();
+    void loadWorkspaceProfile(const QString& name);
+
     // Track
     void addAudioTrack();
     void addVideoTrack();
@@ -140,6 +147,8 @@ private:
     void setupStatusBar();
     void setupConnections();
     void setupViewModes();
+    void setupUndoRedo();
+    void rebuildWorkspaceMenu();
 
     // Recent files
     void updateRecentFilesMenu();
@@ -244,6 +253,15 @@ private:
 
     void setupRTMPStreamer();
     void updateOnAirStatus(bool live);
+
+    // Undo/Redo
+    UndoManager* m_undoManager = nullptr;
+    QAction*     m_actUndo     = nullptr;
+    QAction*     m_actRedo     = nullptr;
+
+    // Workspace profiles
+    QMenu*               m_workspaceLoadMenu = nullptr;
+    QList<QAction*>      m_workspaceShortcuts;
 };
 
 } // namespace dawcast::widgets

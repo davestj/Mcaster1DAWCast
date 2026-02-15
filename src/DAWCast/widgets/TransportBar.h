@@ -45,12 +45,14 @@ signals:
     void zoomChanged(int pixelsPerSecond);
     void automationWriteToggled(bool enabled);
     void crossfadeModeChanged(int mode);
+    void punchToggled(bool enabled);
     void busesClicked();
     void prevMarkerClicked();
     void nextMarkerClicked();
     void markerViewToggled(bool enabled);
     void listViewToggled(bool enabled);
     void gridViewToggled(bool enabled);
+    void snapModeChanged(int mode);
 
 private slots:
     void onTapTempo();
@@ -92,9 +94,10 @@ private:
     QSlider* m_zoomSlider = nullptr;
     QLabel*  m_zoomLabel  = nullptr;
 
-    // Automation / Crossfade
-    BevelButton* m_autoBtn  = nullptr;
-    QComboBox*   m_xfCombo  = nullptr;
+    // Automation / Crossfade / Punch
+    BevelButton* m_autoBtn   = nullptr;
+    BevelButton* m_punchBtn  = nullptr;
+    QComboBox*   m_xfCombo   = nullptr;
 
     // Secondary row
     BevelButton* m_busesBtn    = nullptr;
@@ -104,6 +107,9 @@ private:
     BevelButton* m_listBtn     = nullptr;
     BevelButton* m_gridBtn     = nullptr;
     QComboBox*   m_zoomPreset  = nullptr;
+
+    // Snap-to-grid
+    QComboBox*   m_snapCombo   = nullptr;
 };
 
 } // namespace dawcast::widgets

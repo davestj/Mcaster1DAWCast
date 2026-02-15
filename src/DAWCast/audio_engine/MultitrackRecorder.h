@@ -61,6 +61,10 @@ public:
     /// @param inputChannels  Number of interleaved channels in the input buffer
     void processInputBlock(const float* input, int frames, int inputChannels);
 
+    /// Set the current playhead position so punch-in/out can be evaluated.
+    /// Called from the audio thread (PlaybackEngine::processBlock).
+    void setCurrentPosition(int64_t samples) { m_currentPosition = samples; }
+
 signals:
     void recordingStarted();
     void recordingStopped();
@@ -84,6 +88,7 @@ private:
     std::atomic<bool> m_recording{false};
     int64_t           m_recordStartPosition = 0;
     int64_t           m_samplesRecorded     = 0;
+    int64_t           m_currentPosition     = 0;  ///< Set from audio thread for punch I/O
 
     /// One open QFile per target, in the same order as m_targets.
     QList<QFile*> m_tempFiles;

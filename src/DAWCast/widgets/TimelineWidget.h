@@ -7,6 +7,7 @@
 #include <QList>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 #include <cstdint>
 
 class QPainter;
@@ -41,6 +42,28 @@ public:
     /// Supported video file extensions for drag-and-drop import
     static QStringList supportedVideoExtensions();
 
+    // ── Snap-to-Grid ───────────────────────────────────────────────────
+    enum SnapMode { SnapOff, SnapBeat, SnapBar, SnapSecond, SnapHalfSecond, SnapFrame };
+    Q_ENUM(SnapMode)
+
+    void setSnapMode(SnapMode mode);
+    [[nodiscard]] SnapMode snapMode() const { return m_snapMode; }
+
+    /// Quantize a raw sample position to the current snap grid
+    [[nodiscard]] int64_t snapPosition(int64_t raw) const;
+
+    // ── Clipboard operations ───────────────────────────────────────────
+    void copySelectedClips();
+    void cutSelectedClips();
+    void pasteClips();
+    void deleteSelectedClips();
+
+    // ── Zoom operations ────────────────────────────────────────────────
+    void zoomIn();
+    void zoomOut();
+    void zoomToFit();
+    void zoomToSelection();
+
 signals:
     void clipMoved(int clipId, int64_t newPosition);
     void clipSelected(int clipId);
@@ -48,6 +71,7 @@ signals:
     void automationPointAdded(int trackIndex, const QString& param, int64_t time, float value);
     void automationPointMoved(int trackIndex, const QString& param, int pointIndex, int64_t time, float value);
     void automationPointRemoved(int trackIndex, const QString& param, int pointIndex);
+    void snapModeChanged(SnapMode mode);
 
 private slots:
     void onWaveformReady(const QString& filePath);
@@ -65,6 +89,7 @@ protected:
 
 private:
     void drawRuler(QPainter& painter, int viewWidth);
+    void drawPunchMarkers(QPainter& painter, int viewHeight);
     void drawClip(QPainter& painter, Clip* clip, int trackIndex, int clipIndex, int yTop);
     void drawWaveform(QPainter& painter, Clip* clip, const QColor& baseColor,
                       int clipX, int clipY, int clipW, int clipH);
@@ -80,6 +105,12 @@ private:
     bool isVideoFile(const QString& filePath) const;
     int64_t probeDuration(const QString& filePath) const;
 
+    /// Probe whether a media file has audio and/or video streams.
+    /// Sets hasAudio and hasVideo to true if the respective streams exist.
+    static void probeStreams(const QString& filePath, bool& hasAudio, bool& hasVideo);
+
+    void drawSnapGrid(QPainter& painter, int viewWidth);
+
     Timeline* m_timeline = nullptr;
     float           m_zoom     = 1.0f;
     int64_t         m_scroll   = 0;
@@ -93,6 +124,22 @@ private:
     QString         m_editingAutoParam;         // Which parameter lane is active
     int             m_draggingAutoPoint = -1;   // Index of the point being dragged (-1 = none)
     bool            m_draggingAuto = false;     // Whether an automation point drag is active
+
+    // ── Snap-to-Grid ───────────────────────────────────────────────────
+    SnapMode        m_snapMode = SnapOff;
+
+    // ── Clipboard ──────────────────────────────────────────────────────
+    struct ClipData {
+        QString sourcePath;
+        int64_t sourceIn   = 0;
+        int64_t sourceOut  = 0;
+        float   gain       = 1.0f;
+        int64_t fadeIn     = 0;
+        int64_t fadeOut    = 0;
+        int     trackIndex = 0;      // relative track within the selection
+        int64_t relativePosition = 0; // offset from earliest clip in selection
+    };
+    QVector<ClipData> m_clipboard;
 };
 
 } // namespace dawcast::widgets

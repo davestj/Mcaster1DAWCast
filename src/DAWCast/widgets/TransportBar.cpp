@@ -181,6 +181,14 @@ TransportBar::TransportBar(QWidget* parent)
         QStringLiteral("QPushButton { font-size: 11px; font-weight: bold; }"));
     row1->addWidget(m_autoBtn);
 
+    m_punchBtn = new BevelButton(QStringLiteral("I/O"), this);
+    m_punchBtn->setFixedSize(QSize(40, 30));
+    m_punchBtn->setCheckable(true);
+    m_punchBtn->setToolTip(tr("Punch In/Out — record only between punch markers"));
+    m_punchBtn->setStyleSheet(
+        QStringLiteral("QPushButton { font-size: 11px; font-weight: bold; }"));
+    row1->addWidget(m_punchBtn);
+
     m_xfCombo = new QComboBox(this);
     m_xfCombo->addItem(QStringLiteral("XF Auto"));
     m_xfCombo->addItem(QStringLiteral("XF Manual"));
@@ -271,6 +279,18 @@ TransportBar::TransportBar(QWidget* parent)
     m_zoomPreset->setToolTip(tr("Zoom preset — approximate visible window"));
     row2->addWidget(m_zoomPreset);
 
+    // ── Snap-to-Grid selector ──────────────────────────────────────────
+    m_snapCombo = new QComboBox(this);
+    m_snapCombo->addItem(tr("Snap: Off"),    0);
+    m_snapCombo->addItem(tr("Snap: Beat"),   1);
+    m_snapCombo->addItem(tr("Snap: Bar"),    2);
+    m_snapCombo->addItem(tr("Snap: 1s"),     3);
+    m_snapCombo->addItem(tr("Snap: 0.5s"),   4);
+    m_snapCombo->addItem(tr("Snap: Frame"),  5);
+    m_snapCombo->setFixedWidth(90);
+    m_snapCombo->setToolTip(tr("Snap-to-grid mode — quantize clip positions"));
+    row2->addWidget(m_snapCombo);
+
     row2->addStretch();
 
     outerLayout->addLayout(row2);
@@ -319,6 +339,17 @@ TransportBar::TransportBar(QWidget* parent)
         emit automationWriteToggled(checked);
     });
 
+    // Punch I/O toggle
+    connect(m_punchBtn, &BevelButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            m_punchBtn->setHighlightColor(QColor(255, 120, 40, 200));  // orange
+        } else {
+            m_punchBtn->setHighlightColor(QColor(255, 255, 255, 120));
+        }
+        m_punchBtn->update();
+        emit punchToggled(checked);
+    });
+
     // Crossfade mode
     connect(m_xfCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &TransportBar::crossfadeModeChanged);
@@ -330,6 +361,12 @@ TransportBar::TransportBar(QWidget* parent)
     connect(m_flagBtn,  &BevelButton::toggled, this, &TransportBar::markerViewToggled);
     connect(m_listBtn,  &BevelButton::toggled, this, &TransportBar::listViewToggled);
     connect(m_gridBtn,  &BevelButton::toggled, this, &TransportBar::gridViewToggled);
+
+    // Snap mode selector
+    connect(m_snapCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int index) {
+        emit snapModeChanged(m_snapCombo->itemData(index).toInt());
+    });
 
     // Metronome button highlight: orange when checked
     connect(m_metronomeBtn, &BevelButton::toggled, this, [this](bool checked) {

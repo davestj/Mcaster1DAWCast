@@ -143,6 +143,15 @@ void TrackHeaderWidget::buildUI()
         emit recordArmToggled(checked);
     });
 
+    // Monitor (headphone icon) — input monitoring toggle
+    m_monitorBtn = makeBtn(QStringLiteral("\xf0\x9f\x8e\xa7"));  // headphone emoji U+1F3A7
+    m_monitorBtn->setToolTip(tr("Input Monitor — hear your input in real-time"));
+    row2->addWidget(m_monitorBtn);
+    connect(m_monitorBtn, &QPushButton::toggled, this, [this](bool checked) {
+        updateButtonStyle(m_monitorBtn, checked, QColor(0x30, 0xa0, 0xc0));  // teal
+        emit inputMonitorToggled(checked);
+    });
+
     // EQ
     m_eqBtn = makeBtn(QStringLiteral("\xe2\x89\xa1"));  // Unicode triple bar (identical to)
     row2->addWidget(m_eqBtn);
@@ -291,13 +300,19 @@ void TrackHeaderWidget::showTrackMenu()
         m_nameEdit->setFocus();
         m_nameEdit->selectAll();
     });
-    menu.addAction(tr("Change Color..."));
+    menu.addAction(tr("Change Color..."), this, [this]() {
+        emit colorChangeRequested(m_trackIndex);
+    });
     menu.addSeparator();
     menu.addAction(tr("Duplicate Track"));
     menu.addAction(tr("Delete Track"));
     menu.addSeparator();
-    menu.addAction(tr("Freeze Track"));
-    menu.addAction(tr("Bounce to Audio"));
+    menu.addAction(tr("Freeze Track"), this, [this]() {
+        emit freezeRequested(m_trackIndex);
+    });
+    menu.addAction(tr("Bounce to Audio"), this, [this]() {
+        emit bounceRequested(m_trackIndex);
+    });
 
     menu.exec(m_menuBtn->mapToGlobal(QPoint(0, m_menuBtn->height())));
 }
