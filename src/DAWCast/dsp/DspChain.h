@@ -25,6 +25,7 @@ public:
     int  effectCount() const;
     IEffectUnit* effect(int index) const;
     void bypass(bool bypassed);
+    [[nodiscard]] bool isBypassed() const { return m_bypassed; }
 
 signals:
     void chainChanged();

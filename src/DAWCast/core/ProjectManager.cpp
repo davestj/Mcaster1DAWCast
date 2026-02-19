@@ -203,6 +203,20 @@ QJsonObject ProjectManager::serializeTimeline() const
                 clipJson[QStringLiteral("gain")]              = static_cast<double>(clip->gain());
                 clipJson[QStringLiteral("fade_in")]           = static_cast<qint64>(clip->fadeIn());
                 clipJson[QStringLiteral("fade_out")]          = static_cast<qint64>(clip->fadeOut());
+
+                // Serialize clip gain envelope
+                const auto& envelope = clip->gainEnvelope();
+                if (!envelope.isEmpty()) {
+                    QJsonArray envArray;
+                    for (const auto& pt : envelope) {
+                        QJsonObject ptJson;
+                        ptJson[QStringLiteral("offset")]  = static_cast<qint64>(pt.offsetSamples);
+                        ptJson[QStringLiteral("gain_db")] = static_cast<double>(pt.gainDb);
+                        envArray.append(ptJson);
+                    }
+                    clipJson[QStringLiteral("gain_envelope")] = envArray;
+                }
+
                 clips.append(clipJson);
             }
             trackJson[QStringLiteral("clips")] = clips;
@@ -233,6 +247,20 @@ QJsonObject ProjectManager::serializeTimeline() const
                 clipJson[QStringLiteral("gain")]              = static_cast<double>(clip->gain());
                 clipJson[QStringLiteral("fade_in")]           = static_cast<qint64>(clip->fadeIn());
                 clipJson[QStringLiteral("fade_out")]          = static_cast<qint64>(clip->fadeOut());
+
+                // Serialize clip gain envelope
+                const auto& envelope = clip->gainEnvelope();
+                if (!envelope.isEmpty()) {
+                    QJsonArray envArray;
+                    for (const auto& pt : envelope) {
+                        QJsonObject ptJson;
+                        ptJson[QStringLiteral("offset")]  = static_cast<qint64>(pt.offsetSamples);
+                        ptJson[QStringLiteral("gain_db")] = static_cast<double>(pt.gainDb);
+                        envArray.append(ptJson);
+                    }
+                    clipJson[QStringLiteral("gain_envelope")] = envArray;
+                }
+
                 clips.append(clipJson);
             }
             trackJson[QStringLiteral("clips")] = clips;
@@ -288,6 +316,20 @@ bool ProjectManager::deserializeTimeline(const QJsonObject& obj)
             clip->setFadeIn(static_cast<int64_t>(clipJson.value(QStringLiteral("fade_in")).toDouble(0)));
             clip->setFadeOut(static_cast<int64_t>(clipJson.value(QStringLiteral("fade_out")).toDouble(0)));
 
+            // Deserialize clip gain envelope
+            QJsonArray envArray = clipJson.value(QStringLiteral("gain_envelope")).toArray();
+            if (!envArray.isEmpty()) {
+                QList<GainPoint> envelope;
+                for (const auto& ptVal : envArray) {
+                    QJsonObject ptJson = ptVal.toObject();
+                    GainPoint pt;
+                    pt.offsetSamples = static_cast<int64_t>(ptJson.value(QStringLiteral("offset")).toDouble(0));
+                    pt.gainDb = static_cast<float>(ptJson.value(QStringLiteral("gain_db")).toDouble(0.0));
+                    envelope.append(pt);
+                }
+                clip->setGainEnvelope(envelope);
+            }
+
             track->addClip(clip);
         }
     }
@@ -316,6 +358,20 @@ bool ProjectManager::deserializeTimeline(const QJsonObject& obj)
             clip->setGain(static_cast<float>(clipJson.value(QStringLiteral("gain")).toDouble(1.0)));
             clip->setFadeIn(static_cast<int64_t>(clipJson.value(QStringLiteral("fade_in")).toDouble(0)));
             clip->setFadeOut(static_cast<int64_t>(clipJson.value(QStringLiteral("fade_out")).toDouble(0)));
+
+            // Deserialize clip gain envelope
+            QJsonArray envArray = clipJson.value(QStringLiteral("gain_envelope")).toArray();
+            if (!envArray.isEmpty()) {
+                QList<GainPoint> envelope;
+                for (const auto& ptVal : envArray) {
+                    QJsonObject ptJson = ptVal.toObject();
+                    GainPoint pt;
+                    pt.offsetSamples = static_cast<int64_t>(ptJson.value(QStringLiteral("offset")).toDouble(0));
+                    pt.gainDb = static_cast<float>(ptJson.value(QStringLiteral("gain_db")).toDouble(0.0));
+                    envelope.append(pt);
+                }
+                clip->setGainEnvelope(envelope);
+            }
 
             track->addClip(clip);
         }

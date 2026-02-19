@@ -90,6 +90,7 @@ void AudioClipReader::readSamples(float* output, int64_t timelinePosition,
     const int64_t fadeInLen    = m_clip->fadeIn();
     const int64_t fadeOutLen   = m_clip->fadeOut();
     const float   clipGain     = m_clip->gain();
+    const bool    hasGainEnvelope = !m_clip->gainEnvelope().isEmpty();
 
     for (int f = 0; f < frames; ++f) {
         int64_t tlPos = timelinePosition + f;
@@ -122,7 +123,16 @@ void AudioClipReader::readSamples(float* output, int64_t timelinePosition,
             }
         }
 
-        float totalGain = clipGain * fadeGain;
+        // --- Clip gain envelope ---
+        // When the envelope has points, use the interpolated envelope gain
+        // (which overrides the base clip gain).  Otherwise use clipGain.
+        float baseGain = clipGain;
+        if (hasGainEnvelope) {
+            int64_t posInClipForEnv = tlPos - clipStart;
+            baseGain = m_clip->gainAt(posInClipForEnv);
+        }
+
+        float totalGain = baseGain * fadeGain;
 
         // Read from decoded buffer and add to output
         int srcCh = m_channels;

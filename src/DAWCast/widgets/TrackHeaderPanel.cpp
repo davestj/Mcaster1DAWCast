@@ -4,10 +4,12 @@
 
 #include "TrackHeaderPanel.h"
 #include "TrackHeaderWidget.h"
+#include "BevelButton.h"
 #include "../timeline/Timeline.h"
 #include "../timeline/AudioTrack.h"
 #include "../timeline/VideoTrack.h"
 #include "../timeline/MidiTrack.h"
+#include "../timeline/TrackGroup.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -15,6 +17,7 @@
 #include <QScrollBar>
 #include <QPushButton>
 #include <QLabel>
+#include <QMenu>
 
 namespace dawcast::widgets {
 
@@ -108,6 +111,12 @@ void TrackHeaderPanel::setTimeline(dawcast::Timeline* timeline)
                 this, &TrackHeaderPanel::rebuildHeaders);
         connect(m_timeline, &Timeline::trackRemoved,
                 this, &TrackHeaderPanel::rebuildHeaders);
+        connect(m_timeline, &Timeline::trackGroupAdded,
+                this, &TrackHeaderPanel::rebuildHeaders);
+        connect(m_timeline, &Timeline::trackGroupRemoved,
+                this, &TrackHeaderPanel::rebuildHeaders);
+        connect(m_timeline, &Timeline::trackGroupChanged,
+                this, &TrackHeaderPanel::rebuildHeaders);
     }
 
     rebuildHeaders();
@@ -120,12 +129,19 @@ QScrollBar* TrackHeaderPanel::verticalScrollBar() const
 
 void TrackHeaderPanel::rebuildHeaders()
 {
-    // Remove existing headers
+    // Remove existing headers and group widgets
     for (auto* hdr : m_headers) {
         m_stackLayout->removeWidget(hdr);
         hdr->deleteLater();
     }
     m_headers.clear();
+
+    // Remove group header widgets
+    for (auto* gw : m_groupWidgets) {
+        m_stackLayout->removeWidget(gw);
+        gw->deleteLater();
+    }
+    m_groupWidgets.clear();
 
     if (!m_timeline)
         return;
@@ -136,12 +152,94 @@ void TrackHeaderPanel::rebuildHeaders()
     QLayoutItem* stretch = m_stackLayout->takeAt(m_stackLayout->count() - 1);
     delete stretch;
 
-    for (int i = 0; i < trackCount; ++i) {
+    // Collect group membership for each track
+    QList<TrackGroup*> groups = m_timeline->trackGroups();
+
+    // Build a set of tracks that belong to any group
+    QSet<QObject*> groupedTracks;
+    for (auto* group : groups) {
+        for (auto* t : group->tracks()) {
+            groupedTracks.insert(t);
+        }
+    }
+
+    // Helper: create a group header widget
+    auto createGroupHeader = [this](TrackGroup* group, int groupIdx) -> QWidget* {
+        auto* groupBar = new QWidget(m_headerStack);
+        groupBar->setFixedWidth(TrackHeaderWidget::kHeaderWidth);
+        groupBar->setFixedHeight(28);
+        groupBar->setStyleSheet(
+            QStringLiteral("background-color: %1; border-bottom: 1px solid #2a2e3e;")
+                .arg(group->color().darker(160).name()));
+
+        auto* layout = new QHBoxLayout(groupBar);
+        layout->setContentsMargins(6, 2, 6, 2);
+        layout->setSpacing(4);
+
+        // Expand/collapse arrow
+        auto* arrowBtn = new QPushButton(
+            group->isCollapsed() ? QStringLiteral("\xe2\x96\xb6")   // right triangle
+                                 : QStringLiteral("\xe2\x96\xbc"),  // down triangle
+            groupBar);
+        arrowBtn->setFixedSize(20, 20);
+        arrowBtn->setStyleSheet(QStringLiteral(
+            "QPushButton { background: transparent; color: #ccc; border: none;"
+            " font-size: 10px; } QPushButton:hover { color: #fff; }"));
+        layout->addWidget(arrowBtn);
+
+        connect(arrowBtn, &QPushButton::clicked, this, [this, group, groupIdx]() {
+            group->setCollapsed(!group->isCollapsed());
+            emit groupCollapseToggled(groupIdx, group->isCollapsed());
+            rebuildHeaders();
+        });
+
+        // Color indicator
+        auto* colorDot = new QWidget(groupBar);
+        colorDot->setFixedSize(10, 10);
+        colorDot->setStyleSheet(
+            QStringLiteral("background-color: %1; border-radius: 2px;").arg(group->color().name()));
+        layout->addWidget(colorDot);
+
+        // Group name
+        auto* nameLabel = new QLabel(group->name(), groupBar);
+        nameLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: #dde; font-size: 11px; font-weight: bold; }"));
+        layout->addWidget(nameLabel, 1);
+
+        // Mute button
+        auto* muteBtn = new BevelButton(QStringLiteral("M"), groupBar);
+        muteBtn->setCheckable(true);
+        muteBtn->setChecked(group->isMuted());
+        muteBtn->setFixedSize(22, 18);
+        muteBtn->setCheckedFaceColor(QColor(200, 120, 30));
+        layout->addWidget(muteBtn);
+        connect(muteBtn, &BevelButton::toggled, group, &TrackGroup::setMuted);
+
+        // Solo button
+        auto* soloBtn = new BevelButton(QStringLiteral("S"), groupBar);
+        soloBtn->setCheckable(true);
+        soloBtn->setChecked(group->isSolo());
+        soloBtn->setFixedSize(22, 18);
+        soloBtn->setCheckedFaceColor(QColor(200, 190, 50));
+        layout->addWidget(soloBtn);
+        connect(soloBtn, &BevelButton::toggled, group, &TrackGroup::setSolo);
+
+        // Track count badge
+        auto* countLabel = new QLabel(
+            QStringLiteral("(%1)").arg(group->trackCount()), groupBar);
+        countLabel->setStyleSheet(QStringLiteral(
+            "QLabel { color: #889; font-size: 9px; }"));
+        layout->addWidget(countLabel);
+
+        return groupBar;
+    };
+
+    // Helper to add a track header at a given index with optional indent
+    auto addTrackHeader = [&](int i, bool indented) {
         auto* hdr = new TrackHeaderWidget(m_headerStack);
         hdr->setTrackIndex(i);
         hdr->setTrackColor(kTrackColors[i % kColorCount]);
 
-        // Determine track name from the model
         QObject* trackObj = m_timeline->track(i);
         QString name;
         if (auto* at = qobject_cast<AudioTrack*>(trackObj))
@@ -154,7 +252,11 @@ void TrackHeaderPanel::rebuildHeaders()
             name = tr("Track %1").arg(i + 1);
         hdr->setTrackName(name);
 
-        // Forward signals
+        // Apply indent for grouped tracks
+        if (indented) {
+            hdr->setContentsMargins(12, 0, 0, 0);
+        }
+
         connect(hdr, &TrackHeaderWidget::eqRequested,
                 this, &TrackHeaderPanel::eqRequested);
         connect(hdr, &TrackHeaderWidget::settingsRequested,
@@ -162,6 +264,54 @@ void TrackHeaderPanel::rebuildHeaders()
 
         m_stackLayout->addWidget(hdr);
         m_headers.append(hdr);
+    };
+
+    // First, render groups and their tracks
+    for (int g = 0; g < groups.size(); ++g) {
+        TrackGroup* group = groups[g];
+
+        // Group header bar
+        auto* groupWidget = createGroupHeader(group, g);
+        m_stackLayout->addWidget(groupWidget);
+        m_groupWidgets.append(groupWidget);
+
+        if (group->isCollapsed()) {
+            // Collapsed: show a thin summary row
+            auto* collapsedRow = new QWidget(m_headerStack);
+            collapsedRow->setFixedWidth(TrackHeaderWidget::kHeaderWidth);
+            collapsedRow->setFixedHeight(16);
+            collapsedRow->setStyleSheet(
+                QStringLiteral("background-color: %1; border-bottom: 1px solid #2a2e3e;")
+                    .arg(group->color().darker(200).name()));
+            auto* cLayout = new QHBoxLayout(collapsedRow);
+            cLayout->setContentsMargins(24, 0, 6, 0);
+            auto* cLabel = new QLabel(
+                tr("%1 tracks").arg(group->trackCount()), collapsedRow);
+            cLabel->setStyleSheet(QStringLiteral(
+                "QLabel { color: #667; font-size: 9px; font-style: italic; }"));
+            cLayout->addWidget(cLabel);
+            m_stackLayout->addWidget(collapsedRow);
+            m_groupWidgets.append(collapsedRow);
+        } else {
+            // Expanded: show all child tracks with indent
+            for (auto* trackObj : group->tracks()) {
+                // Find the track index in the timeline
+                for (int i = 0; i < trackCount; ++i) {
+                    if (m_timeline->track(i) == trackObj) {
+                        addTrackHeader(i, true);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Then render ungrouped tracks
+    for (int i = 0; i < trackCount; ++i) {
+        QObject* trackObj = m_timeline->track(i);
+        if (groupedTracks.contains(trackObj)) continue;
+
+        addTrackHeader(i, false);
     }
 
     // Re-add stretch at the bottom

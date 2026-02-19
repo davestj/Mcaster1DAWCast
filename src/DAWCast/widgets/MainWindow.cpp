@@ -25,10 +25,12 @@
 #include "ScriptReaderPanel.h"
 #include "PedalboardWidget.h"
 #include "StreamMonitorPanel.h"
+#include "MarkerListWidget.h"
 #include "../ai/AIPanel.h"
 #include "../core/ViewModeManager.h"
 
 #include "../timeline/Timeline.h"
+#include "../timeline/Marker.h"
 #include "../timeline/AudioTrack.h"
 #include "../audio_engine/AudioEngine.h"
 #include "../audio_engine/AudioMixer.h"
@@ -284,6 +286,13 @@ void MainWindow::setupMenus()
     m_actToggleAI->setCheckable(true);
     m_actToggleAI->setChecked(true);
     connect(m_actToggleAI, &QAction::triggered, this, &MainWindow::toggleAIPanel);
+
+    m_actToggleMarkerList = viewMenu->addAction(tr("Marker &List"));
+    m_actToggleMarkerList->setCheckable(true);
+    m_actToggleMarkerList->setChecked(false);
+    connect(m_actToggleMarkerList, &QAction::triggered, this, [this]() {
+        if (m_markerListDock) m_markerListDock->setVisible(!m_markerListDock->isVisible());
+    });
 
     viewMenu->addSeparator();
 
@@ -663,6 +672,16 @@ void MainWindow::setupDockWidgets()
     m_streamMonitorDock->setWidget(m_streamMonitor);
     addDockWidget(Qt::RightDockWidgetArea, m_streamMonitorDock);
     m_streamMonitorDock->hide();
+
+    // Bottom dock — Marker List (tabified with Mixer)
+    m_markerListDock = new QDockWidget(tr("Marker List"), this);
+    m_markerListDock->setObjectName(QStringLiteral("MarkerListDock"));
+    m_markerListDock->setMinimumSize(200, 120);
+    m_markerList = new MarkerListWidget(m_markerListDock);
+    m_markerListDock->setWidget(m_markerList);
+    addDockWidget(Qt::BottomDockWidgetArea, m_markerListDock);
+    tabifyDockWidget(m_mixerDock, m_markerListDock);
+    m_mixerDock->raise();   // Keep mixer as the default visible bottom tab
 }
 
 // ── Status Bar ──────────────────────────────────────────────────────────────
@@ -683,6 +702,9 @@ void MainWindow::setupAudioPipeline()
     // Give the TimelineWidget and TrackHeaderPanel their data model
     m_timeline->setTimeline(m_timelineModel);
     m_trackHeaders->setTimeline(m_timelineModel);
+
+    // Give the MarkerListWidget its data model
+    m_markerList->setTimeline(m_timelineModel);
 
     // Wire "+" button in the track header panel to add an audio track
     connect(m_trackHeaders, &TrackHeaderPanel::addTrackRequested,
@@ -798,6 +820,59 @@ void MainWindow::setupConnections()
         statusBar()->showMessage(tr("Audio buses"), 2000);
     });
 
+    // ── Marker navigation: Prev / Next ────────────────────────────────
+    connect(m_transportBar, &TransportBar::prevMarkerClicked, this, [this]() {
+        if (!m_timelineModel) return;
+        int64_t pos = m_timelineModel->playhead();
+        int idx = m_timelineModel->previousMarkerIndex(pos);
+        if (idx >= 0) {
+            int64_t target = m_timelineModel->marker(idx).position();
+            m_timelineModel->setPlayhead(target);
+            if (m_playbackEngine) m_playbackEngine->seekTo(target);
+        } else {
+            // No previous marker — jump to start
+            m_timelineModel->setPlayhead(0);
+            if (m_playbackEngine) m_playbackEngine->seekTo(0);
+        }
+    });
+
+    connect(m_transportBar, &TransportBar::nextMarkerClicked, this, [this]() {
+        if (!m_timelineModel) return;
+        int64_t pos = m_timelineModel->playhead();
+        int idx = m_timelineModel->nextMarkerIndex(pos);
+        if (idx >= 0) {
+            int64_t target = m_timelineModel->marker(idx).position();
+            m_timelineModel->setPlayhead(target);
+            if (m_playbackEngine) m_playbackEngine->seekTo(target);
+        } else {
+            // No next marker — jump to end
+            int64_t dur = m_timelineModel->duration();
+            if (dur > 0) {
+                m_timelineModel->setPlayhead(dur);
+                if (m_playbackEngine) m_playbackEngine->seekTo(dur);
+            }
+        }
+    });
+
+    // ── Loop toggle ───────────────────────────────────────────────────
+    connect(m_transportBar, &TransportBar::loopToggled, this, [this](bool enabled) {
+        if (!m_timelineModel) return;
+        if (enabled && m_timelineModel->loopEnd() <= m_timelineModel->loopStart()) {
+            // No loop region set — default to full timeline
+            m_timelineModel->setLoopStart(0);
+            int64_t dur = m_timelineModel->duration();
+            m_timelineModel->setLoopEnd(dur > 0 ? dur : m_timelineModel->sampleRate() * 10);
+        }
+        m_timelineModel->setLoopEnabled(enabled);
+        statusBar()->showMessage(enabled ? tr("Loop enabled") : tr("Loop disabled"), 2000);
+    });
+
+    // ── Marker list panel navigation ──────────────────────────────────
+    connect(m_markerList, &MarkerListWidget::markerSelected, this, [this](int64_t pos) {
+        if (m_timelineModel) m_timelineModel->setPlayhead(pos);
+        if (m_playbackEngine) m_playbackEngine->seekTo(pos);
+    });
+
     // Metronome toggle and tempo from TransportBar -> PlaybackEngine::Metronome
     connect(m_transportBar, &TransportBar::metronomeToggled, this, [this](bool on) {
         if (m_playbackEngine && m_playbackEngine->metronome()) {
@@ -865,6 +940,8 @@ void MainWindow::setupConnections()
             m_actToggleLUFS, &QAction::setChecked);
     connect(m_aiDock, &QDockWidget::visibilityChanged,
             m_actToggleAI, &QAction::setChecked);
+    connect(m_markerListDock, &QDockWidget::visibilityChanged,
+            m_actToggleMarkerList, &QAction::setChecked);
 
     // LUFS metering — feed from audio engine buffer-processed signal
     if (m_audioEngine && m_lufsMeter) {

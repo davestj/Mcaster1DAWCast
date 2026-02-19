@@ -15,6 +15,7 @@
 #include "Marker.h"
 #include "Automation.h"
 #include "../audio_engine/WaveformCache.h"
+#include "../dsp/DspChain.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -27,8 +28,11 @@
 #include <QMimeData>
 #include <QUrl>
 #include <QMenu>
+#include <QInputDialog>
+#include <QColorDialog>
 #include <QFontMetrics>
 #include <QFileInfo>
+#include <QToolTip>
 
 #ifdef HAVE_AVFORMAT
 extern "C" {
@@ -80,6 +84,24 @@ const QColor kAutoPanColor(0, 204, 255);           // cyan    #00CCFF
 const QColor kAutoEffectColor(0, 204, 102);        // green   #00CC66
 constexpr int kAutoPointRadius = 3;                // px radius for automation breakpoints
 constexpr int kAutoPointHitRadius = 6;             // px hit-test radius
+
+// Loop region colors
+const QColor kLoopRegionFill(0, 180, 160, 30);     // teal, semi-transparent
+const QColor kLoopBracketColor(0, 200, 180);        // teal bracket color
+constexpr int kLoopBracketWidth = 6;                // px width of loop start/end brackets
+constexpr int kMarkerFlagHeight = 12;               // px height of marker flag triangle
+constexpr int kMarkerHitRadius  = 8;                // px hit-test radius for marker flags
+
+// Clip gain envelope colors and sizes
+const QColor kGainEnvelopeColor(255, 210, 0);       // gold/yellow
+const QColor kGainEnvelopeFill(255, 210, 0, 40);    // semi-transparent fill
+constexpr int kGainPointSize = 6;                    // 6x6 diamond handles
+constexpr int kGainPointHitRadius = 8;               // px hit-test radius
+constexpr float kGainEnvelopeMaxDb  = 12.0f;         // top of envelope range
+constexpr float kGainEnvelopeMinDb  = -60.0f;        // bottom of envelope range
+
+// Freeze indicator
+const QColor kFreezeColor(120, 180, 255);            // icy blue
 } // anonymous namespace
 
 TimelineWidget::TimelineWidget(QWidget* parent)
@@ -115,6 +137,11 @@ void TimelineWidget::setTimeline(Timeline* timeline)
                 this, [this](int) { update(); });
         connect(m_timeline, &Timeline::trackRemoved,
                 this, [this](int) { update(); });
+        // Repaint when markers or loop region change
+        connect(m_timeline, &Timeline::markersChanged,
+                this, [this]() { update(); });
+        connect(m_timeline, &Timeline::loopChanged,
+                this, [this]() { update(); });
     }
 
     update();
@@ -220,6 +247,11 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
         if (audioTrack) {
             drawAutomation(p, audioTrack, t);
         }
+
+        // Draw freeze indicator if the track's DSP chain is bypassed (frozen)
+        if (audioTrack) {
+            drawFreezeIndicator(p, audioTrack, yTop);
+        }
     }
 
     // --- Playhead ---
@@ -243,6 +275,12 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
 
     // --- Punch-In / Punch-Out markers ---
     drawPunchMarkers(p, h);
+
+    // --- Loop region ---
+    drawLoopRegion(p, w, h);
+
+    // --- Markers ---
+    drawMarkers(p, w, h);
 
     // --- Rubber-band selection ---
     if (m_dragging && !m_rubberBand.isNull()) {
@@ -403,6 +441,112 @@ void TimelineWidget::drawPunchMarkers(QPainter& painter, int viewHeight)
     }
 }
 
+// ── Marker flags on the ruler ──────────────────────────────────────────────
+
+void TimelineWidget::drawMarkers(QPainter& painter, int viewWidth, int viewHeight)
+{
+    if (!m_timeline) return;
+
+    QFont markerFont = font();
+    markerFont.setPointSize(7);
+    QFontMetrics fm(markerFont);
+
+    for (int i = 0; i < m_timeline->markerCount(); ++i) {
+        const Marker& mkr = m_timeline->marker(i);
+        int px = sampleToPixel(mkr.position(), m_scroll, m_zoom);
+        if (px < -20 || px > viewWidth + 20) continue;
+
+        QColor color = mkr.color();
+
+        // Draw vertical line through the track area (thinner, semi-transparent)
+        QColor lineColor = color;
+        lineColor.setAlpha(80);
+        painter.setPen(QPen(lineColor, 1, Qt::DotLine));
+        painter.drawLine(px, kRulerHeight, px, viewHeight);
+
+        // Draw triangular flag at the top of the ruler
+        QPainterPath flag;
+        flag.moveTo(px, 2);
+        flag.lineTo(px + kMarkerFlagHeight, 2);
+        flag.lineTo(px + kMarkerFlagHeight, 2 + kMarkerFlagHeight);
+        flag.lineTo(px, 2 + kMarkerFlagHeight / 2);
+        flag.closeSubpath();
+
+        painter.setBrush(color);
+        painter.setPen(Qt::NoPen);
+        painter.drawPath(flag);
+
+        // Draw marker name next to the flag (small font, truncated)
+        painter.setFont(markerFont);
+        painter.setPen(QColor(220, 220, 220));
+        QString label = mkr.name();
+        int maxTextWidth = 60;
+        if (fm.horizontalAdvance(label) > maxTextWidth) {
+            label = fm.elidedText(label, Qt::ElideRight, maxTextWidth);
+        }
+        painter.drawText(px + kMarkerFlagHeight + 2, 11, label);
+    }
+}
+
+// ── Loop region ────────────────────────────────────────────────────────────
+
+void TimelineWidget::drawLoopRegion(QPainter& painter, int viewWidth, int viewHeight)
+{
+    if (!m_timeline || !m_timeline->loopEnabled()) return;
+
+    int64_t loopStart = m_timeline->loopStart();
+    int64_t loopEnd   = m_timeline->loopEnd();
+    if (loopEnd <= loopStart) return;
+
+    int lsX = sampleToPixel(loopStart, m_scroll, m_zoom);
+    int leX = sampleToPixel(loopEnd, m_scroll, m_zoom);
+
+    // Clamp to visible area
+    if (leX < 0 || lsX > viewWidth) return;
+
+    // Semi-transparent teal fill spanning the loop region (ruler + tracks)
+    painter.fillRect(qMax(0, lsX), 0, qMin(viewWidth, leX) - qMax(0, lsX), viewHeight,
+                     kLoopRegionFill);
+
+    // Loop start bracket (left bracket)
+    if (lsX >= 0 && lsX <= viewWidth) {
+        painter.setPen(QPen(kLoopBracketColor, 2));
+        painter.drawLine(lsX, 0, lsX, viewHeight);
+
+        // Bracket cap at top
+        painter.drawLine(lsX, 0, lsX + kLoopBracketWidth, 0);
+        painter.drawLine(lsX, kRulerHeight - 1, lsX + kLoopBracketWidth, kRulerHeight - 1);
+
+        // Small "L" label
+        QFont bracketFont = font();
+        bracketFont.setPointSize(7);
+        bracketFont.setBold(true);
+        painter.setFont(bracketFont);
+        painter.setPen(kLoopBracketColor);
+        painter.drawText(lsX + 2, kRulerHeight - 4, QStringLiteral("L"));
+    }
+
+    // Loop end bracket (right bracket)
+    if (leX >= 0 && leX <= viewWidth) {
+        painter.setPen(QPen(kLoopBracketColor, 2));
+        painter.drawLine(leX, 0, leX, viewHeight);
+
+        // Bracket cap at top
+        painter.drawLine(leX - kLoopBracketWidth, 0, leX, 0);
+        painter.drawLine(leX - kLoopBracketWidth, kRulerHeight - 1, leX, kRulerHeight - 1);
+
+        // Small "L" label
+        QFont bracketFont = font();
+        bracketFont.setPointSize(7);
+        bracketFont.setBold(true);
+        painter.setFont(bracketFont);
+        painter.setPen(kLoopBracketColor);
+        painter.drawText(leX - 8, kRulerHeight - 4, QStringLiteral("L"));
+    }
+}
+
+// ── Clip drawing ───────────────────────────────────────────────────────────
+
 void TimelineWidget::drawClip(QPainter& p, Clip* clip, int trackIndex, int clipIndex, int yTop)
 {
     int x1 = sampleToPixel(clip->timelinePosition(), m_scroll, m_zoom);
@@ -425,7 +569,13 @@ void TimelineWidget::drawClip(QPainter& p, Clip* clip, int trackIndex, int clipI
 
     // Waveform rendering (real data or loading placeholder)
     if (clipW > 10) {
-        drawWaveform(p, clip, baseColor, x1, clipY, clipW, clipH);
+        float vZoom = verticalZoomForTrack(trackIndex);
+        drawWaveform(p, clip, baseColor, x1, clipY, clipW, clipH, vZoom);
+    }
+
+    // Gain envelope overlay (rubber-band line + handles)
+    if (!clip->gainEnvelope().isEmpty() && clipW > 10) {
+        drawGainEnvelope(p, clip, x1, clipY, clipW, clipH);
     }
 
     // Filename text
@@ -557,10 +707,66 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
     m_dragging = true;
     m_draggingAuto = false;
     m_draggingAutoPoint = -1;
+    m_draggingGainPoint = false;
+    m_gainPointIndex = -1;
+    m_gainPointClip = nullptr;
+    m_draggingMarkerIdx = -1;
+    m_draggingLoopStart = false;
+    m_draggingLoopEnd   = false;
     m_dragStart = event->pos();
 
-    // Click in ruler area: set playhead
+    // Click in ruler area: check markers, loop brackets, then set playhead
     if (event->pos().y() < kRulerHeight && m_timeline) {
+        int mouseX = event->pos().x();
+
+        // Hit-test loop brackets first (if loop is enabled)
+        if (m_timeline->loopEnabled()) {
+            int lsX = sampleToPixel(m_timeline->loopStart(), m_scroll, m_zoom);
+            int leX = sampleToPixel(m_timeline->loopEnd(), m_scroll, m_zoom);
+
+            if (qAbs(mouseX - lsX) <= kMarkerHitRadius) {
+                m_draggingLoopStart = true;
+                return;
+            }
+            if (qAbs(mouseX - leX) <= kMarkerHitRadius) {
+                m_draggingLoopEnd = true;
+                return;
+            }
+
+            // Double-click on the loop bar to toggle looping
+            if (event->type() == QEvent::MouseButtonDblClick
+                && mouseX > lsX && mouseX < leX) {
+                m_timeline->setLoopEnabled(!m_timeline->loopEnabled());
+                update();
+                return;
+            }
+        }
+
+        // Hit-test marker flags
+        for (int i = 0; i < m_timeline->markerCount(); ++i) {
+            int mkrX = sampleToPixel(m_timeline->marker(i).position(), m_scroll, m_zoom);
+            if (qAbs(mouseX - mkrX) <= kMarkerHitRadius) {
+                if (event->type() == QEvent::MouseButtonDblClick) {
+                    // Double-click: open edit dialog
+                    Marker mkr = m_timeline->marker(i);
+                    bool ok = false;
+                    QString name = QInputDialog::getText(
+                        this, tr("Edit Marker"), tr("Name:"),
+                        QLineEdit::Normal, mkr.name(), &ok);
+                    if (ok && !name.isEmpty()) {
+                        mkr.setName(name);
+                        m_timeline->setMarker(i, mkr);
+                    }
+                    update();
+                    return;
+                }
+                // Single click: start dragging the marker
+                m_draggingMarkerIdx = i;
+                return;
+            }
+        }
+
+        // Default: set playhead
         int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
         m_timeline->setPlayhead(qMax(int64_t(0), sample));
         emit playheadMoved(m_timeline->playhead());
@@ -618,6 +824,61 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
                 }
             }
 
+            // ── Gain Envelope Editing (Alt+click on clip) ───────────
+            if ((event->modifiers() & Qt::AltModifier) && audioTrack) {
+                int64_t clickSampleGE = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+                for (int c = 0; c < audioTrack->clipCount(); ++c) {
+                    Clip* clip = audioTrack->clip(c);
+                    if (!clip) continue;
+                    if (clickSampleGE < clip->timelinePosition() || clickSampleGE >= clip->endPosition())
+                        continue;
+
+                    // Compute clip pixel geometry for hit-testing
+                    int cx1 = sampleToPixel(clip->timelinePosition(), m_scroll, m_zoom);
+                    int cx2 = sampleToPixel(clip->endPosition(), m_scroll, m_zoom);
+                    int cY = kRulerHeight + trackIdx * kTrackHeight + 4;
+                    int cH = kTrackHeight - 8;
+                    int cW = qMax(4, cx2 - cx1);
+
+                    // Check if Alt+right-click on an existing gain point -> delete
+                    int gpIdx = hitTestGainPoint(clip, cx1, cW, cY, cH,
+                                                  event->pos().x(), event->pos().y());
+                    if (gpIdx >= 0 && event->button() == Qt::RightButton) {
+                        clip->removeGainPoint(gpIdx);
+                        emit gainEnvelopeChanged(trackIdx, c);
+                        m_dragging = false;
+                        update();
+                        return;
+                    }
+
+                    // Alt+left-click on existing point -> start dragging
+                    if (gpIdx >= 0 && event->button() == Qt::LeftButton) {
+                        m_draggingGainPoint = true;
+                        m_gainPointIndex = gpIdx;
+                        m_gainPointClip = clip;
+                        m_gainPointTrack = trackIdx;
+                        m_gainPointClipIndex = c;
+                        update();
+                        return;
+                    }
+
+                    // Alt+left-click on clip (not on a point) -> add new gain point
+                    if (event->button() == Qt::LeftButton) {
+                        int64_t offsetSamples = clickSampleGE - clip->timelinePosition();
+                        // Convert Y to dB
+                        float frac = 1.0f - static_cast<float>(event->pos().y() - cY)
+                                          / static_cast<float>(cH);
+                        frac = std::clamp(frac, 0.0f, 1.0f);
+                        float db = kGainEnvelopeMinDb + frac * (kGainEnvelopeMaxDb - kGainEnvelopeMinDb);
+                        clip->addGainPoint(offsetSamples, db);
+                        emit gainEnvelopeChanged(trackIdx, c);
+                        update();
+                        return;
+                    }
+                    break;
+                }
+            }
+
             // Normal clip selection
             int clipCount = 0;
             if (audioTrack) clipCount = audioTrack->clipCount();
@@ -654,6 +915,39 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
 void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
 {
     if (m_dragging) {
+        // Gain envelope point drag
+        if (m_draggingGainPoint && m_gainPointClip && m_gainPointIndex >= 0) {
+            Clip* clip = m_gainPointClip;
+            int64_t clickSample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            int64_t newOffset = clickSample - clip->timelinePosition();
+            newOffset = std::clamp(newOffset, int64_t(0), clip->duration());
+
+            int cY = kRulerHeight + m_gainPointTrack * kTrackHeight + 4;
+            int cH = kTrackHeight - 8;
+            float frac = 1.0f - static_cast<float>(event->pos().y() - cY)
+                              / static_cast<float>(cH);
+            frac = std::clamp(frac, 0.0f, 1.0f);
+            float db = kGainEnvelopeMinDb + frac * (kGainEnvelopeMaxDb - kGainEnvelopeMinDb);
+
+            clip->moveGainPoint(m_gainPointIndex, newOffset, db);
+
+            // Find the new index after re-sorting
+            const auto& env = clip->gainEnvelope();
+            for (int i = 0; i < env.size(); ++i) {
+                if (env[i].offsetSamples == newOffset && qFuzzyCompare(env[i].gainDb, db)) {
+                    m_gainPointIndex = i;
+                    break;
+                }
+            }
+
+            // Show dB tooltip while dragging
+            QString tip = QStringLiteral("%1 dB").arg(db, 0, 'f', 1);
+            QToolTip::showText(event->globalPos(), tip, this);
+
+            update();
+            return;
+        }
+
         // Automation point drag
         if (m_draggingAuto && m_draggingAutoPoint >= 0 && m_timeline
             && m_editingAutoTrack >= 0 && !m_editingAutoParam.isEmpty()) {
@@ -688,6 +982,33 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
             }
             update();
         }
+        // Dragging a marker flag
+        else if (m_draggingMarkerIdx >= 0 && m_timeline) {
+            int64_t newPos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            newPos = qMax(int64_t(0), newPos);
+            Marker mkr = m_timeline->marker(m_draggingMarkerIdx);
+            mkr.setPosition(newPos);
+            m_timeline->setMarker(m_draggingMarkerIdx, mkr);
+            update();
+        }
+        // Dragging loop start bracket
+        else if (m_draggingLoopStart && m_timeline) {
+            int64_t newPos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            newPos = qMax(int64_t(0), newPos);
+            if (newPos < m_timeline->loopEnd()) {
+                m_timeline->setLoopStart(newPos);
+            }
+            update();
+        }
+        // Dragging loop end bracket
+        else if (m_draggingLoopEnd && m_timeline) {
+            int64_t newPos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            newPos = qMax(int64_t(0), newPos);
+            if (newPos > m_timeline->loopStart()) {
+                m_timeline->setLoopEnd(newPos);
+            }
+            update();
+        }
         // Dragging in ruler: update playhead
         else if (m_dragStart.y() < kRulerHeight && m_timeline) {
             int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
@@ -714,9 +1035,22 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
 
 void TimelineWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    // If we were dragging a marker, re-sort markers
+    if (m_draggingMarkerIdx >= 0 && m_timeline) {
+        m_timeline->sortMarkers();
+    }
+
     m_dragging = false;
     m_draggingAuto = false;
     m_draggingAutoPoint = -1;
+    m_draggingGainPoint = false;
+    m_gainPointIndex = -1;
+    m_gainPointClip = nullptr;
+    m_gainPointTrack = -1;
+    m_gainPointClipIndex = -1;
+    m_draggingMarkerIdx = -1;
+    m_draggingLoopStart = false;
+    m_draggingLoopEnd   = false;
     m_rubberBand = QRect();
     update();
     QWidget::mouseReleaseEvent(event);
@@ -724,6 +1058,27 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent* event)
 
 void TimelineWidget::wheelEvent(QWheelEvent* event)
 {
+    // Per-track vertical waveform zoom: Ctrl+Alt+Wheel
+    if ((event->modifiers() & Qt::ControlModifier)
+        && (event->modifiers() & Qt::AltModifier)
+        && m_timeline) {
+        int mouseY = static_cast<int>(event->position().y());
+        if (mouseY >= kRulerHeight) {
+            int trackIdx = (mouseY - kRulerHeight) / kTrackHeight;
+            if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
+                float current = m_trackVerticalZoom.value(trackIdx, 1.0f);
+                if (event->angleDelta().y() > 0)
+                    current = std::min(current * 1.15f, 4.0f);
+                else
+                    current = std::max(current / 1.15f, 0.25f);
+                m_trackVerticalZoom[trackIdx] = current;
+                update();
+                event->accept();
+                return;
+            }
+        }
+    }
+
     // Zoom in/out centered on cursor
     float oldZoom = m_zoom;
     if (event->angleDelta().y() > 0)
@@ -753,6 +1108,12 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
     menu.addAction(tr("Delete"), this, [this]{ deleteSelectedClips(); });
     menu.addSeparator();
 
+    // ── Normalize (shown when clips are selected) ─────────────────────
+    if (!m_selectedClips.isEmpty()) {
+        menu.addAction(tr("Normalize..."), this, [this]{ normalizeSelectedClips(); });
+        menu.addSeparator();
+    }
+
     // ── Punch-In / Punch-Out markers ──────────────────────────────────
     if (m_timeline) {
         int64_t clickSamplePos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
@@ -776,6 +1137,86 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
                 update();
             });
         }
+        menu.addSeparator();
+
+        // ── Marker actions ────────────────────────────────────────────────
+        menu.addAction(tr("Add Marker Here"), this, [this, clickSamplePos]() {
+            bool ok = false;
+            QString name = QInputDialog::getText(
+                this, tr("Add Marker"), tr("Marker name:"),
+                QLineEdit::Normal,
+                QStringLiteral("Marker %1").arg(m_timeline->markerCount() + 1),
+                &ok);
+            if (ok && !name.isEmpty()) {
+                Marker mkr(name, clickSamplePos, Marker::Type::Cue);
+                m_timeline->addMarker(mkr);
+                update();
+            }
+        });
+
+        // Right-click on an existing marker: offer edit/delete
+        for (int i = 0; i < m_timeline->markerCount(); ++i) {
+            int mkrX = sampleToPixel(m_timeline->marker(i).position(), m_scroll, m_zoom);
+            if (qAbs(event->pos().x() - mkrX) <= kMarkerHitRadius) {
+                const int markerIdx = i;
+                menu.addAction(tr("Edit Marker \"%1\"...").arg(m_timeline->marker(i).name()),
+                               this, [this, markerIdx]() {
+                    Marker mkr = m_timeline->marker(markerIdx);
+                    bool ok = false;
+                    QString name = QInputDialog::getText(
+                        this, tr("Edit Marker"), tr("Name:"),
+                        QLineEdit::Normal, mkr.name(), &ok);
+                    if (ok && !name.isEmpty()) {
+                        mkr.setName(name);
+                        m_timeline->setMarker(markerIdx, mkr);
+                        update();
+                    }
+                });
+                menu.addAction(tr("Change Marker Color..."), this, [this, markerIdx]() {
+                    Marker mkr = m_timeline->marker(markerIdx);
+                    QColor color = QColorDialog::getColor(mkr.color(), this, tr("Marker Color"));
+                    if (color.isValid()) {
+                        mkr.setColor(color);
+                        m_timeline->setMarker(markerIdx, mkr);
+                        update();
+                    }
+                });
+                menu.addAction(tr("Delete Marker"), this, [this, markerIdx]() {
+                    m_timeline->removeMarker(markerIdx);
+                    update();
+                });
+                break;
+            }
+        }
+
+        menu.addSeparator();
+
+        // ── Loop region actions ───────────────────────────────────────────
+        menu.addAction(tr("Set Loop Start Here"), this, [this, clickSamplePos]() {
+            m_timeline->setLoopStart(clickSamplePos);
+            if (m_timeline->loopEnd() <= clickSamplePos) {
+                // Auto-set loop end to end of timeline
+                m_timeline->setLoopEnd(m_timeline->duration());
+            }
+            m_timeline->setLoopEnabled(true);
+            update();
+        });
+        menu.addAction(tr("Set Loop End Here"), this, [this, clickSamplePos]() {
+            m_timeline->setLoopEnd(clickSamplePos);
+            if (m_timeline->loopStart() >= clickSamplePos) {
+                m_timeline->setLoopStart(0);
+            }
+            m_timeline->setLoopEnabled(true);
+            update();
+        });
+
+        if (m_timeline->loopEnabled()) {
+            menu.addAction(tr("Clear Loop Region"), this, [this]() {
+                m_timeline->setLoopEnabled(false);
+                update();
+            });
+        }
+
         menu.addSeparator();
     }
 
@@ -909,7 +1350,8 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
 }
 
 void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseColor,
-                                  int clipX, int clipY, int clipW, int clipH)
+                                  int clipX, int clipY, int clipW, int clipH,
+                                  float verticalZoom)
 {
     auto* cache = WaveformCache::instance();
     const WaveformData* waveform = cache->getWaveform(clip->sourcePath());
@@ -993,6 +1435,10 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
                 waveform->rms[static_cast<size_t>(bPrev)] * (1.0 - frac) +
                 waveform->rms[static_cast<size_t>(bNext)] * frac);
         }
+
+        // Apply per-track vertical zoom (visual amplification only)
+        maxPeak *= verticalZoom;
+        maxRms  *= verticalZoom;
 
         // Clamp to [0, 1]
         maxPeak = std::clamp(maxPeak, 0.0f, 1.0f);
@@ -1721,6 +2167,233 @@ void TimelineWidget::zoomToSelection()
     m_zoom = static_cast<float>(width()) / static_cast<float>(maxEnd - minPos);
     m_zoom = qBound(kMinZoom, m_zoom, kMaxZoom);
     update();
+}
+
+// ── Clip Gain Envelope Drawing ───────────────────────────────────────────────
+
+void TimelineWidget::drawGainEnvelope(QPainter& painter, Clip* clip,
+                                      int clipX, int clipY, int clipW, int clipH)
+{
+    const auto& env = clip->gainEnvelope();
+    if (env.isEmpty()) return;
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    int64_t clipDuration = clip->duration();
+    if (clipDuration <= 0) { painter.restore(); return; }
+
+    // Map a dB value to a Y pixel within the clip rect.
+    // +12 dB = top (clipY), -60 dB = bottom (clipY + clipH), 0 dB ~ center
+    auto dbToY = [&](float db) -> int {
+        float clamped = std::clamp(db, kGainEnvelopeMinDb, kGainEnvelopeMaxDb);
+        float frac = (clamped - kGainEnvelopeMinDb)
+                   / (kGainEnvelopeMaxDb - kGainEnvelopeMinDb);
+        return clipY + clipH - static_cast<int>(frac * clipH);
+    };
+
+    // Map a sample offset to an X pixel
+    auto offsetToX = [&](int64_t offset) -> int {
+        double frac = static_cast<double>(offset) / clipDuration;
+        return clipX + static_cast<int>(frac * clipW);
+    };
+
+    // 0 dB reference line Y
+    int zeroDbY = dbToY(0.0f);
+
+    // Build the envelope polyline and fill path
+    QPainterPath curvePath;
+    QPainterPath fillPath;
+
+    bool first = true;
+    for (const auto& pt : env) {
+        int px = offsetToX(pt.offsetSamples);
+        int py = dbToY(pt.gainDb);
+        if (first) {
+            curvePath.moveTo(px, py);
+            fillPath.moveTo(px, zeroDbY);
+            fillPath.lineTo(px, py);
+            first = false;
+        } else {
+            curvePath.lineTo(px, py);
+            fillPath.lineTo(px, py);
+        }
+    }
+
+    // Close fill path back to 0 dB line
+    if (!first) {
+        int lastX = offsetToX(env.last().offsetSamples);
+        fillPath.lineTo(lastX, zeroDbY);
+        fillPath.closeSubpath();
+
+        // Semi-transparent yellow fill between curve and 0 dB line
+        painter.setBrush(kGainEnvelopeFill);
+        painter.setPen(Qt::NoPen);
+        painter.drawPath(fillPath);
+
+        // Draw the curve line
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(kGainEnvelopeColor, 2.0));
+        painter.drawPath(curvePath);
+    }
+
+    // Draw 0 dB reference line (thin dotted)
+    painter.setPen(QPen(QColor(255, 210, 0, 80), 1, Qt::DotLine));
+    painter.drawLine(clipX, zeroDbY, clipX + clipW, zeroDbY);
+
+    // Draw diamond handles at each gain point
+    for (const auto& pt : env) {
+        int px = offsetToX(pt.offsetSamples);
+        int py = dbToY(pt.gainDb);
+
+        if (px < clipX - kGainPointSize || px > clipX + clipW + kGainPointSize)
+            continue;
+
+        // Diamond shape (rotated square)
+        int half = kGainPointSize / 2;
+        QPolygon diamond;
+        diamond << QPoint(px, py - half)
+                << QPoint(px + half, py)
+                << QPoint(px, py + half)
+                << QPoint(px - half, py);
+
+        painter.setBrush(kGainEnvelopeColor);
+        painter.setPen(QPen(kGainEnvelopeColor.darker(130), 1));
+        painter.drawPolygon(diamond);
+    }
+
+    painter.restore();
+}
+
+int TimelineWidget::hitTestGainPoint(Clip* clip, int clipX, int clipW,
+                                     int clipY, int clipH, int x, int y) const
+{
+    const auto& env = clip->gainEnvelope();
+    if (env.isEmpty()) return -1;
+
+    int64_t clipDuration = clip->duration();
+    if (clipDuration <= 0) return -1;
+
+    auto dbToY = [&](float db) -> int {
+        float clamped = std::clamp(db, kGainEnvelopeMinDb, kGainEnvelopeMaxDb);
+        float frac = (clamped - kGainEnvelopeMinDb)
+                   / (kGainEnvelopeMaxDb - kGainEnvelopeMinDb);
+        return clipY + clipH - static_cast<int>(frac * clipH);
+    };
+
+    auto offsetToX = [&](int64_t offset) -> int {
+        double frac = static_cast<double>(offset) / clipDuration;
+        return clipX + static_cast<int>(frac * clipW);
+    };
+
+    for (int i = 0; i < env.size(); ++i) {
+        int px = offsetToX(env[i].offsetSamples);
+        int py = dbToY(env[i].gainDb);
+        int dx = x - px;
+        int dy = y - py;
+        if (dx * dx + dy * dy <= kGainPointHitRadius * kGainPointHitRadius)
+            return i;
+    }
+
+    return -1;
+}
+
+// ── Normalize Selected Clips ────────────────────────────────────────────────
+
+void TimelineWidget::normalizeSelectedClips()
+{
+    if (!m_timeline || m_selectedClips.isEmpty())
+        return;
+
+    // Ask the user for a target level
+    bool ok = false;
+    double targetDb = QInputDialog::getDouble(
+        this, tr("Normalize"), tr("Normalize to (dBFS):"),
+        -0.3, -60.0, 0.0, 1, &ok);
+    if (!ok) return;
+
+    auto* cache = WaveformCache::instance();
+
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            if (!m_selectedClips.contains(c)) continue;
+            Clip* clip = audioTrack->clip(c);
+            if (!clip) continue;
+
+            // Get peak from WaveformCache data
+            const WaveformData* wf = cache->getWaveform(clip->sourcePath());
+            if (!wf || wf->peaks.empty()) continue;
+
+            // Find the peak across all blocks within this clip's source range
+            int blockSize = wf->blockSize;
+            int64_t srcIn = clip->sourceIn();
+            int64_t srcOut = clip->sourceOut();
+            int blk0 = static_cast<int>(srcIn / blockSize);
+            int blk1 = static_cast<int>(srcOut / blockSize);
+            blk0 = std::clamp(blk0, 0, static_cast<int>(wf->peaks.size()) - 1);
+            blk1 = std::clamp(blk1, 0, static_cast<int>(wf->peaks.size()) - 1);
+
+            float peakVal = 0.0f;
+            for (int b = blk0; b <= blk1; ++b) {
+                if (wf->peaks[static_cast<size_t>(b)] > peakVal)
+                    peakVal = wf->peaks[static_cast<size_t>(b)];
+            }
+
+            if (peakVal <= 0.0f) continue;  // silent clip
+
+            // Calculate gain adjustment: targetDb - current peak dB
+            float peakDb = 20.0f * std::log10(peakVal);
+            float gainAdjust = static_cast<float>(targetDb) - peakDb;
+
+            // Apply as linear gain multiplier
+            float currentGain = clip->gain();
+            float currentGainDb = 20.0f * std::log10(std::max(currentGain, 1e-10f));
+            float newGainDb = currentGainDb + gainAdjust;
+            float newGain = std::pow(10.0f, newGainDb / 20.0f);
+            clip->setGain(newGain);
+        }
+    }
+
+    update();
+}
+
+// ── Per-Track Vertical Zoom Helper ──────────────────────────────────────────
+
+float TimelineWidget::verticalZoomForTrack(int trackIndex) const
+{
+    return m_trackVerticalZoom.value(trackIndex, 1.0f);
+}
+
+// ── Freeze Indicator Drawing ────────────────────────────────────────────────
+
+void TimelineWidget::drawFreezeIndicator(QPainter& painter, AudioTrack* track, int yTop)
+{
+    if (!track) return;
+
+    // Check if the DSP chain exists and is bypassed (frozen state from TrackBouncer)
+    // Use the const accessor to avoid lazily creating a DspChain in draw code
+    const DspChain* chain = static_cast<const AudioTrack*>(track)->effectChain();
+    if (!chain || !chain->isBypassed()) return;
+
+    painter.save();
+
+    // Draw a slight blue tint over the frozen track lane
+    QColor frozenTint(120, 180, 255, 20);
+    painter.fillRect(0, yTop, width(), kTrackHeight, frozenTint);
+
+    // Draw snowflake icon in the top-right corner of the track lane
+    QFont freezeFont = font();
+    freezeFont.setPointSize(14);
+    painter.setFont(freezeFont);
+    painter.setPen(kFreezeColor);
+    // Snowflake character U+2744
+    painter.drawText(width() - 24, yTop + 18, QString::fromUtf8("\xe2\x9d\x84"));
+
+    painter.restore();
 }
 
 } // namespace dawcast::widgets

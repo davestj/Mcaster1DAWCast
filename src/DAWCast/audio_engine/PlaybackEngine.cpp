@@ -6,6 +6,7 @@
 #include "AudioEngine.h"
 #include "AudioMixer.h"
 #include "AudioClipReader.h"
+#include "BusRouter.h"
 #include "Metronome.h"
 #include "MultitrackRecorder.h"
 #include "../broadcast/RTMPStreamer.h"
@@ -90,6 +91,11 @@ void PlaybackEngine::setRecorder(MultitrackRecorder* recorder)
 void PlaybackEngine::setRTMPStreamer(RTMPStreamer* streamer)
 {
     m_rtmpStreamer = streamer;
+}
+
+void PlaybackEngine::setBusRouter(BusRouter* router)
+{
+    m_busRouter = router;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +199,11 @@ void PlaybackEngine::processBlock(int frames, int channels,
     // This only reallocates on the very first call or if buffer size changes.
     ensureTrackBuffers(frames, channels);
 
+    // Clear all bus buffers for this block
+    if (m_busRouter) {
+        m_busRouter->clearAll(frames, channels);
+    }
+
     const int totalSamples = frames * channels;
 
     // Process each audio track: read clips, apply DSP, feed mixer strip
@@ -240,6 +251,12 @@ void PlaybackEngine::processBlock(int frames, int channels,
             }
         }
 
+        // Route through bus system if available
+        if (m_busRouter) {
+            m_busRouter->routeTrack(static_cast<int>(&tp - m_tracks.data()),
+                                    tp.buffer.data(), frames, channels);
+        }
+
         // Set up the AudioBuffer struct pointing to this track's data
         tp.audioBuf.data       = tp.buffer.data();
         tp.audioBuf.frames     = frames;
@@ -248,6 +265,11 @@ void PlaybackEngine::processBlock(int frames, int channels,
 
         // Point the mixer strip to this track's buffer
         m_mixer->setStripBuffer(tp.mixerStrip, &tp.audioBuf);
+    }
+
+    // ── Bus routing: process all buses after track audio is routed ──
+    if (m_busRouter) {
+        m_busRouter->processAll(frames, channels);
     }
 
     // ── Metronome: mix click track into the first active strip buffer ──
@@ -284,8 +306,18 @@ void PlaybackEngine::processBlock(int frames, int channels,
         }
     }
 
-    // Advance the playhead. The GUI-thread timer will detect end-of-timeline.
-    m_playheadPos.store(pos + frames, std::memory_order_release);
+    // Advance the playhead. If loop is enabled and we've passed loopEnd,
+    // wrap back to loopStart atomically on the audio thread.
+    int64_t newPos = pos + frames;
+    if (m_timeline) {
+        bool loopEnabled = m_timeline->loopEnabled();
+        int64_t loopStart = m_timeline->loopStart();
+        int64_t loopEnd   = m_timeline->loopEnd();
+        if (loopEnabled && loopEnd > loopStart && newPos >= loopEnd) {
+            newPos = loopStart + (newPos - loopEnd);
+        }
+    }
+    m_playheadPos.store(newPos, std::memory_order_release);
 }
 
 // ---------------------------------------------------------------------------

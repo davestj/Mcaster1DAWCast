@@ -8,11 +8,14 @@
 #include <QList>
 #include <cstdint>
 
+#include "Marker.h"
+
 namespace dawcast {
 
 class AudioTrack;
 class VideoTrack;
 class MidiTrack;
+class TrackGroup;
 
 class Timeline : public QObject
 {
@@ -51,10 +54,57 @@ public:
     [[nodiscard]] bool punchInEnabled()  const { return m_punchInEnabled; }
     [[nodiscard]] bool punchOutEnabled() const { return m_punchOutEnabled; }
 
+    // ── Marker system ─────────────────────────────────────────────────
+    void addMarker(const Marker& marker);
+    void removeMarker(int index);
+    void setMarker(int index, const Marker& marker);
+    [[nodiscard]] int markerCount() const { return m_markers.size(); }
+    [[nodiscard]] const Marker& marker(int index) const;
+    [[nodiscard]] QList<Marker>& markers() { return m_markers; }
+    [[nodiscard]] const QList<Marker>& markers() const { return m_markers; }
+
+    /// Sort markers by position (ascending).
+    void sortMarkers();
+
+    /// Find the index of the marker immediately before @a position,
+    /// or -1 if none exists.
+    [[nodiscard]] int previousMarkerIndex(int64_t position) const;
+
+    /// Find the index of the marker immediately after @a position,
+    /// or -1 if none exists.
+    [[nodiscard]] int nextMarkerIndex(int64_t position) const;
+
+    // ── Track groups (folders) ────────────────────────────────────────
+    TrackGroup* addTrackGroup(const QString& name);
+    void removeTrackGroup(int index);
+    [[nodiscard]] QList<TrackGroup*> trackGroups() const { return m_trackGroups; }
+    [[nodiscard]] int trackGroupCount() const { return m_trackGroups.size(); }
+    [[nodiscard]] TrackGroup* trackGroup(int index) const;
+
+    /// Move a track into a group (or out of any group if group is nullptr).
+    void moveTrackToGroup(int trackIndex, TrackGroup* group);
+
+    /// Find which group a track belongs to (nullptr if ungrouped).
+    [[nodiscard]] TrackGroup* groupForTrack(QObject* track) const;
+
+    // ── Loop region ───────────────────────────────────────────────────
+    void setLoopStart(int64_t samples);
+    void setLoopEnd(int64_t samples);
+    void setLoopEnabled(bool enabled);
+
+    [[nodiscard]] int64_t loopStart()   const { return m_loopStart; }
+    [[nodiscard]] int64_t loopEnd()     const { return m_loopEnd; }
+    [[nodiscard]] bool    loopEnabled() const { return m_loopEnabled; }
+
 signals:
     void trackAdded(int index);
     void trackRemoved(int index);
     void playheadChanged(int64_t samples);
+    void markersChanged();
+    void loopChanged();
+    void trackGroupAdded(int index);
+    void trackGroupRemoved(int index);
+    void trackGroupChanged();
 
 private:
     QList<QObject*> m_tracks;  // Mix of AudioTrack*, VideoTrack*, and MidiTrack*
@@ -67,6 +117,17 @@ private:
     int64_t m_punchOut       = 0;
     bool    m_punchInEnabled = false;
     bool    m_punchOutEnabled = false;
+
+    // Markers
+    QList<Marker> m_markers;
+
+    // Track groups
+    QList<TrackGroup*> m_trackGroups;
+
+    // Loop region
+    int64_t m_loopStart   = 0;
+    int64_t m_loopEnd     = 0;
+    bool    m_loopEnabled = false;
 };
 
 } // namespace dawcast

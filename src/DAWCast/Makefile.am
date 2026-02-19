@@ -164,6 +164,12 @@ moc_TrackBouncer.cpp: $(srcdir)/audio_engine/TrackBouncer.h
 moc_Metronome.cpp: $(srcdir)/audio_engine/Metronome.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_AudioBus.cpp: $(srcdir)/audio_engine/AudioBus.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_BusRouter.cpp: $(srcdir)/audio_engine/BusRouter.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- video_engine --
 moc_VideoDecoder.cpp: $(srcdir)/video_engine/VideoDecoder.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -206,6 +212,9 @@ moc_MidiClip.cpp: $(srcdir)/timeline/MidiClip.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 moc_MidiTrack.cpp: $(srcdir)/timeline/MidiTrack.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_TrackGroup.cpp: $(srcdir)/timeline/TrackGroup.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # -- plugins --
@@ -417,6 +426,9 @@ moc_StreamMonitorPanel.cpp: $(srcdir)/widgets/StreamMonitorPanel.h
 moc_TrackColorDialog.cpp: $(srcdir)/widgets/TrackColorDialog.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_MarkerListWidget.cpp: $(srcdir)/widgets/MarkerListWidget.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -489,6 +501,10 @@ mcaster1dawcast_SOURCES = \
     audio_engine/BatchEncoder.cpp \
     audio_engine/Metronome.h \
     audio_engine/Metronome.cpp \
+    audio_engine/AudioBus.h \
+    audio_engine/AudioBus.cpp \
+    audio_engine/BusRouter.h \
+    audio_engine/BusRouter.cpp \
     video_engine/VideoDecoder.h \
     video_engine/VideoDecoder.cpp \
     video_engine/VideoEncoder.h \
@@ -527,6 +543,8 @@ mcaster1dawcast_SOURCES = \
     timeline/MidiClip.cpp \
     timeline/MidiTrack.h \
     timeline/MidiTrack.cpp \
+    timeline/TrackGroup.h \
+    timeline/TrackGroup.cpp \
     dsp/DspChain.h \
     dsp/DspChain.cpp \
     dsp/Biquad.h \
@@ -717,6 +735,8 @@ mcaster1dawcast_SOURCES = \
     widgets/StreamMonitorPanel.cpp \
     widgets/TrackColorDialog.h \
     widgets/TrackColorDialog.cpp \
+    widgets/MarkerListWidget.h \
+    widgets/MarkerListWidget.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -760,6 +780,8 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
     moc_Metronome.cpp \
+    moc_AudioBus.cpp \
+    moc_BusRouter.cpp \
     moc_MultitrackRecorder.cpp \
     moc_TrackBouncer.cpp \
     moc_ExportEngine.cpp \
@@ -778,6 +800,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_Automation.cpp \
     moc_MidiClip.cpp \
     moc_MidiTrack.cpp \
+    moc_TrackGroup.cpp \
     moc_PluginScanner.cpp \
     moc_PluginHost.cpp \
     moc_DspChain.cpp \
@@ -844,6 +867,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_PedalboardWidget.cpp \
     moc_StreamMonitorPanel.cpp \
     moc_TrackColorDialog.cpp \
+    moc_MarkerListWidget.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \
@@ -864,6 +888,8 @@ BUILT_SOURCES = \
     moc_WaveformCache.cpp \
     moc_PlaybackEngine.cpp \
     moc_Metronome.cpp \
+    moc_AudioBus.cpp \
+    moc_BusRouter.cpp \
     moc_MultitrackRecorder.cpp \
     moc_TrackBouncer.cpp \
     moc_ExportEngine.cpp \
@@ -882,6 +908,7 @@ BUILT_SOURCES = \
     moc_Automation.cpp \
     moc_MidiClip.cpp \
     moc_MidiTrack.cpp \
+    moc_TrackGroup.cpp \
     moc_PluginScanner.cpp \
     moc_PluginHost.cpp \
     moc_DspChain.cpp \
@@ -948,6 +975,7 @@ BUILT_SOURCES = \
     moc_PedalboardWidget.cpp \
     moc_StreamMonitorPanel.cpp \
     moc_TrackColorDialog.cpp \
+    moc_MarkerListWidget.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \

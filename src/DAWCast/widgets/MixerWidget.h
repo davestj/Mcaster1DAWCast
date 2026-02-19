@@ -5,10 +5,13 @@
 
 #include <QWidget>
 #include <QHBoxLayout>
+#include <QList>
 
 class QFrame;
 
 namespace dawcast { class AudioMixer; }
+namespace dawcast { class BusRouter; }
+namespace dawcast { class AudioBus; }
 
 namespace dawcast::widgets {
 
@@ -20,18 +23,29 @@ public:
     ~MixerWidget() override;
 
     void setMixer(AudioMixer* mixer);
+    void setBusRouter(BusRouter* router);
     void addStrip();
     void removeStrip(int index);
 
     int stripCount() const;
 
+    /// Rebuild bus strips from the current BusRouter state.
+    void rebuildBusStrips();
+
+signals:
+    void sendLevelChanged(int trackIndex, int busIndex, float level);
+    void busEffectsRequested(int busIndex);
+
 private:
-    AudioMixer* m_mixer = nullptr;
+    AudioMixer*  m_mixer     = nullptr;
+    BusRouter*   m_busRouter = nullptr;
     int m_stripCount = 0;
 
-    QHBoxLayout* m_stripLayout  = nullptr;
-    QFrame*      m_masterSeparator = nullptr;
-    QWidget*     m_masterStrip  = nullptr;
+    QHBoxLayout* m_stripLayout      = nullptr;
+    QFrame*      m_masterSeparator  = nullptr;
+    QWidget*     m_masterStrip      = nullptr;
+    QFrame*      m_busSeparator     = nullptr;
+    QList<QWidget*> m_busStripWidgets;
 };
 
 } // namespace dawcast::widgets

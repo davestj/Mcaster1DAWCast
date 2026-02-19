@@ -55,6 +55,7 @@ class PianoRollWidget;
 class ScriptReaderPanel;
 class PedalboardWidget;
 class StreamMonitorPanel;
+class MarkerListWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -206,6 +207,7 @@ private:
     QDockWidget* m_scriptReaderDock  = nullptr;
     QDockWidget* m_pedalboardDock    = nullptr;
     QDockWidget* m_streamMonitorDock = nullptr;
+    QDockWidget* m_markerListDock   = nullptr;
 
     // Mode-specific widget contents
     ChapterWidget*       m_chapterWidget     = nullptr;
@@ -215,6 +217,7 @@ private:
     ScriptReaderPanel*   m_scriptReader      = nullptr;
     PedalboardWidget*    m_pedalboard        = nullptr;
     StreamMonitorPanel*  m_streamMonitor     = nullptr;
+    MarkerListWidget*    m_markerList        = nullptr;
 
     // View menu toggle actions (to sync checkmarks with dock visibility)
     QAction* m_actToggleMixer        = nullptr;
@@ -223,6 +226,7 @@ private:
     QAction* m_actToggleEffectsRack  = nullptr;
     QAction* m_actToggleLUFS         = nullptr;
     QAction* m_actToggleAI           = nullptr;
+    QAction* m_actToggleMarkerList   = nullptr;
 
     // Recent files menu
     QMenu*          m_recentFilesMenu = nullptr;

@@ -7,6 +7,7 @@
 #include <QString>
 #include <QColor>
 
+class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSlider;
@@ -38,6 +39,8 @@ public:
     void setRecordArmed(bool armed);
     void setMuted(bool muted);
     void setSolo(bool solo);
+    void setVerticalZoom(float zoom);
+    void setFrozen(bool frozen);
 
     QString trackName() const;
     QColor  trackColor() const;
@@ -47,6 +50,8 @@ public:
     bool    isSolo() const;
     float   volume() const;
     float   pan() const;
+    float   verticalZoom() const;
+    bool    isFrozen() const;
 
 signals:
     void recordArmToggled(bool armed);
@@ -63,6 +68,8 @@ signals:
     void colorChangeRequested(int trackIndex);
     void bounceRequested(int trackIndex);
     void freezeRequested(int trackIndex);
+    void createGroupRequested(int trackIndex);
+    void moveToGroupRequested(int trackIndex, const QString& groupName);
 
 private:
     void buildUI();
@@ -77,8 +84,10 @@ private:
     bool    m_recordArmed = false;
     bool    m_muted       = false;
     bool    m_solo        = false;
+    bool    m_frozen      = false;
     float   m_volume      = 0.0f;   // dB: -60 to +6
     float   m_pan         = 0.0f;   // -100 to +100
+    float   m_verticalZoom = 1.0f;  // 0.25 to 4.0
 
     // Widgets we need to access after construction
     QLineEdit*   m_nameEdit   = nullptr;
@@ -94,6 +103,8 @@ private:
     QSlider*     m_volumeSlider = nullptr;
     QSlider*     m_panSlider    = nullptr;
     QWidget*     m_colorDot     = nullptr;
+    QLabel*      m_freezeLabel  = nullptr;   // snowflake indicator
+    QLabel*      m_zoomLabel    = nullptr;   // vertical zoom factor label
 };
 
 } // namespace dawcast::widgets

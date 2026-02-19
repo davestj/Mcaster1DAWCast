@@ -8,6 +8,7 @@
 #include "MidiTrack.h"
 #include "MidiClip.h"
 #include "Clip.h"
+#include "TrackGroup.h"
 
 #include <algorithm>
 
@@ -51,6 +52,12 @@ void Timeline::removeTrack(int index)
 {
     if (index < 0 || index >= m_tracks.size()) return;
     auto* track = m_tracks.takeAt(index);
+
+    // Remove from any group it belongs to
+    for (auto* group : m_trackGroups) {
+        group->removeTrack(track);
+    }
+
     track->deleteLater();
     emit trackRemoved(index);
 }
@@ -129,6 +136,147 @@ void Timeline::setPlayhead(int64_t samples)
 int64_t Timeline::playhead() const
 {
     return m_playhead;
+}
+
+// ── Marker system ─────────────────────────────────────────────────────────
+
+void Timeline::addMarker(const Marker& marker)
+{
+    m_markers.append(marker);
+    sortMarkers();
+    emit markersChanged();
+}
+
+void Timeline::removeMarker(int index)
+{
+    if (index < 0 || index >= m_markers.size()) return;
+    m_markers.removeAt(index);
+    emit markersChanged();
+}
+
+void Timeline::setMarker(int index, const Marker& marker)
+{
+    if (index < 0 || index >= m_markers.size()) return;
+    m_markers[index] = marker;
+    emit markersChanged();
+}
+
+static const Marker kNullMarker;
+
+const Marker& Timeline::marker(int index) const
+{
+    if (index < 0 || index >= m_markers.size()) return kNullMarker;
+    return m_markers.at(index);
+}
+
+void Timeline::sortMarkers()
+{
+    std::sort(m_markers.begin(), m_markers.end(),
+              [](const Marker& a, const Marker& b) {
+        return a.position() < b.position();
+    });
+}
+
+int Timeline::previousMarkerIndex(int64_t position) const
+{
+    int result = -1;
+    for (int i = 0; i < m_markers.size(); ++i) {
+        if (m_markers[i].position() < position) {
+            result = i;
+        } else {
+            break;  // markers are sorted
+        }
+    }
+    return result;
+}
+
+int Timeline::nextMarkerIndex(int64_t position) const
+{
+    for (int i = 0; i < m_markers.size(); ++i) {
+        if (m_markers[i].position() > position) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// ── Loop region ───────────────────────────────────────────────────────────
+
+void Timeline::setLoopStart(int64_t samples)
+{
+    if (m_loopStart != samples) {
+        m_loopStart = samples;
+        emit loopChanged();
+    }
+}
+
+void Timeline::setLoopEnd(int64_t samples)
+{
+    if (m_loopEnd != samples) {
+        m_loopEnd = samples;
+        emit loopChanged();
+    }
+}
+
+void Timeline::setLoopEnabled(bool enabled)
+{
+    if (m_loopEnabled != enabled) {
+        m_loopEnabled = enabled;
+        emit loopChanged();
+    }
+}
+
+// ── Track groups (folders) ────────────────────────────────────────────────
+
+TrackGroup* Timeline::addTrackGroup(const QString& name)
+{
+    auto* group = new TrackGroup(name, this);
+    m_trackGroups.append(group);
+    int idx = m_trackGroups.size() - 1;
+    emit trackGroupAdded(idx);
+    return group;
+}
+
+void Timeline::removeTrackGroup(int index)
+{
+    if (index < 0 || index >= m_trackGroups.size()) return;
+    auto* group = m_trackGroups.takeAt(index);
+    group->deleteLater();
+    emit trackGroupRemoved(index);
+}
+
+TrackGroup* Timeline::trackGroup(int index) const
+{
+    if (index < 0 || index >= m_trackGroups.size()) return nullptr;
+    return m_trackGroups.at(index);
+}
+
+void Timeline::moveTrackToGroup(int trackIndex, TrackGroup* group)
+{
+    QObject* trackObj = track(trackIndex);
+    if (!trackObj) return;
+
+    // Remove from any existing group
+    for (auto* g : m_trackGroups) {
+        g->removeTrack(trackObj);
+    }
+
+    // Add to new group
+    if (group) {
+        group->addTrack(trackObj);
+    }
+
+    emit trackGroupChanged();
+}
+
+TrackGroup* Timeline::groupForTrack(QObject* trackObj) const
+{
+    for (auto* g : m_trackGroups) {
+        if (g->containsTrack(trackObj)) {
+            return g;
+        }
+    }
+    return nullptr;
 }
 
 } // namespace dawcast

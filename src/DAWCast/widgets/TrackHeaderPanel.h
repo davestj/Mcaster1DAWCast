@@ -5,12 +5,14 @@
 
 #include <QWidget>
 #include <QList>
+#include <QSet>
 
 class QVBoxLayout;
 class QScrollArea;
 class QScrollBar;
 
 namespace dawcast { class Timeline; }
+namespace dawcast { class TrackGroup; }
 
 namespace dawcast::widgets {
 
@@ -46,6 +48,8 @@ signals:
     void addTrackRequested();
     void eqRequested(int trackIndex);
     void settingsRequested(int trackIndex);
+    void createGroupRequested();
+    void groupCollapseToggled(int groupIndex, bool collapsed);
 
 public slots:
     /// Rebuild the list of track headers from the current Timeline model.
@@ -57,6 +61,7 @@ private:
     QWidget*       m_headerStack  = nullptr;
     QVBoxLayout*   m_stackLayout  = nullptr;
     QList<TrackHeaderWidget*> m_headers;
+    QList<QWidget*>           m_groupWidgets;
 };
 
 } // namespace dawcast::widgets

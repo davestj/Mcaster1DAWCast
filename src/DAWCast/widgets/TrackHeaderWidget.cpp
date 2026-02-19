@@ -13,6 +13,8 @@
 #include <QMenu>
 #include <QToolTip>
 
+#include <algorithm>
+
 namespace dawcast::widgets {
 
 namespace {
@@ -74,6 +76,15 @@ void TrackHeaderWidget::buildUI()
         QStringLiteral("background-color: %1; border-radius: 2px;").arg(m_trackColor.name()));
     row1->addWidget(m_colorDot);
 
+    // Freeze indicator (snowflake) — hidden by default
+    m_freezeLabel = new QLabel(QString::fromUtf8("\xe2\x9d\x84"), this);  // U+2744 snowflake
+    m_freezeLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: #78b4ff; font-size: 12px; padding: 0; }"));
+    m_freezeLabel->setToolTip(tr("Frozen"));
+    m_freezeLabel->setFixedWidth(16);
+    m_freezeLabel->setVisible(false);
+    row1->addWidget(m_freezeLabel);
+
     // Editable track name
     m_nameEdit = new QLineEdit(this);
     m_nameEdit->setPlaceholderText(tr("Track Name"));
@@ -98,6 +109,14 @@ void TrackHeaderWidget::buildUI()
     m_menuBtn->setStyleSheet(kBtnBase +
         QStringLiteral(" QPushButton { font-size: 8px; padding: 0; }"));
     row1->addWidget(m_menuBtn);
+
+    // Vertical waveform zoom indicator — hidden at 1.0x
+    m_zoomLabel = new QLabel(this);
+    m_zoomLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: #99a; font-size: 8px; padding: 0 2px; }"));
+    m_zoomLabel->setFixedWidth(30);
+    m_zoomLabel->setVisible(false);
+    row1->addWidget(m_zoomLabel);
 
     connect(m_menuBtn, &QPushButton::clicked, this, &TrackHeaderWidget::showTrackMenu);
 
@@ -307,11 +326,21 @@ void TrackHeaderWidget::showTrackMenu()
     menu.addAction(tr("Duplicate Track"));
     menu.addAction(tr("Delete Track"));
     menu.addSeparator();
-    menu.addAction(tr("Freeze Track"), this, [this]() {
-        emit freezeRequested(m_trackIndex);
-    });
+    if (m_frozen) {
+        menu.addAction(tr("Unfreeze Track"), this, [this]() {
+            emit freezeRequested(m_trackIndex);
+        });
+    } else {
+        menu.addAction(tr("Freeze Track"), this, [this]() {
+            emit freezeRequested(m_trackIndex);
+        });
+    }
     menu.addAction(tr("Bounce to Audio"), this, [this]() {
         emit bounceRequested(m_trackIndex);
+    });
+    menu.addSeparator();
+    menu.addAction(tr("Create Group from Track"), this, [this]() {
+        emit createGroupRequested(m_trackIndex);
     });
 
     menu.exec(m_menuBtn->mapToGlobal(QPoint(0, m_menuBtn->height())));
@@ -360,6 +389,35 @@ void TrackHeaderWidget::setSolo(bool solo)
         m_soloBtn->setChecked(solo);
 }
 
+void TrackHeaderWidget::setVerticalZoom(float zoom)
+{
+    m_verticalZoom = std::clamp(zoom, 0.25f, 4.0f);
+    if (m_zoomLabel) {
+        // Show the label only when zoom differs from 1.0x
+        bool showZoom = (m_verticalZoom < 0.99f || m_verticalZoom > 1.01f);
+        m_zoomLabel->setVisible(showZoom);
+        if (showZoom) {
+            m_zoomLabel->setText(QStringLiteral("%1x").arg(
+                static_cast<double>(m_verticalZoom), 0, 'f', 1));
+        }
+    }
+}
+
+void TrackHeaderWidget::setFrozen(bool frozen)
+{
+    m_frozen = frozen;
+
+    // Show/hide the snowflake indicator
+    if (m_freezeLabel)
+        m_freezeLabel->setVisible(frozen);
+
+    // Dim the EQ and settings buttons when frozen (effects are bypassed)
+    if (m_eqBtn)
+        m_eqBtn->setEnabled(!frozen);
+    if (m_settingsBtn)
+        m_settingsBtn->setEnabled(!frozen);
+}
+
 QString TrackHeaderWidget::trackName() const { return m_trackName; }
 QColor  TrackHeaderWidget::trackColor() const { return m_trackColor; }
 int     TrackHeaderWidget::trackIndex() const { return m_trackIndex; }
@@ -368,5 +426,7 @@ bool    TrackHeaderWidget::isMuted() const { return m_muted; }
 bool    TrackHeaderWidget::isSolo() const { return m_solo; }
 float   TrackHeaderWidget::volume() const { return m_volume; }
 float   TrackHeaderWidget::pan() const { return m_pan; }
+float   TrackHeaderWidget::verticalZoom() const { return m_verticalZoom; }
+bool    TrackHeaderWidget::isFrozen() const { return m_frozen; }
 
 } // namespace dawcast::widgets

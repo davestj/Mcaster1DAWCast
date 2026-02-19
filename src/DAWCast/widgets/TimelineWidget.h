@@ -4,6 +4,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QHash>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -72,6 +73,7 @@ signals:
     void automationPointMoved(int trackIndex, const QString& param, int pointIndex, int64_t time, float value);
     void automationPointRemoved(int trackIndex, const QString& param, int pointIndex);
     void snapModeChanged(SnapMode mode);
+    void gainEnvelopeChanged(int trackIndex, int clipIndex);
 
 private slots:
     void onWaveformReady(const QString& filePath);
@@ -90,11 +92,23 @@ protected:
 private:
     void drawRuler(QPainter& painter, int viewWidth);
     void drawPunchMarkers(QPainter& painter, int viewHeight);
+    void drawMarkers(QPainter& painter, int viewWidth, int viewHeight);
+    void drawLoopRegion(QPainter& painter, int viewWidth, int viewHeight);
     void drawClip(QPainter& painter, Clip* clip, int trackIndex, int clipIndex, int yTop);
     void drawWaveform(QPainter& painter, Clip* clip, const QColor& baseColor,
-                      int clipX, int clipY, int clipW, int clipH);
+                      int clipX, int clipY, int clipW, int clipH,
+                      float verticalZoom = 1.0f);
+    void drawGainEnvelope(QPainter& painter, Clip* clip, int clipX, int clipY,
+                          int clipW, int clipH);
     void drawMidiClip(QPainter& painter, MidiClip* clip, int trackIndex, int clipIndex, int yTop);
     void drawAutomation(QPainter& painter, AudioTrack* track, int trackIndex);
+    void drawFreezeIndicator(QPainter& painter, AudioTrack* track, int yTop);
+
+    // Gain envelope mouse interaction helpers
+    int  hitTestGainPoint(Clip* clip, int clipX, int clipW, int clipY, int clipH,
+                          int x, int y) const;
+    void normalizeSelectedClips();
+    float verticalZoomForTrack(int trackIndex) const;
 
     // Automation point hit-testing
     int  hitTestAutomationPoint(int trackIndex, int x, int y) const;
@@ -127,6 +141,21 @@ private:
 
     // ── Snap-to-Grid ───────────────────────────────────────────────────
     SnapMode        m_snapMode = SnapOff;
+
+    // ── Marker dragging ───────────────────────────────────────────────
+    int             m_draggingMarkerIdx = -1;    // Index of marker being dragged (-1 = none)
+    bool            m_draggingLoopStart = false;
+    bool            m_draggingLoopEnd   = false;
+
+    // ── Gain Envelope Editing ────────────────────────────────────────
+    bool            m_draggingGainPoint = false;
+    int             m_gainPointIndex = -1;     // Index of the gain point being dragged
+    Clip*           m_gainPointClip = nullptr;  // Clip whose gain point is being dragged
+    int             m_gainPointTrack = -1;
+    int             m_gainPointClipIndex = -1;
+
+    // ── Per-track vertical waveform zoom ─────────────────────────────
+    QHash<int, float> m_trackVerticalZoom;  // trackIndex -> zoom factor (default 1.0)
 
     // ── Clipboard ──────────────────────────────────────────────────────
     struct ClipData {

@@ -28,4 +28,30 @@ void Marker::setType(Type type)
     m_type = type;
 }
 
+void Marker::setColor(const QColor& color)
+{
+    m_color = color;
+}
+
+void Marker::setComment(const QString& comment)
+{
+    m_comment = comment;
+}
+
+void Marker::setEndPosition(int64_t endPosition)
+{
+    m_endPosition = endPosition;
+}
+
+QString Marker::typeName(Type type)
+{
+    switch (type) {
+    case Type::Chapter: return QStringLiteral("Chapter");
+    case Type::Cue:     return QStringLiteral("Cue");
+    case Type::Loop:    return QStringLiteral("Loop");
+    case Type::Region:  return QStringLiteral("Region");
+    }
+    return QStringLiteral("Unknown");
+}
+
 } // namespace dawcast

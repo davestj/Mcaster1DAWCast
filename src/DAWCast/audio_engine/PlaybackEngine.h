@@ -19,6 +19,7 @@ class AudioEngine;
 class AudioMixer;
 class AudioTrack;
 class AudioClipReader;
+class BusRouter;
 class Clip;
 class Metronome;
 class MultitrackRecorder;
@@ -55,6 +56,10 @@ public:
 
     /// Accessor for the built-in metronome / click track.
     [[nodiscard]] Metronome* metronome() const { return m_metronome; }
+
+    /// Set the bus router for bus-based audio routing.
+    void setBusRouter(BusRouter* router);
+    [[nodiscard]] BusRouter* busRouter() const { return m_busRouter; }
 
     void play();
     void pause();
@@ -100,6 +105,7 @@ private:
     Timeline*            m_timeline      = nullptr;
     AudioEngine*         m_audioEngine   = nullptr;
     AudioMixer*          m_mixer         = nullptr;
+    BusRouter*           m_busRouter     = nullptr;
     Metronome*           m_metronome     = nullptr;
     MultitrackRecorder*  m_recorder      = nullptr;
     RTMPStreamer*         m_rtmpStreamer  = nullptr;
