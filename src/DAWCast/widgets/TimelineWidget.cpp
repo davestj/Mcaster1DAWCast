@@ -14,7 +14,9 @@
 #include "Clip.h"
 #include "Marker.h"
 #include "Automation.h"
+#include "TimelineCommands.h"
 #include "../audio_engine/WaveformCache.h"
+#include "../core/UndoManager.h"
 #include "../dsp/DspChain.h"
 
 #include <QPainter>
@@ -281,6 +283,9 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
 
     // --- Markers ---
     drawMarkers(p, w, h);
+
+    // --- Ripple mode indicator ---
+    drawRippleIndicator(p, w);
 
     // --- Rubber-band selection ---
     if (m_dragging && !m_rubberBand.isNull()) {
@@ -824,6 +829,28 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
                 }
             }
 
+            // ── Slip Editing (Cmd+Alt drag inside a clip) ───────────
+            if ((event->modifiers() & (Qt::ControlModifier | Qt::AltModifier))
+                == (Qt::ControlModifier | Qt::AltModifier)
+                && audioTrack && event->button() == Qt::LeftButton) {
+                int64_t clickSampleSlip = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+                for (int c = 0; c < audioTrack->clipCount(); ++c) {
+                    Clip* clip = audioTrack->clip(c);
+                    if (!clip) continue;
+                    if (clickSampleSlip >= clip->timelinePosition()
+                        && clickSampleSlip < clip->endPosition()) {
+                        m_slipEditing = true;
+                        m_slipClip = clip;
+                        m_slipTrackIndex = trackIdx;
+                        m_slipStartSourceIn = clip->sourceIn();
+                        m_slipDragOrigin = event->pos();
+                        setCursor(Qt::SizeHorCursor);
+                        update();
+                        return;
+                    }
+                }
+            }
+
             // ── Gain Envelope Editing (Alt+click on clip) ───────────
             if ((event->modifiers() & Qt::AltModifier) && audioTrack) {
                 int64_t clickSampleGE = pixelToSample(event->pos().x(), m_scroll, m_zoom);
@@ -914,6 +941,27 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
 
 void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    // ── Slip editing drag ────────────────────────────────────────────
+    if (m_slipEditing && m_slipClip) {
+        int dx = event->pos().x() - m_slipDragOrigin.x();
+        // Convert pixel delta to sample delta
+        int64_t sampleDelta = static_cast<int64_t>(dx / static_cast<double>(m_zoom));
+        int64_t clipDuration = m_slipClip->duration();
+
+        // Calculate new sourceIn: shift source window by the drag delta
+        int64_t newSourceIn = m_slipStartSourceIn - sampleDelta;
+        if (newSourceIn < 0) newSourceIn = 0;
+
+        // Keep the clip's visible duration the same
+        int64_t newSourceOut = newSourceIn + clipDuration;
+
+        m_slipClip->setSourceIn(newSourceIn);
+        m_slipClip->setSourceOut(newSourceOut);
+
+        update();
+        return;
+    }
+
     if (m_dragging) {
         // Gain envelope point drag
         if (m_draggingGainPoint && m_gainPointClip && m_gainPointIndex >= 0) {
@@ -1040,6 +1088,14 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent* event)
         m_timeline->sortMarkers();
     }
 
+    // End slip editing
+    if (m_slipEditing) {
+        m_slipEditing = false;
+        m_slipClip = nullptr;
+        m_slipTrackIndex = -1;
+        setCursor(Qt::ArrowCursor);
+    }
+
     m_dragging = false;
     m_draggingAuto = false;
     m_draggingAutoPoint = -1;
@@ -1106,6 +1162,10 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
     menu.addAction(tr("Paste"), this, [this]{ pasteClips(); });
     menu.addSeparator();
     menu.addAction(tr("Delete"), this, [this]{ deleteSelectedClips(); });
+    menu.addSeparator();
+
+    // ── Split at Playhead ────────────────────────────────────────────
+    menu.addAction(tr("Split at Playhead"), this, [this]{ splitAtPlayhead(); });
     menu.addSeparator();
 
     // ── Normalize (shown when clips are selected) ─────────────────────
@@ -2048,6 +2108,28 @@ void TimelineWidget::pasteClips()
     int64_t playhead = m_timeline->playhead();
     int trackCount = m_timeline->trackCount();
 
+    // In ripple mode, calculate total paste duration to shift clips first
+    if (m_rippleMode) {
+        // Find the max extent of the pasted content per track
+        QHash<int, int64_t> trackPasteDurations;
+        for (const ClipData& cd : std::as_const(m_clipboard)) {
+            int64_t clipDur = cd.sourceOut - cd.sourceIn;
+            int64_t clipEnd = cd.relativePosition + clipDur;
+            if (!trackPasteDurations.contains(cd.trackIndex)
+                || clipEnd > trackPasteDurations[cd.trackIndex]) {
+                trackPasteDurations[cd.trackIndex] = clipEnd;
+            }
+        }
+
+        for (auto it = trackPasteDurations.begin(); it != trackPasteDurations.end(); ++it) {
+            int trackIdx = it.key();
+            if (trackIdx < 0 || trackIdx >= trackCount) continue;
+            auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(trackIdx));
+            if (!audioTrack) continue;
+            rippleShift(audioTrack, playhead, it.value());
+        }
+    }
+
     for (const ClipData& cd : std::as_const(m_clipboard)) {
         int targetTrack = cd.trackIndex;
         if (targetTrack < 0 || targetTrack >= trackCount) {
@@ -2090,16 +2172,37 @@ void TimelineWidget::deleteSelectedClips()
         auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
         if (!audioTrack) continue;
 
-        // Remove in reverse order to keep indices valid
+        // Collect indices and ripple info before removal
         QList<int> toRemove;
         for (int c = 0; c < audioTrack->clipCount(); ++c) {
             if (m_selectedClips.contains(c))
                 toRemove.append(c);
         }
 
+        if (toRemove.isEmpty()) continue;
+
+        // For ripple mode: find the earliest deleted clip position and total gap
+        int64_t rippleFrom = INT64_MAX;
+        int64_t rippleDelta = 0;
+        if (m_rippleMode) {
+            for (int idx : toRemove) {
+                Clip* clip = audioTrack->clip(idx);
+                if (!clip) continue;
+                if (clip->timelinePosition() < rippleFrom)
+                    rippleFrom = clip->timelinePosition();
+                rippleDelta += clip->duration();
+            }
+        }
+
+        // Remove in reverse order to keep indices valid
         std::sort(toRemove.begin(), toRemove.end(), std::greater<int>());
         for (int idx : toRemove) {
             audioTrack->removeClip(idx);
+        }
+
+        // Ripple: shift subsequent clips left to fill the gap
+        if (m_rippleMode && rippleFrom < INT64_MAX && rippleDelta > 0) {
+            rippleShift(audioTrack, rippleFrom, -rippleDelta);
         }
     }
 
@@ -2392,6 +2495,84 @@ void TimelineWidget::drawFreezeIndicator(QPainter& painter, AudioTrack* track, i
     painter.setPen(kFreezeColor);
     // Snowflake character U+2744
     painter.drawText(width() - 24, yTop + 18, QString::fromUtf8("\xe2\x9d\x84"));
+
+    painter.restore();
+}
+
+// ── Split at Playhead (Cmd+E) ───────────────────────────────────────────────
+
+void TimelineWidget::splitAtPlayhead()
+{
+    if (!m_timeline) return;
+
+    int64_t playhead = m_timeline->playhead();
+    if (playhead <= 0) return;
+
+    int trackCount = m_timeline->trackCount();
+    for (int t = 0; t < trackCount; ++t) {
+        auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+        if (!audioTrack) continue;
+
+        for (int c = 0; c < audioTrack->clipCount(); ++c) {
+            Clip* clip = audioTrack->clip(c);
+            if (!clip) continue;
+
+            // Check if the playhead falls within this clip (exclusive of edges)
+            if (playhead > clip->timelinePosition() && playhead < clip->endPosition()) {
+                auto* cmd = new SplitClipCommand(clip, playhead);
+                cmd->redo();  // Execute immediately (no UndoManager wired at widget level)
+            }
+        }
+    }
+
+    update();
+}
+
+// ── Ripple Editing Mode ─────────────────────────────────────────────────────
+
+void TimelineWidget::setRippleMode(bool enabled)
+{
+    if (m_rippleMode != enabled) {
+        m_rippleMode = enabled;
+        emit rippleModeChanged(enabled);
+        update();
+    }
+}
+
+void TimelineWidget::rippleShift(AudioTrack* track, int64_t fromPosition, int64_t delta)
+{
+    if (!track || delta == 0) return;
+
+    for (int c = 0; c < track->clipCount(); ++c) {
+        Clip* clip = track->clip(c);
+        if (!clip) continue;
+
+        if (clip->timelinePosition() >= fromPosition) {
+            int64_t newPos = clip->timelinePosition() + delta;
+            if (newPos < 0) newPos = 0;
+            clip->setTimelinePosition(newPos);
+        }
+    }
+}
+
+void TimelineWidget::drawRippleIndicator(QPainter& painter, int viewWidth)
+{
+    if (!m_rippleMode) return;
+
+    painter.save();
+
+    // Draw a small "R" badge in the top-left corner below the ruler
+    QFont badgeFont = font();
+    badgeFont.setPointSize(9);
+    badgeFont.setBold(true);
+    painter.setFont(badgeFont);
+
+    QRect badge(4, kRulerHeight + 4, 18, 16);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(200, 120, 30, 200));
+    painter.drawRoundedRect(badge, 3, 3);
+    painter.setPen(QColor(255, 255, 255));
+    painter.drawText(badge, Qt::AlignCenter, QStringLiteral("R"));
 
     painter.restore();
 }

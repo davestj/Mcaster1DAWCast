@@ -12,6 +12,8 @@
 #include <QLabel>
 #include <QMenu>
 #include <QToolTip>
+#include <QDir>
+#include <QFileInfo>
 
 #include <algorithm>
 
@@ -64,10 +66,19 @@ void TrackHeaderWidget::buildUI()
     mainLayout->setContentsMargins(6, 4, 6, 4);
     mainLayout->setSpacing(2);
 
-    // ── Row 1: Color dot + Track name + Dropdown ──────────────────────
+    // ── Row 1: Grip + Color dot + Track name + Dropdown ────────────────
     auto* row1 = new QHBoxLayout;
     row1->setSpacing(4);
     row1->setContentsMargins(0, 0, 0, 0);
+
+    // Drag handle (grip dots) for track reorder
+    auto* gripLabel = new QLabel(QStringLiteral("\xe2\xb8\xb1\xe2\xb8\xb1"), this);  // grip dots
+    gripLabel->setFixedWidth(14);
+    gripLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: #556; font-size: 10px; padding: 0; }"));
+    gripLabel->setToolTip(tr("Drag to reorder"));
+    gripLabel->setCursor(Qt::OpenHandCursor);
+    row1->addWidget(gripLabel);
 
     // Color indicator square
     m_colorDot = new QWidget(this);
@@ -323,8 +334,12 @@ void TrackHeaderWidget::showTrackMenu()
         emit colorChangeRequested(m_trackIndex);
     });
     menu.addSeparator();
-    menu.addAction(tr("Duplicate Track"));
-    menu.addAction(tr("Delete Track"));
+    menu.addAction(tr("Duplicate Track"), this, [this]() {
+        emit duplicateRequested(m_trackIndex);
+    });
+    menu.addAction(tr("Delete Track"), this, [this]() {
+        emit deleteRequested(m_trackIndex);
+    });
     menu.addSeparator();
     if (m_frozen) {
         menu.addAction(tr("Unfreeze Track"), this, [this]() {
@@ -342,6 +357,48 @@ void TrackHeaderWidget::showTrackMenu()
     menu.addAction(tr("Create Group from Track"), this, [this]() {
         emit createGroupRequested(m_trackIndex);
     });
+
+    menu.addSeparator();
+
+    // ── Track Presets ──────────────────────────────────────────────
+    menu.addAction(tr("Save Track Preset..."), this, [this]() {
+        emit saveTrackPresetRequested(m_trackIndex);
+    });
+
+    auto* loadPresetMenu = menu.addMenu(tr("Load Track Preset"));
+
+    // Factory presets
+    static const QStringList factoryPresets = {
+        QStringLiteral("Podcast Voice"),
+        QStringLiteral("Music Instrument"),
+        QStringLiteral("Broadcast Voice"),
+        QStringLiteral("Sound Design")
+    };
+    for (const QString& name : factoryPresets) {
+        loadPresetMenu->addAction(name, this, [this, name]() {
+            emit loadTrackPresetRequested(m_trackIndex, name);
+        });
+    }
+
+    // User presets from ~/.mcaster1/track_presets/
+    QDir presetDir(QDir::homePath() + QStringLiteral("/.mcaster1/track_presets"));
+    if (presetDir.exists()) {
+        QStringList yamlFiles = presetDir.entryList(
+            {QStringLiteral("*.yaml"), QStringLiteral("*.yml")},
+            QDir::Files, QDir::Name);
+        if (!yamlFiles.isEmpty()) {
+            loadPresetMenu->addSeparator();
+            for (const QString& file : yamlFiles) {
+                QString presetName = QFileInfo(file).completeBaseName();
+                // Skip factory names (already listed above)
+                if (factoryPresets.contains(presetName, Qt::CaseInsensitive))
+                    continue;
+                loadPresetMenu->addAction(presetName, this, [this, presetName]() {
+                    emit loadTrackPresetRequested(m_trackIndex, presetName);
+                });
+            }
+        }
+    }
 
     menu.exec(m_menuBtn->mapToGlobal(QPoint(0, m_menuBtn->height())));
 }

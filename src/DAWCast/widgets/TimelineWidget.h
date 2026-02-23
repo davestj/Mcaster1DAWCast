@@ -59,6 +59,17 @@ public:
     void pasteClips();
     void deleteSelectedClips();
 
+    // ── Split at Playhead (Cmd+E) ─────────────────────────────────────
+    void splitAtPlayhead();
+
+    // ── Ripple Editing Mode ───────────────────────────────────────────
+    void setRippleMode(bool enabled);
+    [[nodiscard]] bool rippleMode() const { return m_rippleMode; }
+
+    /// Shift all clips on @a track that start at or after @a fromPosition
+    /// by @a delta samples (+right, -left).
+    void rippleShift(dawcast::AudioTrack* track, int64_t fromPosition, int64_t delta);
+
     // ── Zoom operations ────────────────────────────────────────────────
     void zoomIn();
     void zoomOut();
@@ -74,6 +85,7 @@ signals:
     void automationPointRemoved(int trackIndex, const QString& param, int pointIndex);
     void snapModeChanged(SnapMode mode);
     void gainEnvelopeChanged(int trackIndex, int clipIndex);
+    void rippleModeChanged(bool enabled);
 
 private slots:
     void onWaveformReady(const QString& filePath);
@@ -124,6 +136,7 @@ private:
     static void probeStreams(const QString& filePath, bool& hasAudio, bool& hasVideo);
 
     void drawSnapGrid(QPainter& painter, int viewWidth);
+    void drawRippleIndicator(QPainter& painter, int viewWidth);
 
     Timeline* m_timeline = nullptr;
     float           m_zoom     = 1.0f;
@@ -156,6 +169,16 @@ private:
 
     // ── Per-track vertical waveform zoom ─────────────────────────────
     QHash<int, float> m_trackVerticalZoom;  // trackIndex -> zoom factor (default 1.0)
+
+    // ── Ripple Editing Mode ──────────────────────────────────────────
+    bool            m_rippleMode = false;
+
+    // ── Slip Editing ────────────────────────────────────────────────
+    bool            m_slipEditing = false;      // Active slip drag in progress
+    Clip*           m_slipClip = nullptr;        // Clip being slip-edited
+    int             m_slipTrackIndex = -1;       // Track of clip being slipped
+    int64_t         m_slipStartSourceIn = 0;     // Original sourceIn at drag start
+    QPoint          m_slipDragOrigin;            // Mouse position at slip start
 
     // ── Clipboard ──────────────────────────────────────────────────────
     struct ClipData {

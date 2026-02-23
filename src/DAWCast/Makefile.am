@@ -217,6 +217,9 @@ moc_MidiTrack.cpp: $(srcdir)/timeline/MidiTrack.h
 moc_TrackGroup.cpp: $(srcdir)/timeline/TrackGroup.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_TempoMap.cpp: $(srcdir)/timeline/TempoMap.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- plugins --
 moc_PluginScanner.cpp: $(srcdir)/plugins/PluginScanner.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -429,6 +432,9 @@ moc_TrackColorDialog.cpp: $(srcdir)/widgets/TrackColorDialog.h
 moc_MarkerListWidget.cpp: $(srcdir)/widgets/MarkerListWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_ImportAudioDialog.cpp: $(srcdir)/widgets/ImportAudioDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
@@ -545,6 +551,8 @@ mcaster1dawcast_SOURCES = \
     timeline/MidiTrack.cpp \
     timeline/TrackGroup.h \
     timeline/TrackGroup.cpp \
+    timeline/TempoMap.h \
+    timeline/TempoMap.cpp \
     dsp/DspChain.h \
     dsp/DspChain.cpp \
     dsp/Biquad.h \
@@ -737,6 +745,8 @@ mcaster1dawcast_SOURCES = \
     widgets/TrackColorDialog.cpp \
     widgets/MarkerListWidget.h \
     widgets/MarkerListWidget.cpp \
+    widgets/ImportAudioDialog.h \
+    widgets/ImportAudioDialog.cpp \
     platform/compat.h \
     platform/worker_pool.h \
     platform/worker_pool.cpp \
@@ -801,6 +811,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_MidiClip.cpp \
     moc_MidiTrack.cpp \
     moc_TrackGroup.cpp \
+    moc_TempoMap.cpp \
     moc_PluginScanner.cpp \
     moc_PluginHost.cpp \
     moc_DspChain.cpp \
@@ -868,6 +879,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_StreamMonitorPanel.cpp \
     moc_TrackColorDialog.cpp \
     moc_MarkerListWidget.cpp \
+    moc_ImportAudioDialog.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \
@@ -909,6 +921,7 @@ BUILT_SOURCES = \
     moc_MidiClip.cpp \
     moc_MidiTrack.cpp \
     moc_TrackGroup.cpp \
+    moc_TempoMap.cpp \
     moc_PluginScanner.cpp \
     moc_PluginHost.cpp \
     moc_DspChain.cpp \
@@ -976,6 +989,7 @@ BUILT_SOURCES = \
     moc_StreamMonitorPanel.cpp \
     moc_TrackColorDialog.cpp \
     moc_MarkerListWidget.cpp \
+    moc_ImportAudioDialog.cpp \
     moc_AppConfig.cpp \
     moc_AIEngine.cpp \
     moc_TranscriptionEngine.cpp \

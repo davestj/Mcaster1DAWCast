@@ -70,6 +70,10 @@ signals:
     void freezeRequested(int trackIndex);
     void createGroupRequested(int trackIndex);
     void moveToGroupRequested(int trackIndex, const QString& groupName);
+    void duplicateRequested(int trackIndex);
+    void deleteRequested(int trackIndex);
+    void saveTrackPresetRequested(int trackIndex);
+    void loadTrackPresetRequested(int trackIndex, const QString& presetName);
 
 private:
     void buildUI();

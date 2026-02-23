@@ -11,14 +11,17 @@
 #include <QMap>
 
 class QSpinBox;
+class QDoubleSpinBox;
 class QCheckBox;
 class QLabel;
 class QTableWidget;
 class QFrame;
 class QPushButton;
+class QRadioButton;
 class QMainWindow;
 
 namespace dawcast { class AudioEngine; }
+namespace dawcast { class AudioMixer; }
 
 namespace dawcast::widgets {
 
@@ -38,6 +41,9 @@ public:
 
     /// Set the audio engine so device changes can be applied immediately.
     void setAudioEngine(dawcast::AudioEngine* engine);
+
+    /// Set the audio mixer so solo mode changes can be applied.
+    void setAudioMixer(dawcast::AudioMixer* mixer);
 
     void loadSettings();
     void saveSettings();
@@ -74,6 +80,12 @@ private:
     QComboBox* m_bufferSizeCombo   = nullptr;
     QLabel*    m_latencyLabel      = nullptr;
 
+    // Audio tab — solo mode
+    QRadioButton*   m_soloInPlaceRadio  = nullptr;
+    QRadioButton*   m_soloInFrontRadio  = nullptr;
+    QSpinBox*       m_soloDimSpin       = nullptr;
+    QCheckBox*      m_showImportDialogCheck = nullptr;
+
     // Video tab
     QWidget*   m_videoTab              = nullptr;
     QComboBox* m_videoResolutionCombo  = nullptr;
@@ -90,6 +102,7 @@ private:
     QPushButton*   m_resetShortcutsBtn = nullptr;
 
     dawcast::AudioEngine* m_audioEngine = nullptr;
+    dawcast::AudioMixer*  m_audioMixer  = nullptr;
 };
 
 } // namespace dawcast::widgets

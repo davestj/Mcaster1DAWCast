@@ -88,6 +88,33 @@ float AudioMixer::stripPan(int strip) const
     return 0.0f;
 }
 
+void AudioMixer::setSoloMode(SoloMode mode)
+{
+    if (m_soloMode != mode) {
+        m_soloMode = mode;
+        emit soloModeChanged(mode);
+    }
+}
+
+AudioMixer::SoloMode AudioMixer::soloMode() const
+{
+    return m_soloMode;
+}
+
+void AudioMixer::setSoloDimDb(float db)
+{
+    float clamped = std::clamp(db, -96.0f, 0.0f);
+    if (m_soloDimDb != clamped) {
+        m_soloDimDb = clamped;
+        emit soloDimDbChanged(clamped);
+    }
+}
+
+float AudioMixer::soloDimDb() const
+{
+    return m_soloDimDb;
+}
+
 void AudioMixer::process(AudioBuffer& output)
 {
     // Start with silence
@@ -104,6 +131,12 @@ void AudioMixer::process(AudioBuffer& output)
         }
     }
 
+    // Pre-compute Solo-in-Front dim gain (linear) if needed
+    float dimGain = 0.0f;
+    if (anySoloed && m_soloMode == SoloInFront && m_soloDimDb > -96.0f) {
+        dimGain = std::pow(10.0f, m_soloDimDb / 20.0f);
+    }
+
     const int frames   = output.frames;
     const int channels = output.channels;
 
@@ -111,17 +144,28 @@ void AudioMixer::process(AudioBuffer& output)
         // Skip strips with no input buffer
         if (!strip.inputBuffer || !strip.inputBuffer->data) continue;
 
-        // Solo logic: if any strip is soloed, skip non-soloed strips
-        if (anySoloed && !strip.solo) continue;
-
-        // Mute logic
+        // Mute logic — always applies
         if (strip.muted) continue;
+
+        // Solo routing logic
+        if (anySoloed && !strip.solo) {
+            if (m_soloMode == SoloInPlace) {
+                // SIP: non-soloed tracks are fully muted
+                continue;
+            }
+            // SIF: non-soloed tracks will be dimmed (handled below via dimGain)
+        }
 
         // Convert dB to linear gain: gain = 10^(dB/20)
         // Treat -inf dB (very low values) as silence
         float linearGain = 0.0f;
         if (strip.volumeDb > -96.0f) {
             linearGain = std::pow(10.0f, strip.volumeDb / 20.0f);
+        }
+
+        // Apply Solo-in-Front dim to non-soloed strips
+        if (anySoloed && !strip.solo && m_soloMode == SoloInFront) {
+            linearGain *= dimGain;
         }
 
         // Constant-power panning

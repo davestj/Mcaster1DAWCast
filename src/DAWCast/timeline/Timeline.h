@@ -16,6 +16,7 @@ class AudioTrack;
 class VideoTrack;
 class MidiTrack;
 class TrackGroup;
+class TempoMap;
 
 class Timeline : public QObject
 {
@@ -29,6 +30,9 @@ public:
     VideoTrack* addVideoTrack();
     MidiTrack*  addMidiTrack();
     void removeTrack(int index);
+
+    /// Reorder a track from one index to another.
+    void moveTrack(int fromIndex, int toIndex);
 
     [[nodiscard]] int      trackCount() const;
     [[nodiscard]] QObject* track(int index) const;
@@ -96,9 +100,13 @@ public:
     [[nodiscard]] int64_t loopEnd()     const { return m_loopEnd; }
     [[nodiscard]] bool    loopEnabled() const { return m_loopEnabled; }
 
+    // ── Tempo map ────────────────────────────────────────────────────
+    [[nodiscard]] TempoMap* tempoMap() const { return m_tempoMap; }
+
 signals:
     void trackAdded(int index);
     void trackRemoved(int index);
+    void trackMoved(int fromIndex, int toIndex);
     void playheadChanged(int64_t samples);
     void markersChanged();
     void loopChanged();
@@ -128,6 +136,9 @@ private:
     int64_t m_loopStart   = 0;
     int64_t m_loopEnd     = 0;
     bool    m_loopEnabled = false;
+
+    // Tempo map
+    TempoMap* m_tempoMap = nullptr;
 };
 
 } // namespace dawcast

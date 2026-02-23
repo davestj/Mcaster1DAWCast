@@ -88,6 +88,8 @@ private slots:
     void copy();
     void paste();
     void deleteSelected();
+    void splitAtPlayhead();
+    void toggleRippleMode();
 
     // View
     void toggleMixer();
@@ -109,6 +111,7 @@ private slots:
     void addVideoTrack();
     void addMidiTrack();
     void removeTrack();
+    void duplicateTrack(int trackIndex);
 
     // Podcast
     void openChapterEditor();

@@ -1,0 +1,48 @@
+# Mcaster1DAWCast — Factory Track Preset
+# Broadcast-standard vocal chain with AGC and de-esser
+name: "Broadcast Voice"
+description: "Broadcast-quality vocal chain with AGC, de-esser, and limiting"
+volume_db: 0.0
+pan: 0.0
+color: "#f59e0b"
+effects:
+  - type: "noise_gate"
+    params:
+      threshold_db: -45
+      attack_ms: 0.3
+      release_ms: 150
+  - type: "parametric_eq"
+    params:
+      band_0:
+        type: "high_pass"
+        freq: 100
+        q: 0.707
+        gain_db: 0
+      band_1:
+        type: "peaking"
+        freq: 2500
+        q: 1.2
+        gain_db: 3.0
+      band_2:
+        type: "high_shelf"
+        freq: 8000
+        q: 0.707
+        gain_db: -1.0
+  - type: "de_esser"
+    params:
+      frequency: 6000
+      threshold_db: -25
+      ratio: 4
+  - type: "compressor"
+    params:
+      threshold_db: -18
+      ratio: 6
+      attack_ms: 5
+      release_ms: 100
+  - type: "agc"
+    params:
+      target_db: -14
+      range_db: 12
+  - type: "limiter"
+    params:
+      ceiling_db: -1.0

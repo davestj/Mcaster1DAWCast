@@ -216,6 +216,15 @@ TransportBar::TransportBar(QWidget* parent)
         QStringLiteral("QPushButton { font-size: 10px; }"));
     row2->addWidget(m_busesBtn);
 
+    m_rippleBtn = new BevelButton(QStringLiteral("R"), this);
+    m_rippleBtn->setFixedSize(QSize(24, 24));
+    m_rippleBtn->setCheckable(true);
+    m_rippleBtn->setToolTip(tr("Ripple Edit Mode — inserting/deleting shifts subsequent clips"));
+    m_rippleBtn->setCheckedFaceColor(QColor(200, 120, 30));
+    m_rippleBtn->setStyleSheet(
+        QStringLiteral("QPushButton { font-size: 11px; font-weight: bold; }"));
+    row2->addWidget(m_rippleBtn);
+
     m_flagBtn = new BevelButton(QStringLiteral("\u2691"), this);  // flag
     m_flagBtn->setFixedSize(QSize(30, 24));
     m_flagBtn->setCheckable(true);
@@ -356,6 +365,7 @@ TransportBar::TransportBar(QWidget* parent)
 
     // Secondary row buttons
     connect(m_busesBtn, &BevelButton::clicked, this, &TransportBar::busesClicked);
+    connect(m_rippleBtn, &BevelButton::toggled, this, &TransportBar::rippleModeToggled);
     connect(m_prevBtn,  &BevelButton::clicked, this, &TransportBar::prevMarkerClicked);
     connect(m_nextBtn,  &BevelButton::clicked, this, &TransportBar::nextMarkerClicked);
     connect(m_flagBtn,  &BevelButton::toggled, this, &TransportBar::markerViewToggled);

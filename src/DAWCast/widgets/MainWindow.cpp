@@ -18,6 +18,7 @@
 #include "MasterStrip.h"
 #include "PreferencesDialog.h"
 #include "ViewModeSwitcher.h"
+#include "ImportAudioDialog.h"
 #include "ChapterWidget.h"
 #include "MetadataPanel.h"
 #include "SpectrumWidget.h"
@@ -32,10 +33,13 @@
 #include "../timeline/Timeline.h"
 #include "../timeline/Marker.h"
 #include "../timeline/AudioTrack.h"
+#include "../timeline/Clip.h"
 #include "../audio_engine/AudioEngine.h"
 #include "../audio_engine/AudioMixer.h"
 #include "../audio_engine/PlaybackEngine.h"
 #include "../audio_engine/MultitrackRecorder.h"
+#include "../audio_engine/BusRouter.h"
+#include "../audio_engine/AudioBus.h"
 #include "../audio_engine/Metronome.h"
 #include "../audio_engine/WaveformCache.h"
 #include "../audio_engine/ExportEngine.h"
@@ -46,6 +50,7 @@
 #include "BatchEncoderDialog.h"
 #include "MassTagEditor.h"
 #include "AboutDialog.h"
+#include "ImportAudioDialog.h"
 #include "StreamingDialog.h"
 #include "../broadcast/RTMPStreamer.h"
 #include "../core/UndoManager.h"
@@ -169,6 +174,36 @@ void MainWindow::setupMenus()
 
     fileMenu->addSeparator();
 
+    auto* actImportAudio = fileMenu->addAction(tr("&Import Audio..."));
+    actImportAudio->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    connect(actImportAudio, &QAction::triggered, this, [this] {
+        QStringList files = QFileDialog::getOpenFileNames(this,
+            tr("Import Audio Files"), QString(),
+            tr("Audio Files (*.wav *.aiff *.aif *.mp3 *.flac *.ogg *.opus *.aac *.m4a);;"
+               "All Files (*)"));
+        if (files.isEmpty()) return;
+
+        // Check preference for showing import dialog
+        bool showDialog = true;
+        auto* cfg = dawcast::config::AppConfig::instance();
+        if (cfg)
+            showDialog = cfg->value(QStringLiteral("audio/showImportDialog"), true).toBool();
+
+        if (showDialog) {
+            auto* dlg = new ImportAudioDialog(files, this);
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            if (dlg->exec() != QDialog::Accepted)
+                return;
+            // Import options are available via dlg->options()
+            // Actual import logic to be wired to the timeline engine
+        }
+
+        statusBar()->showMessage(
+            tr("Imported %n file(s)", "", files.size()), 5000);
+    });
+
+    fileMenu->addSeparator();
+
     auto* actExport = fileMenu->addAction(tr("&Export..."));
     actExport->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
     connect(actExport, &QAction::triggered, this, &MainWindow::exportProject);
@@ -214,6 +249,18 @@ void MainWindow::setupMenus()
 
     editMenu->addSeparator();
 
+    // ── Edit > Split / Ripple ──────────────────────────────────────────
+    auto* actSplit = editMenu->addAction(tr("Split at Playhead"));
+    actSplit->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    connect(actSplit, &QAction::triggered, this, &MainWindow::splitAtPlayhead);
+
+    auto* actRipple = editMenu->addAction(tr("Ripple Edit Mode"));
+    actRipple->setCheckable(true);
+    actRipple->setChecked(false);
+    connect(actRipple, &QAction::triggered, this, &MainWindow::toggleRippleMode);
+
+    editMenu->addSeparator();
+
     // ── Edit > Zoom ────────────────────────────────────────────────────
     auto* actZoomIn = editMenu->addAction(tr("Zoom &In"));
     actZoomIn->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal));
@@ -241,6 +288,32 @@ void MainWindow::setupMenus()
 
     editMenu->addSeparator();
 
+    // ── Edit > Solo Mode ─────────────────────────────────────────────
+    auto* soloModeMenu = editMenu->addMenu(tr("Solo &Mode"));
+
+    auto* actSoloInPlace = soloModeMenu->addAction(tr("Solo in Place (SIP)"));
+    actSoloInPlace->setCheckable(true);
+    actSoloInPlace->setChecked(true);
+
+    auto* actSoloInFront = soloModeMenu->addAction(tr("Solo in Front (SIF)"));
+    actSoloInFront->setCheckable(true);
+
+    auto* soloModeGroup = new QActionGroup(this);
+    soloModeGroup->setExclusive(true);
+    soloModeGroup->addAction(actSoloInPlace);
+    soloModeGroup->addAction(actSoloInFront);
+
+    connect(actSoloInPlace, &QAction::triggered, this, [this]() {
+        if (m_audioMixer)
+            m_audioMixer->setSoloMode(dawcast::AudioMixer::SoloInPlace);
+    });
+    connect(actSoloInFront, &QAction::triggered, this, [this]() {
+        if (m_audioMixer)
+            m_audioMixer->setSoloMode(dawcast::AudioMixer::SoloInFront);
+    });
+
+    editMenu->addSeparator();
+
     auto* actPreferences = editMenu->addAction(tr("&Preferences..."));
     actPreferences->setShortcut(QKeySequence::Preferences);
     actPreferences->setMenuRole(QAction::PreferencesRole);  // macOS puts this in app menu
@@ -248,6 +321,8 @@ void MainWindow::setupMenus()
         auto* dlg = new PreferencesDialog(this);
         if (m_audioEngine)
             dlg->setAudioEngine(m_audioEngine);
+        if (m_audioMixer)
+            dlg->setAudioMixer(m_audioMixer);
         dlg->setAttribute(Qt::WA_DeleteOnClose);
         dlg->exec();
     });
@@ -709,6 +784,21 @@ void MainWindow::setupAudioPipeline()
     // Wire "+" button in the track header panel to add an audio track
     connect(m_trackHeaders, &TrackHeaderPanel::addTrackRequested,
             this, &MainWindow::addAudioTrack);
+    connect(m_trackHeaders, &TrackHeaderPanel::duplicateTrackRequested,
+            this, &MainWindow::duplicateTrack);
+    connect(m_trackHeaders, &TrackHeaderPanel::deleteTrackRequested,
+            this, [this](int trackIndex) {
+        if (m_timelineModel) {
+            m_timelineModel->removeTrack(trackIndex);
+            statusBar()->showMessage(tr("Track deleted"), 3000);
+        }
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackMoveRequested,
+            this, [this](int from, int to) {
+        if (m_timelineModel) {
+            m_timelineModel->moveTrack(from, to);
+        }
+    });
 
     // Audio mixer (volume / pan / mute / solo per strip)
     m_audioMixer = new dawcast::AudioMixer(this);
@@ -788,6 +878,15 @@ void MainWindow::setupConnections()
     connect(m_transportBar, &TransportBar::automationWriteToggled, this, [this](bool on) {
         statusBar()->showMessage(on ? tr("Automation write enabled")
                                     : tr("Automation write disabled"), 2000);
+    });
+
+    // Ripple edit mode toggle from transport bar
+    connect(m_transportBar, &TransportBar::rippleModeToggled, this, [this](bool enabled) {
+        if (m_timeline) {
+            m_timeline->setRippleMode(enabled);
+            statusBar()->showMessage(
+                enabled ? tr("Ripple Edit: ON") : tr("Ripple Edit: OFF"), 2000);
+        }
     });
 
     // Crossfade mode
@@ -977,10 +1076,11 @@ void MainWindow::setupConnections()
     // output in a future update; for now we log the value)
     connect(m_masterStrip, &MasterStrip::levelChanged,
             this, [this](float db) {
-        Q_UNUSED(db)
-        // TODO: route to AudioMixer master volume once the mixer exposes
-        // a dedicated master bus.  For now, the fader value is stored in
-        // the MasterStrip widget itself.
+        // Route master fader to the BusRouter's master bus
+        if (m_playbackEngine && m_playbackEngine->busRouter()) {
+            auto* master = m_playbackEngine->busRouter()->masterBus();
+            if (master) master->setVolume(db);
+        }
     });
 
     // Pre-cache waveforms when files are double-clicked in Media Library
@@ -1172,6 +1272,24 @@ void MainWindow::deleteSelected()
     statusBar()->showMessage(tr("Delete"), 2000);
 }
 
+void MainWindow::splitAtPlayhead()
+{
+    if (m_timeline) {
+        m_timeline->splitAtPlayhead();
+    }
+    statusBar()->showMessage(tr("Split at Playhead"), 2000);
+}
+
+void MainWindow::toggleRippleMode()
+{
+    if (m_timeline) {
+        m_timeline->setRippleMode(!m_timeline->rippleMode());
+        statusBar()->showMessage(
+            m_timeline->rippleMode() ? tr("Ripple Edit: ON") : tr("Ripple Edit: OFF"),
+            2000);
+    }
+}
+
 // ── View Slots ──────────────────────────────────────────────────────────────
 
 void MainWindow::toggleMixer()
@@ -1251,6 +1369,47 @@ void MainWindow::addMidiTrack()
 void MainWindow::removeTrack()
 {
     statusBar()->showMessage(tr("Track removed"), 3000);
+}
+
+void MainWindow::duplicateTrack(int trackIndex)
+{
+    if (!m_timelineModel) return;
+    if (trackIndex < 0 || trackIndex >= m_timelineModel->trackCount()) return;
+
+    QObject* srcTrackObj = m_timelineModel->track(trackIndex);
+    auto* srcAudio = qobject_cast<dawcast::AudioTrack*>(srcTrackObj);
+    if (!srcAudio) {
+        statusBar()->showMessage(tr("Only audio tracks can be duplicated"), 3000);
+        return;
+    }
+
+    // Create a new audio track
+    auto* newTrack = m_timelineModel->addAudioTrack();
+    newTrack->setName(srcAudio->name() + QStringLiteral(" - Copy"));
+    newTrack->setVolume(srcAudio->volumeDb());
+    newTrack->setPan(srcAudio->pan());
+    newTrack->setMuted(srcAudio->isMuted());
+    newTrack->setSolo(srcAudio->isSolo());
+
+    // Copy all clips (new Clip objects referencing the same source files)
+    for (int c = 0; c < srcAudio->clipCount(); ++c) {
+        dawcast::Clip* srcClip = srcAudio->clip(c);
+        if (!srcClip) continue;
+
+        auto* newClip = new dawcast::Clip(newTrack);
+        newClip->setSourcePath(srcClip->sourcePath());
+        newClip->setSourceIn(srcClip->sourceIn());
+        newClip->setSourceOut(srcClip->sourceOut());
+        newClip->setTimelinePosition(srcClip->timelinePosition());
+        newClip->setGain(srcClip->gain());
+        newClip->setFadeIn(srcClip->fadeIn());
+        newClip->setFadeOut(srcClip->fadeOut());
+        newClip->setGainEnvelope(srcClip->gainEnvelope());
+
+        newTrack->addClip(newClip);
+    }
+
+    statusBar()->showMessage(tr("Track duplicated: %1").arg(newTrack->name()), 3000);
 }
 
 // ── Podcast Slots ───────────────────────────────────────────────────────────

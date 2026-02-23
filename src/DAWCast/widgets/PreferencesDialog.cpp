@@ -5,6 +5,7 @@
 #include "PreferencesDialog.h"
 #include "AppConfig.h"
 #include "../audio_engine/AudioEngine.h"
+#include "../audio_engine/AudioMixer.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -13,6 +14,8 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QCheckBox>
+#include <QRadioButton>
+#include <QButtonGroup>
 #include <QDialogButtonBox>
 #include <QLabel>
 #include <QTableWidget>
@@ -120,6 +123,42 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     // Update latency when buffer size or sample rate changes
     connect(m_bufferSizeCombo, &QComboBox::currentIndexChanged, this, &PreferencesDialog::updateLatencyLabel);
     connect(m_sampleRateCombo, &QComboBox::currentIndexChanged, this, &PreferencesDialog::updateLatencyLabel);
+
+    // ── Solo Mode section ──────────────────────────────────────────
+    auto* soloGroup = new QGroupBox(tr("Solo Mode"), audioTab);
+    auto* soloLayout = new QVBoxLayout(soloGroup);
+
+    m_soloInPlaceRadio = new QRadioButton(tr("Solo in Place (SIP) — mute non-soloed tracks"), soloGroup);
+    m_soloInPlaceRadio->setChecked(true);
+    soloLayout->addWidget(m_soloInPlaceRadio);
+
+    auto* sifRow = new QHBoxLayout;
+    m_soloInFrontRadio = new QRadioButton(tr("Solo in Front (SIF) — dim non-soloed tracks by:"), soloGroup);
+    sifRow->addWidget(m_soloInFrontRadio);
+
+    m_soloDimSpin = new QSpinBox(soloGroup);
+    m_soloDimSpin->setRange(-40, -6);
+    m_soloDimSpin->setValue(-20);
+    m_soloDimSpin->setSuffix(tr(" dB"));
+    m_soloDimSpin->setEnabled(false);
+    m_soloDimSpin->setFixedWidth(80);
+    sifRow->addWidget(m_soloDimSpin);
+    sifRow->addStretch();
+    soloLayout->addLayout(sifRow);
+
+    auto* soloBtnGroup = new QButtonGroup(this);
+    soloBtnGroup->addButton(m_soloInPlaceRadio);
+    soloBtnGroup->addButton(m_soloInFrontRadio);
+
+    connect(m_soloInFrontRadio, &QRadioButton::toggled,
+            m_soloDimSpin, &QSpinBox::setEnabled);
+
+    audioLayout->addRow(soloGroup);
+
+    // ── Import options ─────────────────────────────────────────────
+    m_showImportDialogCheck = new QCheckBox(tr("Always show import options dialog"), audioTab);
+    m_showImportDialogCheck->setChecked(true);
+    audioLayout->addRow(QString(), m_showImportDialogCheck);
 
     m_tabs->addTab(audioTab, tr("Audio"));
 
@@ -304,6 +343,22 @@ void PreferencesDialog::loadSettings()
     idx = m_sampleRateCombo->findText(audioSr);
     if (idx >= 0) m_sampleRateCombo->setCurrentIndex(idx);
 
+    // Solo mode
+    int soloMode = cfg->value(QStringLiteral("audio/soloMode"), 0).toInt();
+    if (soloMode == 1 && m_soloInFrontRadio)
+        m_soloInFrontRadio->setChecked(true);
+    else if (m_soloInPlaceRadio)
+        m_soloInPlaceRadio->setChecked(true);
+
+    int soloDim = cfg->value(QStringLiteral("audio/soloDimDb"), -20).toInt();
+    if (m_soloDimSpin)
+        m_soloDimSpin->setValue(qBound(-40, soloDim, -6));
+
+    // Import dialog
+    bool showImport = cfg->value(QStringLiteral("audio/showImportDialog"), true).toBool();
+    if (m_showImportDialogCheck)
+        m_showImportDialogCheck->setChecked(showImport);
+
     // Video
     int resIdx = cfg->value(QStringLiteral("video/defaultResolution"), 1).toInt();
     m_videoResolutionCombo->setCurrentIndex(qBound(0, resIdx, m_videoResolutionCombo->count() - 1));
@@ -349,6 +404,25 @@ void PreferencesDialog::saveSettings()
         if (bs > 0) m_audioEngine->setBufferSize(bs);
     }
 
+    // Solo mode
+    int soloModeVal = (m_soloInFrontRadio && m_soloInFrontRadio->isChecked()) ? 1 : 0;
+    cfg->setValue(QStringLiteral("audio/soloMode"), soloModeVal);
+    if (m_soloDimSpin)
+        cfg->setValue(QStringLiteral("audio/soloDimDb"), m_soloDimSpin->value());
+
+    // Apply solo mode to mixer
+    if (m_audioMixer) {
+        m_audioMixer->setSoloMode(soloModeVal == 1
+            ? dawcast::AudioMixer::SoloInFront
+            : dawcast::AudioMixer::SoloInPlace);
+        if (m_soloDimSpin)
+            m_audioMixer->setSoloDimDb(static_cast<float>(m_soloDimSpin->value()));
+    }
+
+    // Import dialog preference
+    if (m_showImportDialogCheck)
+        cfg->setValue(QStringLiteral("audio/showImportDialog"), m_showImportDialogCheck->isChecked());
+
     // Video
     cfg->setValue(QStringLiteral("video/defaultResolution"), m_videoResolutionCombo->currentIndex());
     cfg->setValue(QStringLiteral("video/defaultFramerate"), m_videoFramerateCombo->currentIndex());
@@ -378,6 +452,11 @@ void PreferencesDialog::updateLatencyLabel()
 void PreferencesDialog::setAudioEngine(dawcast::AudioEngine* engine)
 {
     m_audioEngine = engine;
+}
+
+void PreferencesDialog::setAudioMixer(dawcast::AudioMixer* mixer)
+{
+    m_audioMixer = mixer;
 }
 
 void PreferencesDialog::populateAudioDevices()

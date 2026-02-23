@@ -17,6 +17,14 @@ class AudioMixer : public QObject
 public:
     static constexpr int MaxStrips = 32;
 
+    /// Solo routing modes — determines how non-soloed tracks behave
+    /// when at least one track is soloed.
+    enum SoloMode {
+        SoloInPlace,   ///< Non-soloed tracks are fully muted (default)
+        SoloInFront    ///< Non-soloed tracks are dimmed by soloDimDb()
+    };
+    Q_ENUM(SoloMode)
+
     explicit AudioMixer(QObject* parent = nullptr);
     ~AudioMixer() override;
 
@@ -33,7 +41,19 @@ public:
     [[nodiscard]] float stripVolume(int strip) const;
     [[nodiscard]] float stripPan(int strip) const;
 
+    /// Solo routing mode
+    void setSoloMode(SoloMode mode);
+    [[nodiscard]] SoloMode soloMode() const;
+
+    /// Dim level for Solo-in-Front mode (negative dB, e.g. -20.0f)
+    void setSoloDimDb(float db);
+    [[nodiscard]] float soloDimDb() const;
+
     void process(AudioBuffer& output);
+
+signals:
+    void soloModeChanged(SoloMode mode);
+    void soloDimDbChanged(float db);
 
 private:
     struct Strip {
@@ -45,6 +65,8 @@ private:
     };
 
     QVector<Strip> m_strips;
+    SoloMode m_soloMode  = SoloInPlace;
+    float    m_soloDimDb  = -20.0f;  ///< Default dim: -20 dB for Solo-in-Front
 };
 
 } // namespace dawcast

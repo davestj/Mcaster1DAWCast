@@ -53,6 +53,7 @@ signals:
     void listViewToggled(bool enabled);
     void gridViewToggled(bool enabled);
     void snapModeChanged(int mode);
+    void rippleModeToggled(bool enabled);
 
 private slots:
     void onTapTempo();
@@ -110,6 +111,9 @@ private:
 
     // Snap-to-grid
     QComboBox*   m_snapCombo   = nullptr;
+
+    // Ripple edit
+    BevelButton* m_rippleBtn   = nullptr;
 };
 
 } // namespace dawcast::widgets

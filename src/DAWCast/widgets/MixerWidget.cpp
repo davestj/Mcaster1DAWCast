@@ -138,15 +138,19 @@ QWidget* createChannelStrip(QWidget* parent, const QString& name,
     return strip;
 }
 
-/// Create a channel strip with send controls below the pan knob.
+const QString kEqLabelStyle = QStringLiteral(
+    "QLabel { color: #8aa; font-size: 8px; font-weight: bold; }");
+
+/// Create a channel strip with inline 3-band EQ and send controls.
 QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
-                                     int stripIndex, MixerWidget* mixer)
+                                     int stripIndex, MixerWidget* mixer,
+                                     ChannelEQKnobs* eqKnobsOut = nullptr)
 {
     auto* strip = new QWidget(parent);
     strip->setObjectName(QStringLiteral("channelStrip"));
     strip->setStyleSheet(kStripStyle);
     strip->setFixedWidth(kStripWidth);
-    strip->setMinimumHeight(kStripMinHeight + 80);  // extra room for sends
+    strip->setMinimumHeight(kStripMinHeight + 140);  // extra room for EQ + sends
 
     auto* layout = new QVBoxLayout(strip);
     layout->setContentsMargins(4, 6, 4, 6);
@@ -164,6 +168,65 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     vuMeter->setMinimumHeight(60);
     vuMeter->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     layout->addWidget(vuMeter, 1);
+
+    // ── Inline 3-Band EQ section ──────────────────────────────────
+    auto* eqLabel = new QLabel(QStringLiteral("EQ"), strip);
+    eqLabel->setAlignment(Qt::AlignCenter);
+    eqLabel->setStyleSheet(kEqLabelStyle);
+    layout->addWidget(eqLabel);
+
+    auto* eqGroup = new QWidget(strip);
+    auto* eqLayout = new QHBoxLayout(eqGroup);
+    eqLayout->setContentsMargins(0, 0, 0, 0);
+    eqLayout->setSpacing(2);
+
+    // LF knob — Low shelf at 200 Hz, +/-12 dB
+    auto* lfKnob = new EmbossedKnob(eqGroup);
+    lfKnob->setRange(-12.0f, 12.0f);
+    lfKnob->setValue(0.0f);
+    lfKnob->setLabel(QStringLiteral("LF"));
+    lfKnob->setKnobSize(22);
+    lfKnob->setArcColor(QColor(200, 140, 80));
+    lfKnob->setFixedSize(24, 36);
+    eqLayout->addWidget(lfKnob);
+
+    // MF knob — Peaking at 1 kHz, Q=1.0, +/-12 dB
+    auto* mfKnob = new EmbossedKnob(eqGroup);
+    mfKnob->setRange(-12.0f, 12.0f);
+    mfKnob->setValue(0.0f);
+    mfKnob->setLabel(QStringLiteral("MF"));
+    mfKnob->setKnobSize(22);
+    mfKnob->setArcColor(QColor(140, 200, 80));
+    mfKnob->setFixedSize(24, 36);
+    eqLayout->addWidget(mfKnob);
+
+    // HF knob — High shelf at 8 kHz, +/-12 dB
+    auto* hfKnob = new EmbossedKnob(eqGroup);
+    hfKnob->setRange(-12.0f, 12.0f);
+    hfKnob->setValue(0.0f);
+    hfKnob->setLabel(QStringLiteral("HF"));
+    hfKnob->setKnobSize(22);
+    hfKnob->setArcColor(QColor(80, 140, 200));
+    hfKnob->setFixedSize(24, 36);
+    eqLayout->addWidget(hfKnob);
+
+    layout->addWidget(eqGroup);
+
+    // Return EQ knob references so the mixer widget can wire them up
+    if (eqKnobsOut) {
+        eqKnobsOut->lfKnob = lfKnob;
+        eqKnobsOut->mfKnob = mfKnob;
+        eqKnobsOut->hfKnob = hfKnob;
+    }
+
+    // Emit channelEQChanged when any EQ knob moves
+    auto emitEQ = [mixer, stripIndex, lfKnob, mfKnob, hfKnob]() {
+        emit mixer->channelEQChanged(stripIndex,
+                                     lfKnob->value(), mfKnob->value(), hfKnob->value());
+    };
+    QObject::connect(lfKnob, &EmbossedKnob::valueChanged, mixer, emitEQ);
+    QObject::connect(mfKnob, &EmbossedKnob::valueChanged, mixer, emitEQ);
+    QObject::connect(hfKnob, &EmbossedKnob::valueChanged, mixer, emitEQ);
 
     // Volume fader (vertical)
     auto* fader = new QSlider(Qt::Vertical, strip);
@@ -371,7 +434,11 @@ void MixerWidget::setBusRouter(BusRouter* router)
 void MixerWidget::addStrip()
 {
     QString name = tr("Ch %1").arg(m_stripCount + 1);
-    auto* strip = createChannelStripWithSends(this, name, m_stripCount, this);
+    ChannelEQKnobs eqKnobs;
+    auto* strip = createChannelStripWithSends(this, name, m_stripCount, this, &eqKnobs);
+
+    // Store EQ knob references for this channel
+    m_channelEQKnobs[m_stripCount] = eqKnobs;
 
     // Insert before the bus separator
     int insertPos = m_stripCount;

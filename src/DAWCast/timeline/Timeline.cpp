@@ -9,6 +9,7 @@
 #include "MidiClip.h"
 #include "Clip.h"
 #include "TrackGroup.h"
+#include "TempoMap.h"
 
 #include <algorithm>
 
@@ -16,6 +17,7 @@ namespace dawcast {
 
 Timeline::Timeline(QObject* parent)
     : QObject(parent)
+    , m_tempoMap(new TempoMap(this))
 {
 }
 
@@ -60,6 +62,16 @@ void Timeline::removeTrack(int index)
 
     track->deleteLater();
     emit trackRemoved(index);
+}
+
+void Timeline::moveTrack(int fromIndex, int toIndex)
+{
+    if (fromIndex < 0 || fromIndex >= m_tracks.size()) return;
+    if (toIndex < 0 || toIndex >= m_tracks.size()) return;
+    if (fromIndex == toIndex) return;
+
+    m_tracks.move(fromIndex, toIndex);
+    emit trackMoved(fromIndex, toIndex);
 }
 
 int Timeline::trackCount() const

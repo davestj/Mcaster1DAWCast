@@ -1,0 +1,37 @@
+# Mcaster1DAWCast — Factory Track Preset
+# Sound design track with reverb and sonic enhancement
+name: "Sound Design"
+description: "Creative sound design chain with reverb and sonic enhancement"
+volume_db: -6.0
+pan: 0.0
+color: "#a78bfa"
+effects:
+  - type: "parametric_eq"
+    params:
+      band_0:
+        type: "low_shelf"
+        freq: 200
+        q: 0.707
+        gain_db: -2.0
+      band_1:
+        type: "peaking"
+        freq: 2000
+        q: 1.5
+        gain_db: 3.0
+      band_2:
+        type: "high_shelf"
+        freq: 12000
+        q: 0.707
+        gain_db: 4.0
+  - type: "reverb"
+    params:
+      decay_seconds: 2.5
+      wet_dry: 0.35
+      pre_delay_ms: 20
+  - type: "sonic_enhancer"
+    params:
+      low_contour: 0.3
+      process: 0.5
+  - type: "limiter"
+    params:
+      ceiling_db: -1.0

@@ -1,0 +1,39 @@
+# Mcaster1DAWCast — Factory Track Preset
+# Standard podcast vocal processing chain
+name: "Podcast Voice"
+description: "Standard podcast vocal processing chain"
+volume_db: 0.0
+pan: 0.0
+color: "#2dd4bf"
+effects:
+  - type: "noise_gate"
+    params:
+      threshold_db: -40
+      attack_ms: 0.5
+      release_ms: 200
+  - type: "parametric_eq"
+    params:
+      band_0:
+        type: "high_pass"
+        freq: 80
+        q: 0.707
+        gain_db: 0
+      band_1:
+        type: "peaking"
+        freq: 3000
+        q: 1.0
+        gain_db: 2.5
+      band_2:
+        type: "high_shelf"
+        freq: 10000
+        q: 0.707
+        gain_db: 1.5
+  - type: "compressor"
+    params:
+      threshold_db: -20
+      ratio: 4
+      attack_ms: 10
+      release_ms: 150
+  - type: "limiter"
+    params:
+      ceiling_db: -0.3

@@ -18,6 +18,8 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QMenu>
+#include <QMouseEvent>
+#include <QApplication>
 
 namespace dawcast::widgets {
 
@@ -111,6 +113,8 @@ void TrackHeaderPanel::setTimeline(dawcast::Timeline* timeline)
                 this, &TrackHeaderPanel::rebuildHeaders);
         connect(m_timeline, &Timeline::trackRemoved,
                 this, &TrackHeaderPanel::rebuildHeaders);
+        connect(m_timeline, &Timeline::trackMoved,
+                this, [this](int, int) { rebuildHeaders(); });
         connect(m_timeline, &Timeline::trackGroupAdded,
                 this, &TrackHeaderPanel::rebuildHeaders);
         connect(m_timeline, &Timeline::trackGroupRemoved,
@@ -261,6 +265,10 @@ void TrackHeaderPanel::rebuildHeaders()
                 this, &TrackHeaderPanel::eqRequested);
         connect(hdr, &TrackHeaderWidget::settingsRequested,
                 this, &TrackHeaderPanel::settingsRequested);
+        connect(hdr, &TrackHeaderWidget::duplicateRequested,
+                this, &TrackHeaderPanel::duplicateTrackRequested);
+        connect(hdr, &TrackHeaderWidget::deleteRequested,
+                this, &TrackHeaderPanel::deleteTrackRequested);
 
         m_stackLayout->addWidget(hdr);
         m_headers.append(hdr);
@@ -316,6 +324,70 @@ void TrackHeaderPanel::rebuildHeaders()
 
     // Re-add stretch at the bottom
     m_stackLayout->addStretch();
+}
+
+// ── Track reorder via drag ──────────────────────────────────────────────────
+
+int TrackHeaderPanel::headerIndexAtPos(const QPoint& pos) const
+{
+    // Map position to the scroll area contents
+    QPoint mappedPos = m_scrollArea->widget()->mapFrom(this, pos);
+    int y = mappedPos.y();
+
+    for (int i = 0; i < m_headers.size(); ++i) {
+        auto* hdr = m_headers[i];
+        int top = hdr->y();
+        int bot = top + hdr->height();
+        if (y >= top && y < bot) {
+            return hdr->trackIndex();
+        }
+    }
+    return -1;
+}
+
+void TrackHeaderPanel::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_dragStartPos = event->pos();
+        m_dragFromIndex = headerIndexAtPos(event->pos());
+    }
+    QWidget::mousePressEvent(event);
+}
+
+void TrackHeaderPanel::mouseMoveEvent(QMouseEvent* event)
+{
+    if (!(event->buttons() & Qt::LeftButton) || m_dragFromIndex < 0) {
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
+
+    // Start dragging after a minimum distance
+    if (!m_dragReorder) {
+        if ((event->pos() - m_dragStartPos).manhattanLength()
+            < QApplication::startDragDistance()) {
+            QWidget::mouseMoveEvent(event);
+            return;
+        }
+        m_dragReorder = true;
+        setCursor(Qt::ClosedHandCursor);
+    }
+
+    QWidget::mouseMoveEvent(event);
+}
+
+void TrackHeaderPanel::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (m_dragReorder && m_dragFromIndex >= 0) {
+        int toIndex = headerIndexAtPos(event->pos());
+        if (toIndex >= 0 && toIndex != m_dragFromIndex) {
+            emit trackMoveRequested(m_dragFromIndex, toIndex);
+        }
+    }
+
+    m_dragReorder = false;
+    m_dragFromIndex = -1;
+    setCursor(Qt::ArrowCursor);
+    QWidget::mouseReleaseEvent(event);
 }
 
 } // namespace dawcast::widgets
