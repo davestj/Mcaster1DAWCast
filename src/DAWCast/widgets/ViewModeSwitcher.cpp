@@ -49,7 +49,8 @@ ViewModeSwitcher::ViewModeSwitcher(QWidget* parent)
 
     m_layout = new QHBoxLayout(this);
     m_layout->setContentsMargins(4, 2, 4, 2);
-    m_layout->setSpacing(2);
+    m_layout->setSpacing(4);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
     buildButtons();
 
@@ -73,32 +74,21 @@ void ViewModeSwitcher::buildButtons()
     for (int i = 0; i < ViewModeManager::modeCount(); ++i) {
         auto mode = static_cast<ViewModeManager::Mode>(i);
 
-        // Try to get an icon; fall back to a Unicode glyph + label
-        QIcon icon = mgr->modeIcon(mode);
         QString label = QString::fromUtf8(kShortLabels[i]);
 
-        BevelButton* btn;
-        if (icon.isNull()) {
-            QString text = QStringLiteral("%1 %2")
-                .arg(QString::fromUtf8(kFallbackGlyphs[i]), label);
-            btn = new BevelButton(text, this);
-        } else {
-            btn = new BevelButton(icon, label, this);
-            btn->setIconSize(QSize(16, 16));
-        }
-
+        auto* btn = new BevelButton(label, this);
         btn->setCheckable(true);
         btn->setFocusPolicy(Qt::NoFocus);
-        btn->setMinimumHeight(28);
-        btn->setMaximumHeight(32);
+        btn->setFixedHeight(26);
+        btn->setMinimumWidth(60);
         btn->setFaceColor(kInactiveFace);
         btn->setCheckedFaceColor(kActiveFace);
-        btn->setBevelDepth(2);
+        btn->setBevelDepth(1);
         btn->setToolTip(mgr->modeDescription(mode));
 
         btn->setStyleSheet(QStringLiteral(
-            "BevelButton { font-size: 11px; color: %1; padding: 2px 8px; }"
-            "BevelButton:checked { color: %2; }")
+            "BevelButton { font-size: 10px; color: %1; padding: 2px 6px; border-radius: 4px; }"
+            "BevelButton:checked { color: %2; font-weight: bold; }")
             .arg(kInactiveText.name(), kActiveText.name()));
 
         // Wire click -> mode selection
