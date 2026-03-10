@@ -67,7 +67,7 @@ void MediaLibraryWidget::setupUi()
     auto* topBar = new QHBoxLayout;
     topBar->setSpacing(6);
 
-    auto* titleLabel = new QLabel(QStringLiteral("\xF0\x9F\x93\x81 Media Library"), this);
+    auto* titleLabel = new QLabel(tr("Media Library"), this);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 1);
@@ -108,7 +108,7 @@ void MediaLibraryWidget::setupUi()
     searchLayout->addWidget(m_searchEdit);
 
     auto* searchBtn = new QToolButton(this);
-    searchBtn->setText(QStringLiteral("\xF0\x9F\x94\x8D"));
+    searchBtn->setText(tr("Search"));
     searchBtn->setToolTip(tr("Search"));
     searchBtn->setAutoRaise(true);
     searchLayout->addWidget(searchBtn);

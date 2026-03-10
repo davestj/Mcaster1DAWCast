@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "PreferencesDialog.h"
+#include "ThemeEngine.h"
 #include "AppConfig.h"
 #include "../audio_engine/AudioEngine.h"
 #include "../audio_engine/AudioMixer.h"
@@ -201,10 +202,16 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
 
     auto* themeFormLayout = new QFormLayout;
     m_themeCombo = new QComboBox(themeTab);
-    m_themeCombo->addItems({
-        tr("Dark (Default)"), tr("Midnight Blue"), tr("Charcoal"),
-        tr("Studio Gray"), tr("High Contrast")
-    });
+    // Populate from actually available themes
+    QStringList themes = ThemeEngine::instance()->availableThemes();
+    if (themes.isEmpty()) {
+        themes << QStringLiteral("DarkStudio") << QStringLiteral("Default") << QStringLiteral("BroadcastPro");
+    }
+    m_themeCombo->addItems(themes);
+    // Select current theme
+    QString current = ThemeEngine::instance()->currentTheme();
+    int idx = m_themeCombo->findText(current);
+    if (idx >= 0) m_themeCombo->setCurrentIndex(idx);
     themeFormLayout->addRow(tr("Theme:"), m_themeCombo);
     themeLayout->addLayout(themeFormLayout);
 
@@ -428,8 +435,11 @@ void PreferencesDialog::saveSettings()
     cfg->setValue(QStringLiteral("video/defaultFramerate"), m_videoFramerateCombo->currentIndex());
     cfg->setValue(QStringLiteral("video/hwAcceleration"), m_hwAccelCheck->isChecked());
 
-    // Theme
+    // Theme — apply immediately
+    QString themeName = m_themeCombo->currentText();
+    cfg->setValue(QStringLiteral("theme/name"), themeName);
     cfg->setValue(QStringLiteral("theme/index"), m_themeCombo->currentIndex());
+    ThemeEngine::instance()->loadTheme(themeName);
 
     // Shortcuts
     saveShortcuts();

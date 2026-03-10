@@ -88,11 +88,11 @@ ActionBar::ActionBar(QWidget* parent)
     m_addTrackBtn->setStyleSheet(outlineStyle);
     m_addTrackBtn->setToolTip(tr("Add a new audio track"));
 
-    m_loadLibraryBtn = new QPushButton(QStringLiteral("\xF0\x9F\x93\x82 Load from Library"), this);
+    m_loadLibraryBtn = new QPushButton(tr("Load from Library"), this);
     m_loadLibraryBtn->setStyleSheet(secondaryStyle);
     m_loadLibraryBtn->setToolTip(tr("Load media from the library"));
 
-    m_exportMixdownBtn = new QPushButton(QStringLiteral("\xE2\x86\x97 Export Mixdown"), this);
+    m_exportMixdownBtn = new QPushButton(tr("Export Mixdown"), this);
     m_exportMixdownBtn->setStyleSheet(secondaryStyle);
     m_exportMixdownBtn->setToolTip(tr("Export the final mixdown"));
 
@@ -106,7 +106,7 @@ ActionBar::ActionBar(QWidget* parent)
 
     // ── Right-side buttons ─────────────────────────────────────────────
 
-    m_projectsBtn = new QPushButton(QStringLiteral("\xF0\x9F\x93\x81 Projects"), this);
+    m_projectsBtn = new QPushButton(tr("Projects"), this);
     m_projectsBtn->setStyleSheet(secondaryStyle);
     m_projectsBtn->setToolTip(tr("Open project browser"));
 

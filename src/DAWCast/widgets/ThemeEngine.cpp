@@ -42,8 +42,14 @@ QStringList ThemeEngine::themeSearchPaths() const
     paths << appDir + QStringLiteral("/../themes");       // macOS .app bundle: Contents/MacOS/../themes
     paths << appDir + QStringLiteral("/../Resources/themes"); // macOS bundle resources
 
-    // 2. Current working directory (development)
+    // 2. Relative to binary for development builds (binary at src/DAWCast/)
+    paths << appDir + QStringLiteral("/../../themes");
+
+    // 3. Current working directory (development)
     paths << QStringLiteral("themes");
+
+    // 4. Absolute project path fallback (development)
+    paths << QStringLiteral("/Users/dstjohn/dev/01_mcaster1.com/Mcaster1DAWCast/themes");
 
     return paths;
 }

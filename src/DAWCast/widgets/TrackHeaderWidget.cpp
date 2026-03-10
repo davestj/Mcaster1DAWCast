@@ -72,7 +72,7 @@ void TrackHeaderWidget::buildUI()
     row1->setContentsMargins(0, 0, 0, 0);
 
     // Drag handle (grip dots) for track reorder
-    auto* gripLabel = new QLabel(QStringLiteral("\xe2\xb8\xb1\xe2\xb8\xb1"), this);  // grip dots
+    auto* gripLabel = new QLabel(QStringLiteral("::"), this);  // grip dots
     gripLabel->setFixedWidth(14);
     gripLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #556; font-size: 10px; padding: 0; }"));
@@ -88,7 +88,7 @@ void TrackHeaderWidget::buildUI()
     row1->addWidget(m_colorDot);
 
     // Freeze indicator (snowflake) — hidden by default
-    m_freezeLabel = new QLabel(QString::fromUtf8("\xe2\x9d\x84"), this);  // U+2744 snowflake
+    m_freezeLabel = new QLabel(QStringLiteral("*"), this);  // frozen indicator
     m_freezeLabel->setStyleSheet(QStringLiteral(
         "QLabel { color: #78b4ff; font-size: 12px; padding: 0; }"));
     m_freezeLabel->setToolTip(tr("Frozen"));
@@ -115,7 +115,7 @@ void TrackHeaderWidget::buildUI()
     });
 
     // Dropdown menu button
-    m_menuBtn = new QPushButton(QStringLiteral("\xe2\x96\xbc"), this);  // Unicode down triangle
+    m_menuBtn = new QPushButton(QStringLiteral("v"), this);  // dropdown
     m_menuBtn->setFixedSize(20, 18);
     m_menuBtn->setStyleSheet(kBtnBase +
         QStringLiteral(" QPushButton { font-size: 8px; padding: 0; }"));
@@ -165,7 +165,7 @@ void TrackHeaderWidget::buildUI()
     });
 
     // Record arm (red circle)
-    m_recBtn = makeBtn(QStringLiteral("\xe2\x97\x8f"));  // Unicode filled circle
+    m_recBtn = makeBtn(QStringLiteral("R"));
     row2->addWidget(m_recBtn);
     connect(m_recBtn, &QPushButton::toggled, this, [this](bool checked) {
         m_recordArmed = checked;
@@ -174,7 +174,7 @@ void TrackHeaderWidget::buildUI()
     });
 
     // Monitor (headphone icon) — input monitoring toggle
-    m_monitorBtn = makeBtn(QStringLiteral("\xf0\x9f\x8e\xa7"));  // headphone emoji U+1F3A7
+    m_monitorBtn = makeBtn(QStringLiteral("MON"));
     m_monitorBtn->setToolTip(tr("Input Monitor — hear your input in real-time"));
     row2->addWidget(m_monitorBtn);
     connect(m_monitorBtn, &QPushButton::toggled, this, [this](bool checked) {
@@ -183,7 +183,7 @@ void TrackHeaderWidget::buildUI()
     });
 
     // EQ
-    m_eqBtn = makeBtn(QStringLiteral("\xe2\x89\xa1"));  // Unicode triple bar (identical to)
+    m_eqBtn = makeBtn(QStringLiteral("EQ"));
     row2->addWidget(m_eqBtn);
     connect(m_eqBtn, &QPushButton::clicked, this, [this]() {
         emit eqRequested(m_trackIndex);
@@ -191,7 +191,7 @@ void TrackHeaderWidget::buildUI()
     m_eqBtn->setCheckable(false);  // EQ opens a dialog, no toggle state
 
     // Scissors (split tool)
-    m_splitBtn = makeBtn(QStringLiteral("\xe2\x9c\x82"));  // Unicode scissors
+    m_splitBtn = makeBtn(QStringLiteral("CUT"));
     row2->addWidget(m_splitBtn);
     connect(m_splitBtn, &QPushButton::toggled, this, [this](bool checked) {
         updateButtonStyle(m_splitBtn, checked, QColor(0x50, 0x90, 0xd0));  // blue
@@ -207,7 +207,7 @@ void TrackHeaderWidget::buildUI()
     });
 
     // Settings (gear)
-    m_settingsBtn = makeBtn(QStringLiteral("\xe2\x9a\x99"));  // Unicode gear
+    m_settingsBtn = makeBtn(QStringLiteral("SET"));
     row2->addWidget(m_settingsBtn);
     connect(m_settingsBtn, &QPushButton::clicked, this, [this]() {
         emit settingsRequested(m_trackIndex);
