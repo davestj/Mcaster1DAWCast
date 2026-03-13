@@ -709,7 +709,7 @@ void TimelineWidget::drawMidiClip(QPainter& p, MidiClip* clip, int trackIndex, i
 
 void TimelineWidget::mousePressEvent(QMouseEvent* event)
 {
-    m_dragging = true;
+    m_dragging = false;  // Only set true when we confirm a drag target
     m_draggingAuto = false;
     m_draggingAutoPoint = -1;
     m_draggingGainPoint = false;
@@ -771,7 +771,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
             }
         }
 
-        // Default: set playhead
+        // Default: set playhead (drag will be handled in mouseMoveEvent)
+        m_dragging = true;  // Enable ruler drag for playhead scrubbing
         int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
         m_timeline->setPlayhead(qMax(int64_t(0), sample));
         emit playheadMoved(m_timeline->playhead());
@@ -929,7 +930,9 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
                     break;
                 }
             }
-            if (!found && !(event->modifiers() & Qt::ControlModifier)) {
+            if (found) {
+                m_dragging = true;  // Enable clip drag
+            } else if (!(event->modifiers() & Qt::ControlModifier)) {
                 m_selectedClips.clear();
             }
         }
@@ -1063,15 +1066,31 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
             m_timeline->setPlayhead(qMax(int64_t(0), sample));
             emit playheadMoved(m_timeline->playhead());
             update();
-        } else if (!m_selectedClips.isEmpty()) {
-            // Clip drag: emit move signal based on delta
+        } else if (!m_selectedClips.isEmpty() && m_timeline) {
+            // Clip drag: move clips by pixel delta
             int64_t deltaSamples = pixelToSample(event->pos().x(), 0, m_zoom)
                                  - pixelToSample(m_dragStart.x(), 0, m_zoom);
-            for (int clipId : std::as_const(m_selectedClips)) {
-                emit clipMoved(clipId, deltaSamples);
+            if (deltaSamples != 0) {
+                // Find the track and move each selected clip
+                int trackIdx = (m_dragStart.y() - kRulerHeight) / kTrackHeight;
+                if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
+                    auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(trackIdx));
+                    if (audioTrack) {
+                        for (int clipId : std::as_const(m_selectedClips)) {
+                            Clip* clip = audioTrack->clip(clipId);
+                            if (clip) {
+                                int64_t newPos = clip->timelinePosition() + deltaSamples;
+                                if (newPos < 0) newPos = 0;
+                                newPos = snapPosition(newPos);
+                                clip->setTimelinePosition(newPos);
+                            }
+                        }
+                    }
+                }
+                emit clipMoved(m_selectedClips.isEmpty() ? -1 : m_selectedClips.first(), deltaSamples);
+                m_dragStart = event->pos();
+                update();
             }
-            m_dragStart = event->pos();
-            update();
         } else {
             // Rubber-band selection
             m_rubberBand = QRect(m_dragStart, event->pos()).normalized();
@@ -1414,10 +1433,14 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
                                   float verticalZoom)
 {
     auto* cache = WaveformCache::instance();
-    const WaveformData* waveform = cache->getWaveform(clip->sourcePath());
 
-    if (!waveform) {
-        // Data not yet decoded — draw a "Loading..." placeholder
+    // Check if waveform is cached WITHOUT triggering a decode
+    // (never do I/O or heavy work inside paintEvent)
+    if (!cache->hasWaveform(clip->sourcePath())) {
+        // Request async decode (no-op if already pending)
+        cache->requestWaveform(clip->sourcePath());
+
+        // Draw a simple "Loading..." placeholder
         p.setPen(QColor(180, 180, 180, 120));
         QFont loadFont = font();
         loadFont.setPointSize(8);
@@ -1426,6 +1449,9 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
                    tr("Loading..."));
         return;
     }
+
+    const WaveformData* waveform = cache->getWaveform(clip->sourcePath());
+    if (!waveform) return;  // race condition guard
 
     if (waveform->peaks.empty() || waveform->sampleRate <= 0)
         return;
@@ -1459,7 +1485,9 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
     // fall under it and take the max peak and max RMS.
     p.setRenderHint(QPainter::Antialiasing, false);
 
-    for (int px = 0; px < drawW; ++px) {
+    // Cap pixel iteration to visible area to prevent huge loops on zoomed-in clips
+    int visibleDrawW = qMin(drawW, width() + 100);
+    for (int px = 0; px < visibleDrawW; ++px) {
         // Source sample range covered by this pixel column
         double srcFrac0 = static_cast<double>(px)     / drawW;
         double srcFrac1 = static_cast<double>(px + 1) / drawW;
