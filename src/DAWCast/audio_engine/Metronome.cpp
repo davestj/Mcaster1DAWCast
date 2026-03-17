@@ -172,9 +172,11 @@ void Metronome::generateClick(float* buffer, int frames, int channels,
             buffer[f * channels + ch] += clickSample;
         }
 
-        // Emit beat signal at beat boundary (sampleOffset == 0)
+        // Store beat info atomically — GUI polls this via timer
+        // (NEVER emit signals from the audio callback thread)
         if (sampleOffset == 0) {
-            emit beat(beatIndex, isDownbeat);
+            m_lastBeatIndex.store(beatIndex, std::memory_order_relaxed);
+            m_lastBeatWasDownbeat.store(isDownbeat, std::memory_order_relaxed);
         }
     }
 }

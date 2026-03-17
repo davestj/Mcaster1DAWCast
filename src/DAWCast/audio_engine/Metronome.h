@@ -70,6 +70,10 @@ private:
     std::atomic<bool> m_enabled{false};
     int               m_countInBars = 0;
 
+    // Beat info — written from audio thread, polled by GUI timer
+    std::atomic<int>  m_lastBeatIndex{-1};
+    std::atomic<bool> m_lastBeatWasDownbeat{false};
+
     // Pre-generated click sounds (mono, to be mixed into each channel)
     std::vector<float> m_downbeatClick;  // 880 Hz, 20 ms, exponential decay
     std::vector<float> m_beatClick;      // 440 Hz, 15 ms, exponential decay

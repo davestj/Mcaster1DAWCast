@@ -291,7 +291,9 @@ int AudioEngine::processCallback(const float* input, float* output,
         }
     }
 
-    emit bufferProcessed();
+    // NOTE: Do NOT emit signals from the audio callback thread —
+    // it can deadlock the GUI. The PlaybackEngine uses atomic polling
+    // instead for position updates.
     return 0; // paContinue
 }
 
