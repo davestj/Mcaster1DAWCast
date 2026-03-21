@@ -557,19 +557,20 @@ void MainWindow::setupToolbars()
     m_toolBar->setMovable(false);
     m_toolBar->setFloatable(false);
 
-    m_transportBar = new TransportBar(this);
-    m_toolBar->addWidget(m_transportBar);
+    // Transport bar + workspace selector in same toolbar
+    auto* transportContainer = new QWidget(this);
+    auto* transportHBox = new QHBoxLayout(transportContainer);
+    transportHBox->setContentsMargins(0, 0, 0, 0);
+    transportHBox->setSpacing(0);
 
-    // View Mode switcher toolbar — below the transport bar
-    m_viewModeToolBar = addToolBar(tr("View Mode"));
-    m_viewModeToolBar->setMovable(false);
-    m_viewModeToolBar->setFloatable(false);
-    m_viewModeToolBar->setStyleSheet(QStringLiteral(
-        "QToolBar { background: #1a2228; border-top: 1px solid #2a3a42; "
-        "border-bottom: 1px solid #2a3a42; spacing: 0; padding: 0; }"));
+    m_transportBar = new TransportBar(this);
+    transportHBox->addWidget(m_transportBar, 1);
 
     m_viewModeSwitcher = new ViewModeSwitcher(this);
-    m_viewModeToolBar->addWidget(m_viewModeSwitcher);
+    m_viewModeSwitcher->setFixedWidth(200);
+    transportHBox->addWidget(m_viewModeSwitcher);
+
+    m_toolBar->addWidget(transportContainer);
 }
 
 // ── Sidebar Navigation (removed — replaced by View Mode system) ────────────
