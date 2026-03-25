@@ -118,6 +118,11 @@ void MainWindow::setupMenus()
 {
     m_menuBar = menuBar();
 
+    // Workspace selector — top-right corner of menu bar
+    m_viewModeSwitcher = new ViewModeSwitcher(this);
+    m_viewModeSwitcher->setFixedWidth(200);
+    m_menuBar->setCornerWidget(m_viewModeSwitcher, Qt::TopRightCorner);
+
     // ── File ────────────────────────────────────────────────────────────
     auto* fileMenu = m_menuBar->addMenu(tr("&File"));
 
@@ -557,20 +562,8 @@ void MainWindow::setupToolbars()
     m_toolBar->setMovable(false);
     m_toolBar->setFloatable(false);
 
-    // Transport bar + workspace selector in same toolbar
-    auto* transportContainer = new QWidget(this);
-    auto* transportHBox = new QHBoxLayout(transportContainer);
-    transportHBox->setContentsMargins(0, 0, 0, 0);
-    transportHBox->setSpacing(0);
-
     m_transportBar = new TransportBar(this);
-    transportHBox->addWidget(m_transportBar, 1);
-
-    m_viewModeSwitcher = new ViewModeSwitcher(this);
-    m_viewModeSwitcher->setFixedWidth(200);
-    transportHBox->addWidget(m_viewModeSwitcher);
-
-    m_toolBar->addWidget(transportContainer);
+    m_toolBar->addWidget(m_transportBar);
 }
 
 // ── Sidebar Navigation (removed — replaced by View Mode system) ────────────

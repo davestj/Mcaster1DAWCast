@@ -4,6 +4,8 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QFile>
+#include <QIcon>
 #include <QSettings>
 #include <QStyleFactory>
 #include <QThread>
@@ -21,6 +23,18 @@ int main(int argc, char* argv[])
     app.setApplicationVersion(QStringLiteral("1.0.0-alpha"));
     app.setOrganizationName(QStringLiteral("Mcaster1"));
     app.setOrganizationDomain(QStringLiteral("mcaster1.com"));
+
+    // Set app icon — used in dock, window title bar, task switcher
+    QString iconPath = QCoreApplication::applicationDirPath()
+                     + QStringLiteral("/../../image_resources/app-icon-1024.png");
+    if (QFile::exists(iconPath)) {
+        app.setWindowIcon(QIcon(iconPath));
+    } else {
+        // Fallback: try relative to CWD
+        iconPath = QStringLiteral("image_resources/app-icon-1024.png");
+        if (QFile::exists(iconPath))
+            app.setWindowIcon(QIcon(iconPath));
+    }
 
     // Use Fusion as the base style for consistent cross-platform appearance
     app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
