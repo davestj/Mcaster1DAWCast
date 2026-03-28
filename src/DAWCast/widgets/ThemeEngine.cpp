@@ -130,8 +130,11 @@ bool ThemeEngine::loadTheme(const QString& name)
         QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
     }
 
-    // Process and apply stylesheet if present
-    if (QFile::exists(qssPath)) {
+    // Process and apply stylesheet
+    // For "Default" theme: clear stylesheet to use native system palette
+    if (name.compare(QStringLiteral("Default"), Qt::CaseInsensitive) == 0) {
+        qApp->setStyleSheet(QString());
+    } else if (QFile::exists(qssPath)) {
         QFile qssFile(qssPath);
         if (qssFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString rawQss = QString::fromUtf8(qssFile.readAll());
@@ -139,7 +142,6 @@ bool ThemeEngine::loadTheme(const QString& name)
             qApp->setStyleSheet(processed);
         }
     } else {
-        // No QSS file — clear any previous stylesheet
         qApp->setStyleSheet(QString());
     }
 

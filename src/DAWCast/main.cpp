@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     dawcast::config::DebugLogger::instance()->info(
         QStringLiteral("Mcaster1DAWCast 1.0.0-alpha starting"));
 
-    // Load theme — honour user preference, default to DarkStudio on first launch
+    // Load theme — honour user preference, default to system Default theme
     splash->showMessage(QStringLiteral("Loading theme..."));
     app.processEvents();
     QThread::msleep(300);
@@ -68,17 +68,24 @@ int main(int argc, char* argv[])
         QSettings settings;
         QString themeName = settings.value(
             QStringLiteral("appearance/theme"),
-            QStringLiteral("DarkStudio")).toString();
-        if (!dawcast::widgets::ThemeEngine::instance()->loadTheme(themeName)) {
-            // Fallback: try DarkStudio, then Default
-            if (themeName != QStringLiteral("DarkStudio")) {
-                dawcast::widgets::ThemeEngine::instance()->loadTheme(
-                    QStringLiteral("DarkStudio"));
-            } else {
-                dawcast::widgets::ThemeEngine::instance()->loadTheme(
-                    QStringLiteral("Default"));
+            QStringLiteral("Default")).toString();
+
+        auto* themeEngine = dawcast::widgets::ThemeEngine::instance();
+        if (!themeEngine->loadTheme(themeName)) {
+            // Fallback chain: try Default first (system colors), then DarkStudio
+            if (themeName != QStringLiteral("Default")) {
+                if (!themeEngine->loadTheme(QStringLiteral("Default"))) {
+                    themeEngine->loadTheme(QStringLiteral("DarkStudio"));
+                }
             }
         }
+
+        // Log available themes for debugging
+        QStringList available = themeEngine->availableThemes();
+        dawcast::config::DebugLogger::instance()->info(
+            QStringLiteral("Available themes: %1 | Loaded: %2")
+                .arg(available.join(QStringLiteral(", ")),
+                     themeEngine->currentTheme()));
     }
 
     // Create the main window (this initializes audio engine, timeline, etc.)
