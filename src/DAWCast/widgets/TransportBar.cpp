@@ -63,21 +63,21 @@ TransportBar::TransportBar(QWidget* parent)
 
     m_rewindBtn = new BevelButton(QStringLiteral("\u23EA"), this);
     m_rewindBtn->setFixedSize(btnSize);
-    m_rewindBtn->setToolTip(tr("Rewind"));
+    m_rewindBtn->setToolTip(tr("Rewind to start (Home) - Returns playhead to position 0:00"));
 
     m_playBtn = new BevelButton(QStringLiteral("\u25B6"), this);
     m_playBtn->setFixedSize(btnSize);
     m_playBtn->setCheckable(true);
-    m_playBtn->setToolTip(tr("Play"));
+    m_playBtn->setToolTip(tr("Play (Space) - Start playback from the current playhead position"));
 
     m_stopBtn = new BevelButton(QStringLiteral("\u23F9"), this);
     m_stopBtn->setFixedSize(btnSize);
-    m_stopBtn->setToolTip(tr("Stop"));
+    m_stopBtn->setToolTip(tr("Stop (Space) - Stop playback and reset playhead to start"));
 
     m_recordBtn = new BevelButton(QStringLiteral("\u23FA"), this);
     m_recordBtn->setFixedSize(btnSize);
     m_recordBtn->setCheckable(true);
-    m_recordBtn->setToolTip(tr("Record"));
+    m_recordBtn->setToolTip(tr("Record (R) - Start recording on armed tracks"));
 
     row1->addWidget(m_rewindBtn);
     row1->addWidget(m_playBtn);
@@ -107,6 +107,19 @@ TransportBar::TransportBar(QWidget* parent)
                         "padding: 4px 8px; border-radius: 3px; }"));
 
     row1->addWidget(m_timeDisplay);
+
+    // ── Selection Display ───────────────────────────────────────────────
+    m_selectionLabel = new QLabel(this);
+    m_selectionLabel->setAlignment(Qt::AlignCenter);
+    m_selectionLabel->setFont(monoFont);
+    m_selectionLabel->setMinimumWidth(200);
+    m_selectionLabel->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
+    m_selectionLabel->setStyleSheet(
+        QStringLiteral("QLabel { background-color: #1a1a1a; color: #66aaff; "
+                        "padding: 4px 6px; border-radius: 3px; font-size: 10px; }"));
+    m_selectionLabel->setToolTip(tr("Time selection range"));
+    m_selectionLabel->hide();  // Hidden until a selection is made
+    row1->addWidget(m_selectionLabel);
 
     row1->addWidget(makeSeparator(this));
 
@@ -138,7 +151,7 @@ TransportBar::TransportBar(QWidget* parent)
     m_metronomeBtn = new BevelButton(QStringLiteral("\u266A"), this);  // musical note
     m_metronomeBtn->setFixedSize(smallBtnSize);
     m_metronomeBtn->setCheckable(true);
-    m_metronomeBtn->setToolTip(tr("Metronome"));
+    m_metronomeBtn->setToolTip(tr("Metronome - Toggle click track on/off during playback and recording"));
     row1->addWidget(m_metronomeBtn);
 
     auto* bpmLabel = new QLabel(QStringLiteral("BPM"), this);
@@ -259,19 +272,19 @@ TransportBar::TransportBar(QWidget* parent)
     m_loopBtn = new BevelButton(QStringLiteral("\u21BB"), this);
     m_loopBtn->setFixedSize(QSize(30, 24));
     m_loopBtn->setCheckable(true);
-    m_loopBtn->setToolTip(tr("Loop"));
+    m_loopBtn->setToolTip(tr("Loop (L) - Repeat playback within the loop region"));
     row2->addWidget(m_loopBtn);
 
     // Pause button (compact, row 2)
     m_pauseBtn = new BevelButton(QStringLiteral("\u23F8"), this);
     m_pauseBtn->setFixedSize(QSize(30, 24));
-    m_pauseBtn->setToolTip(tr("Pause"));
+    m_pauseBtn->setToolTip(tr("Pause - Pause playback and keep the playhead at its current position"));
     row2->addWidget(m_pauseBtn);
 
     // Fast-forward button
     m_ffBtn = new BevelButton(QStringLiteral("\u23E9"), this);
     m_ffBtn->setFixedSize(QSize(30, 24));
-    m_ffBtn->setToolTip(tr("Fast Forward"));
+    m_ffBtn->setToolTip(tr("Fast Forward (End) - Jump playhead to the end of the timeline"));
     row2->addWidget(m_ffBtn);
 
     row2->addWidget(makeSeparator(this));
@@ -511,6 +524,19 @@ void TransportBar::updateTimeDisplay()
 void TransportBar::updateZoomLabel(int value)
 {
     m_zoomLabel->setText(QStringLiteral("%1 px/s").arg(value));
+}
+
+void TransportBar::setSelection(int64_t startSamples, int64_t endSamples, int sampleRate)
+{
+    if (startSamples >= endSamples) {
+        m_selectionLabel->hide();
+        return;
+    }
+    QString startStr = formatTimecode(startSamples, sampleRate);
+    QString endStr   = formatTimecode(endSamples, sampleRate);
+    m_selectionLabel->setText(
+        QStringLiteral("Sel: %1 - %2").arg(startStr, endStr));
+    m_selectionLabel->show();
 }
 
 } // namespace dawcast::widgets

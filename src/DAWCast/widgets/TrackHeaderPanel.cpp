@@ -67,6 +67,7 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
 
     auto* addBtn = new QPushButton(QStringLiteral("+"), titleBar);
     addBtn->setFixedSize(22, 22);
+    addBtn->setToolTip(tr("Add a new audio track to the timeline"));
     addBtn->setStyleSheet(QStringLiteral(
         "QPushButton {"
         "  background-color: #2e3248; color: #8890a8; border: 1px solid #3a3e55;"

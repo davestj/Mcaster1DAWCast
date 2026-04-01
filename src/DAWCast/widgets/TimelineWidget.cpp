@@ -104,6 +104,11 @@ constexpr float kGainEnvelopeMinDb  = -60.0f;        // bottom of envelope range
 
 // Freeze indicator
 const QColor kFreezeColor(120, 180, 255);            // icy blue
+
+// Time selection
+const QColor kTimeSelectionFill(80, 140, 255, 50);     // semi-transparent blue
+const QColor kTimeSelectionBorder(80, 140, 255, 180);  // blue border
+const QColor kTimeSelectionRuler(100, 170, 255, 90);   // ruler highlight
 } // anonymous namespace
 
 TimelineWidget::TimelineWidget(QWidget* parent)
@@ -255,6 +260,9 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
             drawFreezeIndicator(p, audioTrack, yTop);
         }
     }
+
+    // --- Time selection region ---
+    drawSelection(p, w, h);
 
     // --- Playhead ---
     if (m_timeline) {
@@ -771,7 +779,39 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
             }
         }
 
+        // Shift+click in ruler: start/extend a time selection
+        if ((event->modifiers() & Qt::ShiftModifier) && event->button() == Qt::LeftButton) {
+            int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            sample = qMax(int64_t(0), sample);
+            if (hasSelection()) {
+                // Extend the existing selection
+                if (sample < m_selectionStart)
+                    setSelection(sample, m_selectionEnd);
+                else
+                    setSelection(m_selectionStart, sample);
+            } else {
+                // Start a new selection from the playhead to here
+                int64_t ph = m_timeline->playhead();
+                setSelection(qMin(ph, sample), qMax(ph, sample));
+            }
+            m_selectingRegion = true;
+            m_dragging = true;
+            return;
+        }
+
+        // Ctrl+click (or Cmd+click on macOS) in ruler: start a region selection drag
+        if ((event->modifiers() & Qt::ControlModifier) && event->button() == Qt::LeftButton) {
+            int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            sample = qMax(int64_t(0), sample);
+            m_selectionStart = sample;
+            m_selectionEnd = sample;
+            m_selectingRegion = true;
+            m_dragging = true;
+            return;
+        }
+
         // Default: set playhead (drag will be handled in mouseMoveEvent)
+        clearSelection();
         m_dragging = true;  // Enable ruler drag for playhead scrubbing
         int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
         m_timeline->setPlayhead(qMax(int64_t(0), sample));
@@ -1060,6 +1100,15 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
             }
             update();
         }
+        // Selection region drag in ruler
+        else if (m_selectingRegion && m_dragStart.y() < kRulerHeight && m_timeline) {
+            int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+            sample = qMax(int64_t(0), sample);
+            // Determine selection bounds based on drag start
+            int64_t dragStartSample = pixelToSample(m_dragStart.x(), m_scroll, m_zoom);
+            dragStartSample = qMax(int64_t(0), dragStartSample);
+            setSelection(qMin(dragStartSample, sample), qMax(dragStartSample, sample));
+        }
         // Dragging in ruler: update playhead
         else if (m_dragStart.y() < kRulerHeight && m_timeline) {
             int64_t sample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
@@ -1126,6 +1175,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent* event)
     m_draggingMarkerIdx = -1;
     m_draggingLoopStart = false;
     m_draggingLoopEnd   = false;
+    m_selectingRegion = false;
     m_rubberBand = QRect();
     update();
     QWidget::mouseReleaseEvent(event);
@@ -1176,27 +1226,63 @@ void TimelineWidget::wheelEvent(QWheelEvent* event)
 void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
 {
     QMenu menu(this);
-    menu.addAction(tr("Cut"), this, [this]{ cutSelectedClips(); });
-    menu.addAction(tr("Copy"), this, [this]{ copySelectedClips(); });
-    menu.addAction(tr("Paste"), this, [this]{ pasteClips(); });
-    menu.addSeparator();
-    menu.addAction(tr("Delete"), this, [this]{ deleteSelectedClips(); });
-    menu.addSeparator();
 
-    // ── Split at Playhead ────────────────────────────────────────────
-    menu.addAction(tr("Split at Playhead"), this, [this]{ splitAtPlayhead(); });
-    menu.addSeparator();
+    const bool inRuler = event->pos().y() < kRulerHeight;
+    const bool hasClipSelection = !m_selectedClips.isEmpty();
+    const bool hasTimeSelection = hasSelection();
+    int64_t clickSamplePos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
+    clickSamplePos = qMax(int64_t(0), clickSamplePos);
 
-    // ── Normalize (shown when clips are selected) ─────────────────────
-    if (!m_selectedClips.isEmpty()) {
-        menu.addAction(tr("Normalize..."), this, [this]{ normalizeSelectedClips(); });
+    // ════════════════════════════════════════════════════════════════════
+    // RULER right-click menu
+    // ════════════════════════════════════════════════════════════════════
+    if (inRuler && m_timeline) {
+        menu.addAction(tr("Set Playhead Here"), this, [this, clickSamplePos]() {
+            m_timeline->setPlayhead(clickSamplePos);
+            emit playheadMoved(clickSamplePos);
+            update();
+        });
         menu.addSeparator();
-    }
 
-    // ── Punch-In / Punch-Out markers ──────────────────────────────────
-    if (m_timeline) {
-        int64_t clickSamplePos = pixelToSample(event->pos().x(), m_scroll, m_zoom);
-        clickSamplePos = qMax(int64_t(0), clickSamplePos);
+        menu.addAction(tr("Add Marker Here"), this, [this, clickSamplePos]() {
+            bool ok = false;
+            QString name = QInputDialog::getText(
+                this, tr("Add Marker"), tr("Marker name:"),
+                QLineEdit::Normal,
+                QStringLiteral("Marker %1").arg(m_timeline->markerCount() + 1),
+                &ok);
+            if (ok && !name.isEmpty()) {
+                Marker mkr(name, clickSamplePos, Marker::Type::Cue);
+                m_timeline->addMarker(mkr);
+                update();
+            }
+        });
+
+        menu.addSeparator();
+
+        menu.addAction(tr("Set Loop Start Here"), this, [this, clickSamplePos]() {
+            m_timeline->setLoopStart(clickSamplePos);
+            if (m_timeline->loopEnd() <= clickSamplePos)
+                m_timeline->setLoopEnd(m_timeline->duration());
+            m_timeline->setLoopEnabled(true);
+            update();
+        });
+        menu.addAction(tr("Set Loop End Here"), this, [this, clickSamplePos]() {
+            m_timeline->setLoopEnd(clickSamplePos);
+            if (m_timeline->loopStart() >= clickSamplePos)
+                m_timeline->setLoopStart(0);
+            m_timeline->setLoopEnabled(true);
+            update();
+        });
+
+        if (m_timeline->loopEnabled()) {
+            menu.addAction(tr("Clear Loop Region"), this, [this]() {
+                m_timeline->setLoopEnabled(false);
+                update();
+            });
+        }
+
+        menu.addSeparator();
 
         menu.addAction(tr("Set Punch In Here"), this, [this, clickSamplePos]() {
             m_timeline->setPunchIn(clickSamplePos);
@@ -1216,28 +1302,38 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
                 update();
             });
         }
+
         menu.addSeparator();
 
-        // ── Marker actions ────────────────────────────────────────────────
-        menu.addAction(tr("Add Marker Here"), this, [this, clickSamplePos]() {
-            bool ok = false;
-            QString name = QInputDialog::getText(
-                this, tr("Add Marker"), tr("Marker name:"),
-                QLineEdit::Normal,
-                QStringLiteral("Marker %1").arg(m_timeline->markerCount() + 1),
-                &ok);
-            if (ok && !name.isEmpty()) {
-                Marker mkr(name, clickSamplePos, Marker::Type::Cue);
-                m_timeline->addMarker(mkr);
-                update();
-            }
+        menu.addAction(tr("Set Selection Start Here"), this, [this, clickSamplePos]() {
+            setSelection(clickSamplePos, m_selectionEnd > clickSamplePos ? m_selectionEnd : clickSamplePos);
         });
+        menu.addAction(tr("Set Selection End Here"), this, [this, clickSamplePos]() {
+            setSelection(m_selectionStart < clickSamplePos ? m_selectionStart : clickSamplePos, clickSamplePos);
+        });
+
+        if (hasTimeSelection) {
+            menu.addAction(tr("Clear Selection"), this, [this]() {
+                clearSelection();
+            });
+            menu.addAction(tr("Zoom to Selection"), this, [this]() {
+                if (m_selectionEnd > m_selectionStart) {
+                    int64_t range = m_selectionEnd - m_selectionStart;
+                    int64_t padding = range / 20;
+                    m_scroll = qMax(int64_t(0), m_selectionStart - padding);
+                    m_zoom = static_cast<float>(width()) / static_cast<float>(range + padding * 2);
+                    m_zoom = qBound(kMinZoom, m_zoom, kMaxZoom);
+                    update();
+                }
+            });
+        }
 
         // Right-click on an existing marker: offer edit/delete
         for (int i = 0; i < m_timeline->markerCount(); ++i) {
             int mkrX = sampleToPixel(m_timeline->marker(i).position(), m_scroll, m_zoom);
             if (qAbs(event->pos().x() - mkrX) <= kMarkerHitRadius) {
                 const int markerIdx = i;
+                menu.addSeparator();
                 menu.addAction(tr("Edit Marker \"%1\"...").arg(m_timeline->marker(i).name()),
                                this, [this, markerIdx]() {
                     Marker mkr = m_timeline->marker(markerIdx);
@@ -1268,34 +1364,175 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
             }
         }
 
+        menu.exec(event->globalPos());
+        return;
+    }
+
+    // ════════════════════════════════════════════════════════════���═══════
+    // TIME SELECTION right-click menu (when a time region is selected)
+    // ════════════════════════════════════════════════════════════════════
+    if (hasTimeSelection && !hasClipSelection) {
+        menu.addAction(tr("Apply Effect to Selection..."), this, [this]() {
+            // Placeholder -- would open an effect chooser dialog
+        });
+        menu.addAction(tr("Export Selection..."), this, [this]() {
+            // Placeholder -- would export the selected time range
+        });
+        menu.addSeparator();
+        menu.addAction(tr("Silence Selection"), this, [this]() {
+            // Placeholder -- would silence audio in the selection range
+        });
+        menu.addAction(tr("Normalize Selection"), this, [this]() {
+            normalizeSelectedClips();
+        });
+        menu.addSeparator();
+        menu.addAction(tr("Fade In"), this, [this]() {
+            // Placeholder -- would apply a fade-in to the selection
+        });
+        menu.addAction(tr("Fade Out"), this, [this]() {
+            // Placeholder -- would apply a fade-out to the selection
+        });
+        menu.addSeparator();
+        menu.addAction(tr("Loop Selection"), this, [this]() {
+            if (m_timeline) {
+                m_timeline->setLoopStart(m_selectionStart);
+                m_timeline->setLoopEnd(m_selectionEnd);
+                m_timeline->setLoopEnabled(true);
+                update();
+            }
+        });
+        menu.addAction(tr("Zoom to Selection"), this, [this]() {
+            if (m_selectionEnd > m_selectionStart) {
+                int64_t range = m_selectionEnd - m_selectionStart;
+                int64_t padding = range / 20;
+                m_scroll = qMax(int64_t(0), m_selectionStart - padding);
+                m_zoom = static_cast<float>(width()) / static_cast<float>(range + padding * 2);
+                m_zoom = qBound(kMinZoom, m_zoom, kMaxZoom);
+                update();
+            }
+        });
+        menu.addSeparator();
+        menu.addAction(tr("Clear Selection"), this, [this]() {
+            clearSelection();
+        });
+        menu.exec(event->globalPos());
+        return;
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // CLIP right-click menu (when clips are selected)
+    // ════════════════════════════════════════════════════════════════════
+    if (hasClipSelection) {
+        auto* actCut = menu.addAction(tr("Cut"));
+        actCut->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_X));
+        connect(actCut, &QAction::triggered, this, [this]{ cutSelectedClips(); });
+
+        auto* actCopy = menu.addAction(tr("Copy"));
+        actCopy->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_C));
+        connect(actCopy, &QAction::triggered, this, [this]{ copySelectedClips(); });
+
+        auto* actDelete = menu.addAction(tr("Delete"));
+        actDelete->setShortcut(QKeySequence(Qt::Key_Delete));
+        connect(actDelete, &QAction::triggered, this, [this]{ deleteSelectedClips(); });
+
         menu.addSeparator();
 
-        // ── Loop region actions ───────────────────────────────────────────
-        menu.addAction(tr("Set Loop Start Here"), this, [this, clickSamplePos]() {
-            m_timeline->setLoopStart(clickSamplePos);
-            if (m_timeline->loopEnd() <= clickSamplePos) {
-                // Auto-set loop end to end of timeline
-                m_timeline->setLoopEnd(m_timeline->duration());
+        auto* actSplit = menu.addAction(tr("Split at Playhead"));
+        actSplit->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+        connect(actSplit, &QAction::triggered, this, [this]{ splitAtPlayhead(); });
+
+        menu.addSeparator();
+
+        menu.addAction(tr("Normalize..."), this, [this]{ normalizeSelectedClips(); });
+
+        menu.addAction(tr("Fade In"), this, [this]() {
+            // Apply default fade-in to selected clips
+            if (!m_timeline) return;
+            int sr = m_timeline->sampleRate();
+            int trackCount = m_timeline->trackCount();
+            for (int t = 0; t < trackCount; ++t) {
+                auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+                if (!audioTrack) continue;
+                for (int c : std::as_const(m_selectedClips)) {
+                    Clip* clip = audioTrack->clip(c);
+                    if (clip) clip->setFadeIn(sr / 4);  // 0.25 sec default
+                }
             }
-            m_timeline->setLoopEnabled(true);
             update();
         });
-        menu.addAction(tr("Set Loop End Here"), this, [this, clickSamplePos]() {
-            m_timeline->setLoopEnd(clickSamplePos);
-            if (m_timeline->loopStart() >= clickSamplePos) {
-                m_timeline->setLoopStart(0);
+        menu.addAction(tr("Fade Out"), this, [this]() {
+            if (!m_timeline) return;
+            int sr = m_timeline->sampleRate();
+            int trackCount = m_timeline->trackCount();
+            for (int t = 0; t < trackCount; ++t) {
+                auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(t));
+                if (!audioTrack) continue;
+                for (int c : std::as_const(m_selectedClips)) {
+                    Clip* clip = audioTrack->clip(c);
+                    if (clip) clip->setFadeOut(sr / 4);  // 0.25 sec default
+                }
             }
-            m_timeline->setLoopEnabled(true);
             update();
         });
 
-        if (m_timeline->loopEnabled()) {
-            menu.addAction(tr("Clear Loop Region"), this, [this]() {
-                m_timeline->setLoopEnabled(false);
+        menu.addSeparator();
+
+        menu.addAction(tr("Time Stretch / Pitch Shift..."), this, [this] {
+            auto* dialog = new TimeStretchDialog(this);
+            dialog->setAttribute(Qt::WA_DeleteOnClose);
+            connect(dialog, &QDialog::accepted, this, [this, dialog] {
+                Q_UNUSED(dialog);
                 update();
             });
-        }
+            dialog->show();
+        });
 
+        menu.addAction(tr("Reverse"), this, [this]() {
+            // Placeholder -- would reverse the clip audio
+        });
+
+        menu.addSeparator();
+
+        menu.addAction(tr("Bounce to New Track"), this, [this]() {
+            // Placeholder -- would bounce selected clips to a new track
+        });
+
+        menu.addAction(tr("Open in Editor Studio"), this, [this]() {
+            // Placeholder -- would launch dawcast-editor-studio with this clip
+        });
+
+        menu.addSeparator();
+
+        menu.addAction(tr("Properties..."), this, [this]() {
+            // Placeholder -- would show clip properties dialog
+        });
+
+        menu.exec(event->globalPos());
+        return;
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // EMPTY TRACK AREA right-click menu (no selection)
+    // ════════════════════════════════════════════════════════════════════
+    if (m_timeline) {
+        menu.addAction(tr("Add Audio Track"), this, [this]() {
+            if (m_timeline) m_timeline->addAudioTrack();
+            update();
+        });
+        menu.addAction(tr("Add Video Track"), this, [this]() {
+            if (m_timeline) m_timeline->addVideoTrack();
+            update();
+        });
+        menu.addAction(tr("Add MIDI Track"), this, [this]() {
+            if (m_timeline) m_timeline->addMidiTrack();
+            update();
+        });
+        menu.addSeparator();
+
+        menu.addAction(tr("Paste"), this, [this]{ pasteClips(); });
+        menu.addSeparator();
+
+        menu.addAction(tr("Split at Playhead"), this, [this]{ splitAtPlayhead(); });
         menu.addSeparator();
     }
 
@@ -1396,21 +1633,7 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
         }
     }
 
-    // Time Stretch / Pitch Shift (available when a clip is selected)
-    if (!m_selectedClips.isEmpty()) {
-        menu.addAction(tr("Time Stretch / Pitch Shift..."), this, [this] {
-            auto* dialog = new TimeStretchDialog(this);
-            dialog->setAttribute(Qt::WA_DeleteOnClose);
-            connect(dialog, &QDialog::accepted, this, [this, dialog] {
-                // In a full implementation, this would apply the TimeStretch
-                // processor to the selected clip's audio data.
-                Q_UNUSED(dialog);
-                update();
-            });
-            dialog->show();
-        });
-        menu.addSeparator();
-    }
+    menu.addSeparator();
 
     menu.addAction(tr("Zoom In"), this, [this]{
         setZoom(m_zoom * kZoomFactor);
@@ -2603,6 +2826,52 @@ void TimelineWidget::drawRippleIndicator(QPainter& painter, int viewWidth)
     painter.drawText(badge, Qt::AlignCenter, QStringLiteral("R"));
 
     painter.restore();
+}
+
+// ── Time Region Selection ──────────────────────────────────────────────────
+
+void TimelineWidget::setSelection(int64_t start, int64_t end)
+{
+    if (start > end) std::swap(start, end);
+    m_selectionStart = qMax(int64_t(0), start);
+    m_selectionEnd   = end;
+    emit selectionChanged(m_selectionStart, m_selectionEnd);
+    update();
+}
+
+void TimelineWidget::clearSelection()
+{
+    m_selectionStart = 0;
+    m_selectionEnd   = 0;
+    m_selectingRegion = false;
+    emit selectionChanged(0, 0);
+    update();
+}
+
+void TimelineWidget::drawSelection(QPainter& painter, int viewWidth, int viewHeight)
+{
+    if (m_selectionEnd <= m_selectionStart) return;
+
+    int selX1 = sampleToPixel(m_selectionStart, m_scroll, m_zoom);
+    int selX2 = sampleToPixel(m_selectionEnd, m_scroll, m_zoom);
+    if (selX2 < 0 || selX1 > viewWidth) return;
+
+    selX1 = qMax(0, selX1);
+    selX2 = qMin(viewWidth, selX2);
+    int selW = selX2 - selX1;
+    if (selW <= 0) return;
+
+    // Ruler highlight (lighter)
+    painter.fillRect(selX1, 0, selW, kRulerHeight, kTimeSelectionRuler);
+
+    // Track area highlight (semi-transparent blue)
+    painter.fillRect(selX1, kRulerHeight, selW, viewHeight - kRulerHeight,
+                     kTimeSelectionFill);
+
+    // Left and right border lines
+    painter.setPen(QPen(kTimeSelectionBorder, 1));
+    painter.drawLine(selX1, 0, selX1, viewHeight);
+    painter.drawLine(selX2, 0, selX2, viewHeight);
 }
 
 } // namespace dawcast::widgets

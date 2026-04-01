@@ -87,6 +87,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     // ── MASTER label ───────────────────────────────────────────────────
 
     m_masterLabel = new QLabel(QStringLiteral("MASTER"), this);
+    m_masterLabel->setToolTip(tr("Master output level - Controls the final volume of the entire mix"));
     m_masterLabel->setStyleSheet(QStringLiteral(
         "QLabel {"
         "  color: #d0d4e0;"
@@ -138,11 +139,13 @@ MasterStrip::MasterStrip(QWidget* parent)
         "}"
     ));
 
+    m_fader->setToolTip(tr("Master Fader: 0.0 dB - Drag to adjust the master output volume"));
     layout->addWidget(m_fader, 1);  // stretch factor 1
 
     // ── Percentage / dB display ────────────────────────────────────────
 
     m_percentLabel = new QLabel(QStringLiteral("100%"), this);
+    m_percentLabel->setToolTip(tr("Master volume as percentage (100% = 0 dB)"));
     m_percentLabel->setFixedWidth(44);
     m_percentLabel->setAlignment(Qt::AlignCenter);
     m_percentLabel->setStyleSheet(QStringLiteral(
@@ -163,6 +166,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     layout->addWidget(m_lufsMeter);
 
     m_lufsLabel = new QLabel(QStringLiteral("-- LUFS"), this);
+    m_lufsLabel->setToolTip(tr("Loudness Units Full Scale - Real-time loudness measurement of the master output"));
     m_lufsLabel->setFixedWidth(62);
     m_lufsLabel->setAlignment(Qt::AlignCenter);
     m_lufsLabel->setStyleSheet(QStringLiteral(
@@ -179,6 +183,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     // ── LIM indicator ──────────────────────────────────────────────────
 
     m_limIndicator = new QLabel(QStringLiteral("LIM"), this);
+    m_limIndicator->setToolTip(tr("Limiter indicator - Lights up red when the output limiter is actively reducing peaks"));
     m_limIndicator->setFixedSize(32, 18);
     m_limIndicator->setAlignment(Qt::AlignCenter);
     m_limIndicator->setStyleSheet(QStringLiteral(
@@ -199,6 +204,10 @@ MasterStrip::MasterStrip(QWidget* parent)
         float db = kMinDb + (static_cast<float>(value) / kSliderMax) * (kMaxDb - kMinDb);
         m_currentDb = db;
         updatePercentLabel();
+        QString dbStr = (db > 0.0f)
+            ? QStringLiteral("+%1 dB").arg(static_cast<double>(db), 0, 'f', 1)
+            : QStringLiteral("%1 dB").arg(static_cast<double>(db), 0, 'f', 1);
+        m_fader->setToolTip(tr("Master Fader: %1 - Drag to adjust the master output volume").arg(dbStr));
         emit levelChanged(db);
     });
 }

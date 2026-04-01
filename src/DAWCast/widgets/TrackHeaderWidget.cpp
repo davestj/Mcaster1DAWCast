@@ -117,6 +117,7 @@ void TrackHeaderWidget::buildUI()
     // Dropdown menu button
     m_menuBtn = new QPushButton(QStringLiteral("v"), this);  // dropdown
     m_menuBtn->setFixedSize(20, 18);
+    m_menuBtn->setToolTip(tr("Track menu - Rename, duplicate, delete, freeze, bounce, presets, and more"));
     m_menuBtn->setStyleSheet(kBtnBase +
         QStringLiteral(" QPushButton { font-size: 8px; padding: 0; }"));
     row1->addWidget(m_menuBtn);
@@ -148,6 +149,7 @@ void TrackHeaderWidget::buildUI()
 
     // M (mute)
     m_muteBtn = makeBtn(tr("M"));
+    m_muteBtn->setToolTip(tr("Mute Track (M) - Silence this track during playback"));
     row2->addWidget(m_muteBtn);
     connect(m_muteBtn, &QPushButton::toggled, this, [this](bool checked) {
         m_muted = checked;
@@ -157,6 +159,7 @@ void TrackHeaderWidget::buildUI()
 
     // S (solo)
     m_soloBtn = makeBtn(tr("S"));
+    m_soloBtn->setToolTip(tr("Solo Track (S) - Play only this track, muting all others"));
     row2->addWidget(m_soloBtn);
     connect(m_soloBtn, &QPushButton::toggled, this, [this](bool checked) {
         m_solo = checked;
@@ -166,6 +169,7 @@ void TrackHeaderWidget::buildUI()
 
     // Record arm (red circle)
     m_recBtn = makeBtn(QStringLiteral("R"));
+    m_recBtn->setToolTip(tr("Arm for Recording - Enable this track to receive audio input when recording starts"));
     row2->addWidget(m_recBtn);
     connect(m_recBtn, &QPushButton::toggled, this, [this](bool checked) {
         m_recordArmed = checked;
@@ -175,7 +179,7 @@ void TrackHeaderWidget::buildUI()
 
     // Monitor (headphone icon) — input monitoring toggle
     m_monitorBtn = makeBtn(QStringLiteral("MON"));
-    m_monitorBtn->setToolTip(tr("Input Monitor — hear your input in real-time"));
+    m_monitorBtn->setToolTip(tr("Monitor Input - Hear your audio input in real-time through this track's effects chain"));
     row2->addWidget(m_monitorBtn);
     connect(m_monitorBtn, &QPushButton::toggled, this, [this](bool checked) {
         updateButtonStyle(m_monitorBtn, checked, QColor(0x30, 0xa0, 0xc0));  // teal
@@ -184,6 +188,7 @@ void TrackHeaderWidget::buildUI()
 
     // EQ
     m_eqBtn = makeBtn(QStringLiteral("EQ"));
+    m_eqBtn->setToolTip(tr("Open EQ - Open the parametric equalizer for this track"));
     row2->addWidget(m_eqBtn);
     connect(m_eqBtn, &QPushButton::clicked, this, [this]() {
         emit eqRequested(m_trackIndex);
@@ -192,6 +197,7 @@ void TrackHeaderWidget::buildUI()
 
     // Scissors (split tool)
     m_splitBtn = makeBtn(QStringLiteral("CUT"));
+    m_splitBtn->setToolTip(tr("Split Tool - Activate the split/cut tool to divide clips at click position"));
     row2->addWidget(m_splitBtn);
     connect(m_splitBtn, &QPushButton::toggled, this, [this](bool checked) {
         updateButtonStyle(m_splitBtn, checked, QColor(0x50, 0x90, 0xd0));  // blue
@@ -200,6 +206,7 @@ void TrackHeaderWidget::buildUI()
 
     // Automation (tilde / wave)
     m_autoBtn = makeBtn(QStringLiteral("~"));
+    m_autoBtn->setToolTip(tr("Automation - Show/hide volume, pan, and effect automation lanes for this track"));
     row2->addWidget(m_autoBtn);
     connect(m_autoBtn, &QPushButton::toggled, this, [this](bool checked) {
         updateButtonStyle(m_autoBtn, checked, QColor(0x40, 0xb0, 0x80));  // green
@@ -208,6 +215,7 @@ void TrackHeaderWidget::buildUI()
 
     // Settings (gear)
     m_settingsBtn = makeBtn(QStringLiteral("SET"));
+    m_settingsBtn->setToolTip(tr("Track Settings - Open settings dialog for input routing, bus sends, and track configuration"));
     row2->addWidget(m_settingsBtn);
     connect(m_settingsBtn, &QPushButton::clicked, this, [this]() {
         emit settingsRequested(m_trackIndex);
@@ -230,16 +238,18 @@ void TrackHeaderWidget::buildUI()
     m_volumeSlider = new QSlider(Qt::Horizontal, this);
     m_volumeSlider->setRange(-600, 60);  // -60.0 dB to +6.0 dB in tenths
     m_volumeSlider->setValue(0);          // 0 dB default
+    m_volumeSlider->setToolTip(tr("Track Volume: 0.0 dB - Drag to adjust track volume level"));
     m_volumeSlider->setStyleSheet(sliderStyleSheet(QColor(0x50, 0x90, 0xd0)));
     row3->addWidget(m_volumeSlider, 1);
 
     connect(m_volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         m_volume = static_cast<float>(value) / 10.0f;
         emit volumeChanged(m_volume);
-        // Show tooltip with current dB value
+        // Update persistent tooltip and show transient tooltip
         QString tip = (m_volume > 0.0f)
             ? QStringLiteral("+%1 dB").arg(m_volume, 0, 'f', 1)
             : QStringLiteral("%1 dB").arg(m_volume, 0, 'f', 1);
+        m_volumeSlider->setToolTip(tr("Track Volume: %1 - Drag to adjust track volume level").arg(tip));
         QToolTip::showText(QCursor::pos(), tip, m_volumeSlider);
     });
 
@@ -258,6 +268,7 @@ void TrackHeaderWidget::buildUI()
     m_panSlider = new QSlider(Qt::Horizontal, this);
     m_panSlider->setRange(-100, 100);
     m_panSlider->setValue(0);   // center
+    m_panSlider->setToolTip(tr("Pan: Center - Drag left or right to position this track in the stereo field"));
     m_panSlider->setStyleSheet(sliderStyleSheet(QColor(0x40, 0xb0, 0x80)));
     row4->addWidget(m_panSlider, 1);
 
@@ -273,6 +284,7 @@ void TrackHeaderWidget::buildUI()
         if (value == 0) tip = tr("Center");
         else if (value < 0) tip = QStringLiteral("L %1").arg(-value);
         else tip = QStringLiteral("R %1").arg(value);
+        m_panSlider->setToolTip(tr("Pan: %1 - Drag left or right to position this track in the stereo field").arg(tip));
         QToolTip::showText(QCursor::pos(), tip, m_panSlider);
     });
 

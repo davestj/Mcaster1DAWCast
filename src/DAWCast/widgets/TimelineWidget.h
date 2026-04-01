@@ -38,6 +38,13 @@ public:
 
     QList<int> selectedClips() const;
 
+    // ── Time Region Selection ─────────────────────────────────────────
+    void setSelection(int64_t start, int64_t end);
+    [[nodiscard]] int64_t selectionStart() const { return m_selectionStart; }
+    [[nodiscard]] int64_t selectionEnd() const { return m_selectionEnd; }
+    [[nodiscard]] bool hasSelection() const { return m_selectionEnd > m_selectionStart; }
+    void clearSelection();
+
     /// Supported audio file extensions for drag-and-drop import
     static QStringList supportedAudioExtensions();
     /// Supported video file extensions for drag-and-drop import
@@ -76,6 +83,10 @@ public:
     void zoomToFit();
     void zoomToSelection();
 
+    // ── Selection Query (for external use) ────────────────────────────
+    [[nodiscard]] int64_t selectionStartSamples() const { return m_selectionStart; }
+    [[nodiscard]] int64_t selectionEndSamples() const { return m_selectionEnd; }
+
 signals:
     void clipMoved(int clipId, int64_t newPosition);
     void clipSelected(int clipId);
@@ -86,6 +97,7 @@ signals:
     void snapModeChanged(SnapMode mode);
     void gainEnvelopeChanged(int trackIndex, int clipIndex);
     void rippleModeChanged(bool enabled);
+    void selectionChanged(int64_t start, int64_t end);
 
 private slots:
     void onWaveformReady(const QString& filePath);
@@ -115,6 +127,7 @@ private:
     void drawMidiClip(QPainter& painter, MidiClip* clip, int trackIndex, int clipIndex, int yTop);
     void drawAutomation(QPainter& painter, AudioTrack* track, int trackIndex);
     void drawFreezeIndicator(QPainter& painter, AudioTrack* track, int yTop);
+    void drawSelection(QPainter& painter, int viewWidth, int viewHeight);
 
     // Gain envelope mouse interaction helpers
     int  hitTestGainPoint(Clip* clip, int clipX, int clipW, int clipY, int clipH,
@@ -169,6 +182,11 @@ private:
 
     // ── Per-track vertical waveform zoom ─────────────────────────────
     QHash<int, float> m_trackVerticalZoom;  // trackIndex -> zoom factor (default 1.0)
+
+    // ── Time Region Selection ────────────────────────────────────────
+    int64_t         m_selectionStart = 0;
+    int64_t         m_selectionEnd   = 0;
+    bool            m_selectingRegion = false;  // Active ruler drag for selection
 
     // ── Ripple Editing Mode ──────────────────────────────────────────
     bool            m_rippleMode = false;

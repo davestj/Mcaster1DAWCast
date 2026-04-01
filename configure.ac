@@ -467,6 +467,7 @@ AC_CONFIG_FILES([
     Makefile
     src/Makefile
     src/DAWCast/Makefile
+    src/EditorStudio/Makefile
 ])
 AC_OUTPUT
 
@@ -534,4 +535,9 @@ echo ""
 echo "  Build:"
 echo "     ./configure --enable-macos-gui"
 echo "     make -C src/DAWCast -j\$(sysctl -n hw.ncpu)"
+echo "     make -C src/EditorStudio -j\$(sysctl -n hw.ncpu)"
+echo ""
+echo "  Binaries:"
+echo "     mcaster1dawcast         — Main DAW application"
+echo "     dawcast-editor-studio   — Forensic single-file editor"
 echo ""

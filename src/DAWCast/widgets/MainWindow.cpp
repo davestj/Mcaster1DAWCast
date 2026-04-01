@@ -631,6 +631,7 @@ void MainWindow::setupDockWidgets()
     // Bottom dock — Mixer
     m_mixerDock = new QDockWidget(tr("Mixer"), this);
     m_mixerDock->setObjectName(QStringLiteral("MixerDock"));
+    m_mixerDock->setToolTip(tr("Mixer - Per-track volume, pan, mute, solo, and bus routing controls"));
     m_mixerDock->setMinimumHeight(120);
     m_mixer = new MixerWidget(m_mixerDock);
     m_mixerDock->setWidget(m_mixer);
@@ -639,6 +640,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — Video Preview
     m_videoDock = new QDockWidget(tr("Video Preview"), this);
     m_videoDock->setObjectName(QStringLiteral("VideoPreviewDock"));
+    m_videoDock->setToolTip(tr("Video Preview - Live preview of video tracks synchronized with playback"));
     m_videoDock->setMinimumSize(240, 180);
     m_videoPreview = new VideoPreview(m_videoDock);
     m_videoDock->setWidget(m_videoPreview);
@@ -647,6 +649,7 @@ void MainWindow::setupDockWidgets()
     // Left dock — Media Library (replaces basic Media Browser)
     m_mediaBrowserDock = new QDockWidget(tr("Media Library"), this);
     m_mediaBrowserDock->setObjectName(QStringLiteral("MediaBrowserDock"));
+    m_mediaBrowserDock->setToolTip(tr("Media Library - Browse, search, and import audio and video files"));
     m_mediaBrowserDock->setMinimumWidth(280);
     m_mediaLibrary = new MediaLibraryWidget(m_mediaBrowserDock);
     m_mediaBrowser = m_mediaLibrary->fileBrowser();  // keep ref for backward compat
@@ -657,6 +660,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — Effects Rack (tabified with Video Preview)
     m_effectsDock = new QDockWidget(tr("Effects Rack"), this);
     m_effectsDock->setObjectName(QStringLiteral("EffectsRackDock"));
+    m_effectsDock->setToolTip(tr("Effects Rack - Add and configure audio effects for the selected track"));
     m_effectsDock->setMinimumSize(240, 180);
     m_effectsRack = new EffectsRackWidget(m_effectsDock);
     m_effectsDock->setWidget(m_effectsRack);
@@ -666,6 +670,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — LUFS Meter
     m_lufsDock = new QDockWidget(tr("LUFS Meter"), this);
     m_lufsDock->setObjectName(QStringLiteral("LUFSMeterDock"));
+    m_lufsDock->setToolTip(tr("LUFS Meter - Real-time loudness measurement for broadcast standards compliance"));
     m_lufsDock->setMinimumSize(80, 200);
     m_lufsMeter = new LUFSMeterWidget(m_lufsDock);
     m_lufsDock->setWidget(m_lufsMeter);
@@ -674,6 +679,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — AI Panel (tabified with Effects Rack)
     m_aiDock = new QDockWidget(tr("AI Assistant"), this);
     m_aiDock->setObjectName(QStringLiteral("AIDock"));
+    m_aiDock->setToolTip(tr("AI Assistant - AI-powered tools for transcription, noise removal, and content suggestions"));
     m_aiDock->setMinimumSize(240, 180);
     m_aiPanel = new dawcast::ai::AIPanel(m_aiDock);
     m_aiDock->setWidget(m_aiPanel);
@@ -688,6 +694,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — Chapter Widget (Podcaster mode)
     m_chapterDock = new QDockWidget(tr("Chapters"), this);
     m_chapterDock->setObjectName(QStringLiteral("ChapterDock"));
+    m_chapterDock->setToolTip(tr("Chapters - Define chapter markers for podcast episodes"));
     m_chapterDock->setMinimumSize(200, 150);
     m_chapterWidget = new ChapterWidget(m_chapterDock);
     m_chapterDock->setWidget(m_chapterWidget);
@@ -697,6 +704,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — Metadata Panel (Podcaster mode)
     m_metadataDock = new QDockWidget(tr("Metadata"), this);
     m_metadataDock->setObjectName(QStringLiteral("MetadataDock"));
+    m_metadataDock->setToolTip(tr("Metadata - Edit ID3 tags, show notes, and episode information"));
     m_metadataDock->setMinimumSize(200, 150);
     m_metadataPanel = new MetadataPanel(m_metadataDock);
     m_metadataDock->setWidget(m_metadataPanel);
@@ -707,6 +715,7 @@ void MainWindow::setupDockWidgets()
     // Bottom dock — Spectrum Analyzer (Producer / Guitar FX modes)
     m_spectrumDock = new QDockWidget(tr("Spectrum Analyzer"), this);
     m_spectrumDock->setObjectName(QStringLiteral("SpectrumDock"));
+    m_spectrumDock->setToolTip(tr("Spectrum Analyzer - Real-time frequency analysis of the audio output"));
     m_spectrumDock->setMinimumSize(200, 120);
     m_spectrumWidget = new SpectrumWidget(m_spectrumDock);
     m_spectrumDock->setWidget(m_spectrumWidget);
@@ -716,6 +725,7 @@ void MainWindow::setupDockWidgets()
     // Bottom dock — Piano Roll (Studio Artist mode)
     m_pianoRollDock = new QDockWidget(tr("Piano Roll"), this);
     m_pianoRollDock->setObjectName(QStringLiteral("PianoRollDock"));
+    m_pianoRollDock->setToolTip(tr("Piano Roll - MIDI note editor for composing and editing MIDI tracks"));
     m_pianoRollDock->setMinimumSize(300, 150);
     m_pianoRoll = new PianoRollWidget(m_pianoRollDock);
     m_pianoRollDock->setWidget(m_pianoRoll);
@@ -725,6 +735,7 @@ void MainWindow::setupDockWidgets()
     // Left dock — Script Reader (Voice Over mode)
     m_scriptReaderDock = new QDockWidget(tr("Script Reader"), this);
     m_scriptReaderDock->setObjectName(QStringLiteral("ScriptReaderDock"));
+    m_scriptReaderDock->setToolTip(tr("Script Reader - Scrolling teleprompter for voice-over recording sessions"));
     m_scriptReaderDock->setMinimumSize(280, 200);
     m_scriptReader = new ScriptReaderPanel(m_scriptReaderDock);
     m_scriptReaderDock->setWidget(m_scriptReader);
@@ -734,6 +745,7 @@ void MainWindow::setupDockWidgets()
     // Bottom dock — Pedalboard (Guitar FX mode)
     m_pedalboardDock = new QDockWidget(tr("Pedalboard"), this);
     m_pedalboardDock->setObjectName(QStringLiteral("PedalboardDock"));
+    m_pedalboardDock->setToolTip(tr("Pedalboard - Virtual guitar effects pedalboard with drag-and-drop effect chain"));
     m_pedalboardDock->setMinimumSize(400, 280);
     m_pedalboard = new PedalboardWidget(m_pedalboardDock);
     m_pedalboardDock->setWidget(m_pedalboard);
@@ -743,6 +755,7 @@ void MainWindow::setupDockWidgets()
     // Right dock — Stream Monitor (DJ/Live mode)
     m_streamMonitorDock = new QDockWidget(tr("Stream Monitor"), this);
     m_streamMonitorDock->setObjectName(QStringLiteral("StreamMonitorDock"));
+    m_streamMonitorDock->setToolTip(tr("Stream Monitor - Live stream status, bitrate, viewer count, and connection health"));
     m_streamMonitorDock->setMinimumSize(240, 300);
     m_streamMonitor = new StreamMonitorPanel(m_streamMonitorDock);
     m_streamMonitorDock->setWidget(m_streamMonitor);
@@ -752,6 +765,7 @@ void MainWindow::setupDockWidgets()
     // Bottom dock — Marker List (tabified with Mixer)
     m_markerListDock = new QDockWidget(tr("Marker List"), this);
     m_markerListDock->setObjectName(QStringLiteral("MarkerListDock"));
+    m_markerListDock->setToolTip(tr("Marker List - View and navigate to all timeline markers"));
     m_markerListDock->setMinimumSize(200, 120);
     m_markerList = new MarkerListWidget(m_markerListDock);
     m_markerListDock->setWidget(m_markerList);
@@ -865,6 +879,21 @@ void MainWindow::setupConnections()
         if (m_playbackEngine) {
             m_playbackEngine->seekTo(0);
             if (m_timelineModel) m_timelineModel->setPlayhead(0);
+        }
+        int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+        m_transportBar->setPosition(0, sr);
+    });
+
+    // Fast-forward -> jump to end of timeline
+    connect(m_transportBar, &TransportBar::fastForwardClicked, this, [this]() {
+        if (m_timelineModel) {
+            int64_t dur = m_timelineModel->duration();
+            if (dur > 0) {
+                m_timelineModel->setPlayhead(dur);
+                if (m_playbackEngine) m_playbackEngine->seekTo(dur);
+                int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+                m_transportBar->setPosition(dur, sr);
+            }
         }
     });
 
@@ -1012,6 +1041,13 @@ void MainWindow::setupConnections()
             m_transportBar->setPlaying(true);
         });
     }
+
+    // TimelineWidget selection changes -> TransportBar selection display
+    connect(m_timeline, &TimelineWidget::selectionChanged,
+            this, [this](int64_t start, int64_t end) {
+        int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+        m_transportBar->setSelection(start, end, sr);
+    });
 
     // TimelineWidget playhead clicks -> seek PlaybackEngine + VideoPlaybackController
     connect(m_timeline, &TimelineWidget::playheadMoved,

@@ -28,6 +28,10 @@ public:
     void setPosition(int64_t samples, int sampleRate);
     void setDuration(int64_t samples, int sampleRate);
 
+    /// Update the selection display in the transport bar.
+    /// Pass start == end to clear the selection display.
+    void setSelection(int64_t startSamples, int64_t endSamples, int sampleRate);
+
     /// Flash the beat indicator. Call from Metronome::beat signal
     /// with Qt::QueuedConnection.
     void flashBeat(int beatNumber, bool isDownbeat);
@@ -89,7 +93,8 @@ private:
     static constexpr int kMaxTapSamples = 4;
 
     // Time display
-    QLabel* m_timeDisplay = nullptr;
+    QLabel* m_timeDisplay    = nullptr;
+    QLabel* m_selectionLabel = nullptr;
 
     // Zoom
     QSlider* m_zoomSlider = nullptr;
