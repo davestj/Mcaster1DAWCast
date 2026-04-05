@@ -26,6 +26,7 @@
 #include <QFrame>
 #include <QKeySequenceEdit>
 #include <QMessageBox>
+#include <QSettings>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonDocument>
@@ -440,6 +441,14 @@ void PreferencesDialog::saveSettings()
     cfg->setValue(QStringLiteral("theme/name"), themeName);
     cfg->setValue(QStringLiteral("theme/index"), m_themeCombo->currentIndex());
     ThemeEngine::instance()->loadTheme(themeName);
+
+    // Persist the user's theme choice to QSettings so main.cpp picks it
+    // up on next launch (main.cpp reads QSettings before AppConfig exists).
+    {
+        QSettings qs;
+        qs.setValue(QStringLiteral("appearance/theme"), themeName);
+        qs.setValue(QStringLiteral("appearance/theme_user_set"), true);
+    }
 
     // Shortcuts
     saveShortcuts();

@@ -54,6 +54,7 @@
 #include "StreamingDialog.h"
 #include "../broadcast/RTMPStreamer.h"
 #include "../core/UndoManager.h"
+#include "../core/ProjectManager.h"
 #include "../core/WorkspaceManager.h"
 
 #include <QAction>
@@ -815,6 +816,10 @@ void MainWindow::setupAudioPipeline()
         }
     });
 
+    // Project manager — handles save/load serialization to/from JSON
+    m_projectManager = new dawcast::ProjectManager(this);
+    m_projectManager->setTimeline(m_timelineModel);
+
     // Audio mixer (volume / pan / mute / solo per strip)
     m_audioMixer = new dawcast::AudioMixer(this);
 
@@ -1203,17 +1208,34 @@ void MainWindow::openProject(const QString& path)
 {
     if (path.isEmpty()) return;
 
-    m_projectPath = path;
-    QFileInfo fi(path);
-    setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
-    statusBar()->showMessage(tr("Opened: %1").arg(fi.fileName()), 5000);
+    bool loaded = false;
+    if (m_projectManager) {
+        loaded = m_projectManager->openProject(path);
+    }
 
-    addToRecentFiles(path);
+    if (loaded) {
+        m_projectPath = path;
+        QFileInfo fi(path);
+        setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
+        statusBar()->showMessage(tr("Opened: %1").arg(fi.fileName()), 5000);
 
-    // Remember directory for next file dialog
-    auto* config = dawcast::config::AppConfig::instance();
-    config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
-    config->save();
+        addToRecentFiles(path);
+
+        // Refresh the timeline widget and transport bar
+        m_timeline->update();
+        if (m_timelineModel) {
+            int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+            m_transportBar->setDuration(m_timelineModel->duration(), sr);
+            m_transportBar->setPosition(m_timelineModel->playhead(), sr);
+        }
+
+        // Remember directory for next file dialog
+        auto* config = dawcast::config::AppConfig::instance();
+        config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
+        config->save();
+    } else {
+        statusBar()->showMessage(tr("Failed to open: %1").arg(path), 5000);
+    }
 }
 
 void MainWindow::saveProject()
@@ -1222,7 +1244,14 @@ void MainWindow::saveProject()
         saveProjectAs();
         return;
     }
-    statusBar()->showMessage(tr("Project saved"), 3000);
+
+    if (m_projectManager) {
+        if (m_projectManager->saveProjectAs(m_projectPath)) {
+            statusBar()->showMessage(tr("Project saved"), 3000);
+        } else {
+            statusBar()->showMessage(tr("Failed to save project!"), 5000);
+        }
+    }
 }
 
 void MainWindow::saveProjectAs()
@@ -1236,15 +1265,24 @@ void MainWindow::saveProjectAs()
         tr("DAWCast Projects (*.dawcast);;All Files (*)"));
 
     if (!path.isEmpty()) {
-        m_projectPath = path;
-        QFileInfo fi(path);
-        setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
-        statusBar()->showMessage(tr("Project saved as: %1").arg(fi.fileName()), 5000);
+        bool saved = false;
+        if (m_projectManager) {
+            saved = m_projectManager->saveProjectAs(path);
+        }
 
-        addToRecentFiles(path);
+        if (saved) {
+            m_projectPath = path;
+            QFileInfo fi(path);
+            setWindowTitle(QStringLiteral("Mcaster1DAWCast \u2014 %1").arg(fi.baseName()));
+            statusBar()->showMessage(tr("Project saved as: %1").arg(fi.fileName()), 5000);
 
-        config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
-        config->save();
+            addToRecentFiles(path);
+
+            config->setValue(QStringLiteral("file/lastOpenDir"), fi.absolutePath());
+            config->save();
+        } else {
+            statusBar()->showMessage(tr("Failed to save project!"), 5000);
+        }
     }
 }
 
@@ -1758,6 +1796,10 @@ void MainWindow::onStop()
 
     if (m_playbackEngine) {
         m_playbackEngine->stop();
+        // Update the transport bar to reflect the current playhead position
+        // (first stop keeps position, second stop returns to 0)
+        int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+        m_transportBar->setPosition(m_playbackEngine->currentPosition(), sr);
     }
     if (m_videoPlaybackController) {
         m_videoPlaybackController->stop();

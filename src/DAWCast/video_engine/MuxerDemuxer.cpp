@@ -135,7 +135,14 @@ bool MuxerDemuxer::addAudioStream(int sampleRate, int channels, const QString& c
     stream->codecpar->sample_rate = sampleRate;
     stream->codecpar->ch_layout.nb_channels = channels;
     av_channel_layout_default(&stream->codecpar->ch_layout, channels);
-    stream->codecpar->format      = AV_SAMPLE_FMT_FLTP;  // Common for AAC
+
+    // Use the encoder's preferred sample format.
+    // PCM codecs need interleaved float (FLT), while AAC/MP3 prefer planar (FLTP).
+    if (encoder->sample_fmts) {
+        stream->codecpar->format = encoder->sample_fmts[0];
+    } else {
+        stream->codecpar->format = AV_SAMPLE_FMT_FLTP;
+    }
     stream->time_base             = AVRational{1, sampleRate};
 
     m_audioStreamIdx = static_cast<int>(fmtCtx->nb_streams - 1);

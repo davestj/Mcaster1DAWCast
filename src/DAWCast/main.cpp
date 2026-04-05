@@ -66,6 +66,16 @@ int main(int argc, char* argv[])
     QThread::msleep(300);
     {
         QSettings settings;
+
+        // One-time migration: if the user never explicitly chose a theme
+        // (no "theme_user_set" flag), reset to Default so old persisted
+        // DarkStudio settings don't override the intended default.
+        if (!settings.contains(QStringLiteral("appearance/theme_user_set"))) {
+            settings.setValue(QStringLiteral("appearance/theme"),
+                              QStringLiteral("Default"));
+            settings.setValue(QStringLiteral("appearance/theme_user_set"), true);
+        }
+
         QString themeName = settings.value(
             QStringLiteral("appearance/theme"),
             QStringLiteral("Default")).toString();

@@ -2191,6 +2191,21 @@ void TimelineWidget::dropEvent(QDropEvent* event)
         cursorPos += durationSamples;
     }
 
+    // If this is the first content on the timeline (single track, single clip),
+    // snap the clip to position 0 and reset the playhead so the user hears
+    // audio immediately on pressing Play.
+    if (m_timeline->trackCount() == 1) {
+        QObject* firstTrack = m_timeline->track(0);
+        auto* at = qobject_cast<AudioTrack*>(firstTrack);
+        if (at && at->clipCount() == 1) {
+            Clip* firstClip = at->clip(0);
+            if (firstClip) {
+                firstClip->setTimelinePosition(0);
+                m_timeline->setPlayhead(0);
+            }
+        }
+    }
+
     event->acceptProposedAction();
     update();
 }

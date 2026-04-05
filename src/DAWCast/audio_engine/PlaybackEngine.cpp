@@ -17,6 +17,7 @@
 #include "../dsp/DspChain.h"
 
 #include <QDebug>
+#include <QThreadPool>
 #include <algorithm>
 #include <cstring>
 
@@ -67,11 +68,12 @@ void PlaybackEngine::setTimeline(Timeline* timeline)
 
     if (m_timeline) {
         connect(m_timeline, &Timeline::trackAdded,
-                this, &PlaybackEngine::rebuildReaders);
+                this, [this]() { m_needsRebuild = true; });
         connect(m_timeline, &Timeline::trackRemoved,
-                this, &PlaybackEngine::rebuildReaders);
+                this, [this]() { m_needsRebuild = true; });
     }
 
+    m_needsRebuild = true;
     rebuildReaders();
 }
 
@@ -117,14 +119,32 @@ void PlaybackEngine::play()
         }
     }
 
-    // Rebuild readers in case clips were added/modified while stopped
-    rebuildReaders();
-    syncMixerStrips();
-
-    m_playing.store(true, std::memory_order_release);
-    m_positionTimer->start(kPositionPollMs);
-
-    emit playbackStarted();
+    // If readers need rebuilding (clips changed while stopped), do it
+    // in a worker thread so file decoding doesn't block the GUI.
+    if (m_needsRebuild) {
+        m_needsRebuild = false;
+        QThreadPool::globalInstance()->start([this]() {
+            // rebuildReaders decodes files — runs off the GUI thread.
+            // It only touches m_tracks (not accessed by audio thread
+            // while m_playing is false) and AudioClipReader (not a QObject).
+            rebuildReaders();
+            // Finish on the GUI thread: sync mixer strips (QObject methods)
+            // and start playback.
+            QMetaObject::invokeMethod(this, [this]() {
+                syncMixerStrips();
+                m_playing.store(true, std::memory_order_release);
+                m_positionTimer->start(kPositionPollMs);
+                emit playbackStarted();
+            }, Qt::QueuedConnection);
+        });
+    } else {
+        // Readers are current — start immediately
+        rebuildReaders();
+        syncMixerStrips();
+        m_playing.store(true, std::memory_order_release);
+        m_positionTimer->start(kPositionPollMs);
+        emit playbackStarted();
+    }
 }
 
 void PlaybackEngine::pause()
@@ -137,17 +157,24 @@ void PlaybackEngine::pause()
 
 void PlaybackEngine::stop()
 {
+    const bool wasPlaying = m_playing.load(std::memory_order_acquire);
     m_playing.store(false, std::memory_order_release);
     m_positionTimer->stop();
 
-    m_playheadPos.store(0, std::memory_order_release);
-
-    if (m_timeline) {
-        m_timeline->setPlayhead(0);
+    if (wasPlaying) {
+        // First stop: halt playback but keep playhead where it is
+        m_stoppedAtPosition = true;
+    } else if (m_stoppedAtPosition) {
+        // Second stop (already stopped): return to zero
+        m_stoppedAtPosition = false;
+        m_playheadPos.store(0, std::memory_order_release);
+        if (m_timeline) {
+            m_timeline->setPlayhead(0);
+        }
+        emit positionChanged(0);
     }
 
     emit playbackStopped();
-    emit positionChanged(0);
 }
 
 void PlaybackEngine::seekTo(int64_t samplePosition)
@@ -424,6 +451,10 @@ void PlaybackEngine::ensureTrackBuffers(int frames, int channels)
 
     for (auto& tp : m_tracks) {
         tp.buffer.resize(totalSamples, 0.0f);
+        // Update the AudioBuffer pointer in case the vector reallocated
+        tp.audioBuf.data     = tp.buffer.data();
+        tp.audioBuf.frames   = frames;
+        tp.audioBuf.channels = channels;
     }
 
     m_allocFrames   = frames;

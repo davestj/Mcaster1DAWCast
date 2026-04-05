@@ -24,6 +24,7 @@ class PlaybackEngine;
 class MultitrackRecorder;
 class VideoPlaybackController;
 class ExportEngine;
+class ProjectManager;
 class RTMPStreamer;
 class ViewModeManager;
 class UndoManager;
@@ -251,7 +252,8 @@ private:
     void updateRecordButtonState();
     bool hasArmedTracks() const;
 
-    ExportEngine* m_exportEngine = nullptr;
+    ExportEngine*     m_exportEngine    = nullptr;
+    ProjectManager*   m_projectManager  = nullptr;
 
     // RTMP streaming
     RTMPStreamer*     m_rtmpStreamer      = nullptr;

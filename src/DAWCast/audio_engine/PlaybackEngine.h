@@ -132,6 +132,14 @@ private:
     // Current buffer dimensions (to detect when realloc is needed)
     int m_allocFrames   = 0;
     int m_allocChannels = 0;
+
+    // True when the timeline structure has changed and readers need rebuilding
+    // before the next play(). Set by track add/remove signals, cleared in play().
+    bool m_needsRebuild = true;
+
+    // Tracks whether we are in the "stopped at position" state for
+    // double-stop-to-rewind behavior.
+    bool m_stoppedAtPosition = false;
 };
 
 } // namespace dawcast
