@@ -20,6 +20,7 @@ namespace dawcast {
 class Timeline;
 class AudioEngine;
 class AudioMixer;
+class BusRouter;
 class PlaybackEngine;
 class MultitrackRecorder;
 class VideoPlaybackController;
@@ -242,6 +243,7 @@ private:
     Timeline*                  m_timelineModel          = nullptr;
     AudioEngine*               m_audioEngine            = nullptr;
     AudioMixer*                m_audioMixer             = nullptr;
+    BusRouter*                 m_busRouter              = nullptr;
     PlaybackEngine*            m_playbackEngine         = nullptr;
     MultitrackRecorder*        m_recorder               = nullptr;
     VideoPlaybackController*   m_videoPlaybackController = nullptr;

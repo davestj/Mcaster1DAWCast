@@ -816,12 +816,58 @@ void MainWindow::setupAudioPipeline()
         }
     });
 
+    // Track selection -> effects rack. When the user clicks a track header
+    // we swap the EffectsRackWidget over to that track's DspChain so that
+    // Add Effect / Bypass / Remove all operate on the selected track.
+    connect(m_trackHeaders, &TrackHeaderPanel::trackSelected,
+            this, [this](int trackIndex) {
+        if (!m_timelineModel || !m_effectsRack) return;
+        auto* track = qobject_cast<dawcast::AudioTrack*>(
+            m_timelineModel->track(trackIndex));
+        if (!track) return;
+        m_effectsRack->setDspChain(track->effectChain());
+        statusBar()->showMessage(
+            tr("Effects rack bound to track %1").arg(trackIndex + 1), 2000);
+    });
+
     // Project manager — handles save/load serialization to/from JSON
     m_projectManager = new dawcast::ProjectManager(this);
     m_projectManager->setTimeline(m_timelineModel);
 
     // Audio mixer (volume / pan / mute / solo per strip)
     m_audioMixer = new dawcast::AudioMixer(this);
+
+    // Bus router (master + sub-groups + sends). Created here so the master
+    // fader on the MixerWidget has somewhere to send its volume changes
+    // and so the PlaybackEngine can route per-track audio through buses.
+    m_busRouter = new dawcast::BusRouter(this);
+
+    // Hand the AudioMixer to the MixerWidget so fader/pan/mute/solo
+    // changes and VU meter polling are wired up. The mixer widget adds
+    // one strip per AudioMixer strip on setMixer() and the PlaybackEngine
+    // grows the mixer's strip count as tracks are added.
+    if (m_mixer) {
+        m_mixer->setBusRouter(m_busRouter);
+        m_mixer->setMixer(m_audioMixer);
+    }
+
+    // Rebuild mixer widget strips whenever tracks are added/removed so the
+    // fader/VU columns stay in sync with the timeline. The AudioMixer's
+    // strip count is otherwise only advanced lazily by PlaybackEngine on
+    // play(), but we want the mixer dock to reflect new tracks immediately.
+    connect(m_timelineModel, &dawcast::Timeline::trackAdded,
+            this, [this](int) {
+        if (!m_audioMixer || !m_timelineModel) return;
+        while (m_audioMixer->stripCount() < m_timelineModel->trackCount()) {
+            m_audioMixer->addStrip();
+        }
+        if (m_mixer) m_mixer->setMixer(m_audioMixer);
+    });
+    connect(m_timelineModel, &dawcast::Timeline::trackRemoved,
+            this, [this](int idx) {
+        if (m_audioMixer) m_audioMixer->removeStrip(idx);
+        if (m_mixer && m_audioMixer) m_mixer->setMixer(m_audioMixer);
+    });
 
     // Audio engine (PortAudio I/O)
     m_audioEngine = new dawcast::AudioEngine(this);
@@ -848,6 +894,7 @@ void MainWindow::setupAudioPipeline()
     m_playbackEngine->setTimeline(m_timelineModel);
     m_playbackEngine->setAudioEngine(m_audioEngine);
     m_playbackEngine->setRecorder(m_recorder);
+    m_playbackEngine->setBusRouter(m_busRouter);
 
     // Tell the audio engine about the playback engine so the callback
     // calls processBlock() before mixer->process().

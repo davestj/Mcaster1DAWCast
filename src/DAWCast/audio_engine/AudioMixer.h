@@ -6,6 +6,9 @@
 
 #include <QObject>
 #include <QVector>
+#include <atomic>
+#include <memory>
+#include <vector>
 #include "../core/AudioBuffer.h"
 
 namespace dawcast {
@@ -41,6 +44,16 @@ public:
     [[nodiscard]] float stripVolume(int strip) const;
     [[nodiscard]] float stripPan(int strip) const;
 
+    /// Read the most recent peak level captured for a strip (linear amplitude).
+    /// Safe to call from the GUI thread — backed by atomics written from the
+    /// audio callback.
+    [[nodiscard]] float stripPeakL(int strip) const;
+    [[nodiscard]] float stripPeakR(int strip) const;
+
+    /// Read the most recent master output peak (linear amplitude).
+    [[nodiscard]] float masterPeakL() const;
+    [[nodiscard]] float masterPeakR() const;
+
     /// Solo routing mode
     void setSoloMode(SoloMode mode);
     [[nodiscard]] SoloMode soloMode() const;
@@ -67,6 +80,25 @@ private:
     QVector<Strip> m_strips;
     SoloMode m_soloMode  = SoloInPlace;
     float    m_soloDimDb  = -20.0f;  ///< Default dim: -20 dB for Solo-in-Front
+
+    // Per-strip peak meters (written from the audio thread in process(),
+    // read from the GUI thread via a polling QTimer in MixerWidget).
+    //
+    // std::atomic<float> is neither copyable nor movable so we can't store
+    // StripMeters directly in QList/QVector. Use std::vector with
+    // unique_ptr — std::vector tolerates non-copyable element types when
+    // we only ever push_back/emplace_back.
+    struct StripMeters {
+        std::atomic<float> peakL{0.0f};
+        std::atomic<float> peakR{0.0f};
+    };
+    mutable std::vector<std::unique_ptr<StripMeters>> m_meters;
+
+    // Master output peak meters (populated inside process()).
+    std::atomic<float> m_masterPeakL{0.0f};
+    std::atomic<float> m_masterPeakR{0.0f};
+
+    void ensureMeterCapacity(int count) const;
 };
 
 } // namespace dawcast

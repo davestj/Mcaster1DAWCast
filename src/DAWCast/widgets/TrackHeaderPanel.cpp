@@ -351,6 +351,13 @@ void TrackHeaderPanel::mousePressEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         m_dragStartPos = event->pos();
         m_dragFromIndex = headerIndexAtPos(event->pos());
+        // Emit a trackSelected signal so the effects rack (and anything
+        // else that cares about the "current" track) can react. We do this
+        // on press rather than release so the selection feedback is
+        // instant even if the user then drags the header.
+        if (m_dragFromIndex >= 0) {
+            emit trackSelected(m_dragFromIndex);
+        }
     }
     QWidget::mousePressEvent(event);
 }

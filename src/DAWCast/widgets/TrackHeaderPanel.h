@@ -58,6 +58,9 @@ signals:
     void duplicateTrackRequested(int trackIndex);
     void deleteTrackRequested(int trackIndex);
     void trackMoveRequested(int fromIndex, int toIndex);
+    /// Emitted when the user single-clicks a track header. The effects rack
+    /// and other context panels use this to focus on the clicked track.
+    void trackSelected(int trackIndex);
 
 public slots:
     /// Rebuild the list of track headers from the current Timeline model.

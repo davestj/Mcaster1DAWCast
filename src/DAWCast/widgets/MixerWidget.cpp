@@ -18,6 +18,8 @@
 #include <QScrollArea>
 #include <QFrame>
 #include <QComboBox>
+#include <QTimer>
+#include <cmath>
 
 namespace dawcast::widgets {
 
@@ -42,8 +44,18 @@ const QString kFaderStyle = QStringLiteral(
 const QString kSendLabelStyle = QStringLiteral(
     "QLabel { color: #8a8; font-size: 9px; }");
 
+/// Convert the 0..127 slider value into a working dB value for the audio
+/// engine. 100 -> 0 dB, 0 -> -inf (treated as -96 dB).
+inline float faderValueToDb(int value)
+{
+    if (value <= 0) return -96.0f;
+    return 20.0f * std::log10(static_cast<float>(value) / 100.0f);
+}
+
 QWidget* createChannelStrip(QWidget* parent, const QString& name,
-                            bool isMaster = false, bool isBus = false)
+                            bool isMaster = false, bool isBus = false,
+                            VUMeterWidget** vuMeterOut = nullptr,
+                            QSlider** faderOut = nullptr)
 {
     auto* strip = new QWidget(parent);
     if (isMaster) {
@@ -77,6 +89,7 @@ QWidget* createChannelStrip(QWidget* parent, const QString& name,
     vuMeter->setMinimumHeight(80);
     vuMeter->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     layout->addWidget(vuMeter, 1);
+    if (vuMeterOut) *vuMeterOut = vuMeter;
 
     // Volume fader (vertical)
     auto* fader = new QSlider(Qt::Vertical, strip);
@@ -85,6 +98,7 @@ QWidget* createChannelStrip(QWidget* parent, const QString& name,
     fader->setStyleSheet(kFaderStyle);
     fader->setMinimumHeight(60);
     layout->addWidget(fader, 0, Qt::AlignHCenter);
+    if (faderOut) *faderOut = fader;
 
     // dB label below fader
     auto* dbLabel = new QLabel(QStringLiteral("0.0 dB"), strip);
@@ -144,7 +158,9 @@ const QString kEqLabelStyle = QStringLiteral(
 /// Create a channel strip with inline 3-band EQ and send controls.
 QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
                                      int stripIndex, MixerWidget* mixer,
-                                     ChannelEQKnobs* eqKnobsOut = nullptr)
+                                     AudioMixer* audioMixer,
+                                     ChannelEQKnobs* eqKnobsOut = nullptr,
+                                     VUMeterWidget** vuMeterOut = nullptr)
 {
     auto* strip = new QWidget(parent);
     strip->setObjectName(QStringLiteral("channelStrip"));
@@ -168,6 +184,7 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     vuMeter->setMinimumHeight(60);
     vuMeter->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     layout->addWidget(vuMeter, 1);
+    if (vuMeterOut) *vuMeterOut = vuMeter;
 
     // ── Inline 3-Band EQ section ──────────────────────────────────
     auto* eqLabel = new QLabel(QStringLiteral("EQ"), strip);
@@ -242,14 +259,22 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     dbLabel->setStyleSheet(QStringLiteral("QLabel { color: #888; font-size: 9px; }"));
     layout->addWidget(dbLabel);
 
-    QObject::connect(fader, &QSlider::valueChanged, dbLabel, [dbLabel](int value) {
-        if (value == 0) {
-            dbLabel->setText(QStringLiteral("-inf"));
-            return;
-        }
-        float db = 20.0f * std::log10(static_cast<float>(value) / 100.0f);
-        dbLabel->setText(QString::number(static_cast<double>(db), 'f', 1) + QStringLiteral(" dB"));
-    });
+    // Fader drives both the dB label AND the actual mixer strip volume.
+    // Without the setStripVolume() call, moving the fader was purely cosmetic
+    // and audio kept playing at whatever gain the track was last set to.
+    QObject::connect(fader, &QSlider::valueChanged, mixer,
+        [dbLabel, audioMixer, stripIndex](int value) {
+            float db = faderValueToDb(value);
+            if (value == 0) {
+                dbLabel->setText(QStringLiteral("-inf"));
+            } else {
+                dbLabel->setText(QString::number(static_cast<double>(db), 'f', 1)
+                                 + QStringLiteral(" dB"));
+            }
+            if (audioMixer) {
+                audioMixer->setStripVolume(stripIndex, db);
+            }
+        });
 
     // Pan knob
     auto* panKnob = new EmbossedKnob(strip);
@@ -260,6 +285,12 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     panKnob->setArcColor(QColor(80, 180, 255));
     panKnob->setFixedSize(36, 44);
     layout->addWidget(panKnob, 0, Qt::AlignHCenter);
+
+    // Pan knob -> mixer strip pan
+    QObject::connect(panKnob, &EmbossedKnob::valueChanged, mixer,
+        [audioMixer, stripIndex](float value) {
+            if (audioMixer) audioMixer->setStripPan(stripIndex, value);
+        });
 
     // Mute / Solo buttons
     auto* btnRow = new QHBoxLayout;
@@ -278,6 +309,16 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     btnRow->addWidget(soloBtn);
 
     layout->addLayout(btnRow);
+
+    // Mute / solo buttons -> mixer strip state
+    QObject::connect(muteBtn, &BevelButton::toggled, mixer,
+        [audioMixer, stripIndex](bool muted) {
+            if (audioMixer) audioMixer->setStripMuted(stripIndex, muted);
+        });
+    QObject::connect(soloBtn, &BevelButton::toggled, mixer,
+        [audioMixer, stripIndex](bool solo) {
+            if (audioMixer) audioMixer->setStripSolo(stripIndex, solo);
+        });
 
     // ── Sends section ──────────────────────────────────────────────
     auto* sendsLabel = new QLabel(QStringLiteral("Sends"), strip);
@@ -371,13 +412,59 @@ MixerWidget::MixerWidget(QWidget* parent)
     m_masterSeparator->setFrameShape(QFrame::VLine);
     m_masterSeparator->setStyleSheet(QStringLiteral("QFrame { color: #555; }"));
 
-    m_masterStrip = createChannelStrip(container, tr("Master"), true);
+    // Create the master strip, capturing the fader + VU meter so we can
+    // hook them up to the master bus and meter poller later.
+    QSlider* masterFader = nullptr;
+    m_masterStrip = createChannelStrip(container, tr("Master"), true, false,
+                                       &m_masterVuMeter, &masterFader);
+
+    // Master fader -> master bus volume (once a BusRouter is set).
+    // We connect by capturing `this` so we can look up the router dynamically;
+    // the router is not necessarily available at construction time.
+    if (masterFader) {
+        connect(masterFader, &QSlider::valueChanged, this, [this](int value) {
+            if (!m_busRouter) return;
+            AudioBus* master = m_busRouter->masterBus();
+            if (!master) return;
+            master->setVolume(faderValueToDb(value));
+        });
+    }
 
     scrollArea->setWidget(container);
 
     auto* mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->addWidget(scrollArea);
+
+    // ── Meter poll timer ─────────────────────────────────────────────
+    // Drains the AudioMixer's atomic peak accessors and repaints each
+    // VU meter at ~33 Hz. Running on the GUI thread is safe — the mixer
+    // writes into atomics from the audio thread.
+    m_meterTimer = new QTimer(this);
+    m_meterTimer->setInterval(30);
+    connect(m_meterTimer, &QTimer::timeout, this, [this]() {
+        if (!m_mixer) return;
+
+        auto linearToDb = [](float lin) -> float {
+            if (lin <= 1e-6f) return -96.0f;
+            return 20.0f * std::log10(lin);
+        };
+
+        for (int i = 0; i < m_vuMeters.size(); ++i) {
+            auto* meter = m_vuMeters[i];
+            if (!meter) continue;
+            float peakL = m_mixer->stripPeakL(i);
+            float peakR = m_mixer->stripPeakR(i);
+            meter->setLevel(linearToDb(peakL), linearToDb(peakR));
+        }
+
+        if (m_masterVuMeter) {
+            float mL = m_mixer->masterPeakL();
+            float mR = m_mixer->masterPeakR();
+            m_masterVuMeter->setLevel(linearToDb(mL), linearToDb(mR));
+        }
+    });
+    m_meterTimer->start();
 }
 
 MixerWidget::~MixerWidget() = default;
@@ -386,7 +473,16 @@ void MixerWidget::setMixer(AudioMixer* mixer)
 {
     m_mixer = mixer;
 
-    // Clear existing strips (but not master/bus)
+    // Clear existing strips (but not master/bus). The bus separator, bus
+    // strips, master separator and master strip are re-parented out of the
+    // layout first so takeAt() can safely wipe only the channel strips.
+    m_stripLayout->removeWidget(m_busSeparator);
+    for (auto* bw : m_busStripWidgets) {
+        m_stripLayout->removeWidget(bw);
+    }
+    m_stripLayout->removeWidget(m_masterSeparator);
+    m_stripLayout->removeWidget(m_masterStrip);
+
     while (m_stripLayout->count() > 0) {
         auto* item = m_stripLayout->takeAt(0);
         if (item && item->widget()) {
@@ -395,6 +491,8 @@ void MixerWidget::setMixer(AudioMixer* mixer)
         delete item;
     }
     m_stripCount = 0;
+    m_vuMeters.clear();
+    m_channelEQKnobs.clear();
 
     // Rebuild from mixer state
     if (m_mixer) {
@@ -435,10 +533,13 @@ void MixerWidget::addStrip()
 {
     QString name = tr("Ch %1").arg(m_stripCount + 1);
     ChannelEQKnobs eqKnobs;
-    auto* strip = createChannelStripWithSends(this, name, m_stripCount, this, &eqKnobs);
+    VUMeterWidget* vuMeter = nullptr;
+    auto* strip = createChannelStripWithSends(this, name, m_stripCount, this,
+                                              m_mixer, &eqKnobs, &vuMeter);
 
     // Store EQ knob references for this channel
     m_channelEQKnobs[m_stripCount] = eqKnobs;
+    m_vuMeters.append(vuMeter);
 
     // Insert before the bus separator
     int insertPos = m_stripCount;
@@ -456,6 +557,11 @@ void MixerWidget::removeStrip(int index)
     }
     delete item;
     --m_stripCount;
+
+    if (index < m_vuMeters.size()) {
+        m_vuMeters.removeAt(index);
+    }
+    m_channelEQKnobs.remove(index);
 }
 
 int MixerWidget::stripCount() const

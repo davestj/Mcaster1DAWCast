@@ -9,6 +9,12 @@
 #include "IEffectUnit.h"
 #include "ParametricEQ.h"
 #include "NoiseReduction.h"
+#include "Compressor.h"
+#include "Limiter.h"
+#include "NoiseGate.h"
+#include "DeEsser.h"
+#include "Reverb.h"
+#include "GraphicEQ31.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -18,6 +24,10 @@
 #include <QMenu>
 #include <QListWidget>
 #include <QFrame>
+#include <QDialog>
+#include <QFormLayout>
+#include <QDoubleSpinBox>
+#include <QDialogButtonBox>
 
 namespace dawcast::widgets {
 
@@ -121,10 +131,46 @@ void EffectsRackWidget::setDspChain(DspChain* chain)
     }
 }
 
+namespace {
+/// Open a minimal generic parameter editor for any IEffectUnit. Shows one
+/// QDoubleSpinBox per parameter so the user can tweak values without needing
+/// an effect-specific UI. Parameters are written live via setParameter().
+void openGenericEffectEditor(IEffectUnit* effect, QWidget* parent)
+{
+    if (!effect) return;
+
+    auto* dialog = new QDialog(parent);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QObject::tr("%1 — Parameters").arg(effect->name()));
+
+    auto* form = new QFormLayout;
+
+    const int count = effect->parameterCount();
+    for (int i = 0; i < count; ++i) {
+        auto* spin = new QDoubleSpinBox(dialog);
+        spin->setDecimals(3);
+        spin->setRange(-1e6, 1e6);
+        spin->setValue(effect->parameter(i));
+        QObject::connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+                         dialog, [effect, i](double v) {
+            effect->setParameter(i, static_cast<float>(v));
+        });
+        form->addRow(QObject::tr("Param %1").arg(i + 1), spin);
+    }
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::accept);
+
+    auto* layout = new QVBoxLayout(dialog);
+    layout->addLayout(form);
+    layout->addWidget(buttons);
+
+    dialog->show();
+}
+} // namespace
+
 void EffectsRackWidget::addEffect(IEffectUnit* effect)
 {
-    int slotIndex = m_effectCount;
-
     auto* slot = new QWidget(this);
     slot->setObjectName(QStringLiteral("effectSlot"));
     slot->setStyleSheet(kSlotStyle);
@@ -142,7 +188,7 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
     layout->addWidget(dragHandle);
 
     // Effect name
-    QString effectName = effect ? effect->name() : tr("Effect %1").arg(slotIndex + 1);
+    QString effectName = effect ? effect->name() : tr("Effect %1").arg(m_effectCount + 1);
     auto* nameLabel = new QLabel(effectName, slot);
     nameLabel->setStyleSheet(kEffectNameStyle);
     layout->addWidget(nameLabel, 1);
@@ -155,9 +201,16 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
     if (effect) bypassBtn->setChecked(effect->isBypassed());
     layout->addWidget(bypassBtn);
 
-    // Connect bypass
-    connect(bypassBtn, &BevelButton::toggled, this, [this, effect, slot, nameLabel](bool bypassed) {
-        if (effect) effect->setBypassed(bypassed);
+    // Connect bypass — directly drives the effect unit's bypass state.
+    connect(bypassBtn, &BevelButton::toggled, this,
+            [this, slot, nameLabel](bool bypassed) {
+        // Resolve the effect dynamically by looking up the slot's current
+        // position in the layout so that reordering / removes don't strand
+        // the callback with a stale pointer.
+        int idx = m_slotLayout->indexOf(slot);
+        IEffectUnit* fx = (m_chain && idx >= 0 && idx < m_chain->effectCount())
+                              ? m_chain->effect(idx) : nullptr;
+        if (fx) fx->setBypassed(bypassed);
         slot->setStyleSheet(bypassed ? kSlotBypassedStyle : kSlotStyle);
         nameLabel->setStyleSheet(bypassed ? kEffectNameBypassedStyle : kEffectNameStyle);
     });
@@ -171,20 +224,22 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
         "QPushButton:hover { background: #4a4a52; }"));
     layout->addWidget(editBtn);
 
-    connect(editBtn, &QPushButton::clicked, this, [this, effect, slotIndex] {
-        Q_UNUSED(slotIndex);
-        if (!effect) return;
+    connect(editBtn, &QPushButton::clicked, this, [this, slot] {
+        int idx = m_slotLayout->indexOf(slot);
+        IEffectUnit* fx = (m_chain && idx >= 0 && idx < m_chain->effectCount())
+                              ? m_chain->effect(idx) : nullptr;
+        if (!fx) return;
 
-        // Check if this effect is a ParametricEQ and open the visual editor
-        auto* peq = dynamic_cast<ParametricEQ*>(effect);
-        if (peq) {
+        // ParametricEQ gets its bespoke visual editor
+        if (auto* peq = dynamic_cast<ParametricEQ*>(fx)) {
             auto* dialog = new ParametricEQDialog(peq, this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
             dialog->show();
             return;
         }
 
-        // Other effect types can be wired up to their editors here in the future
+        // Every other effect falls back to the generic param-per-spinbox dialog
+        openGenericEffectEditor(fx, this);
     });
 
     // Remove button
@@ -196,8 +251,9 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
         "QPushButton:hover { color: #e44; }"));
     layout->addWidget(removeBtn);
 
-    connect(removeBtn, &QPushButton::clicked, this, [this, slotIndex] {
-        removeEffect(slotIndex);
+    connect(removeBtn, &QPushButton::clicked, this, [this, slot] {
+        int idx = m_slotLayout->indexOf(slot);
+        if (idx >= 0) removeEffect(idx);
     });
 
     // Insert before the "Add Effect" button
@@ -210,6 +266,14 @@ void EffectsRackWidget::removeEffect(int index)
 {
     if (index < 0 || index >= m_effectCount) return;
 
+    // Detach the effect from the chain first so the audio thread stops
+    // calling into it, then delete it after the slot widget goes away.
+    IEffectUnit* fx = nullptr;
+    if (m_chain && index < m_chain->effectCount()) {
+        fx = m_chain->effect(index);
+        m_chain->removeEffect(index);
+    }
+
     auto* item = m_slotLayout->takeAt(index);
     if (item && item->widget()) {
         delete item->widget();
@@ -217,10 +281,9 @@ void EffectsRackWidget::removeEffect(int index)
     delete item;
     --m_effectCount;
 
-    // Also remove from the DSP chain if connected
-    if (m_chain && index < m_chain->effectCount()) {
-        m_chain->removeEffect(index);
-    }
+    // DspChain holds raw pointers — nothing else owns the effect, so we
+    // need to free it here to avoid a leak.
+    delete fx;
 }
 
 int EffectsRackWidget::effectCount() const
@@ -230,6 +293,8 @@ int EffectsRackWidget::effectCount() const
 
 void EffectsRackWidget::showAddEffectMenu()
 {
+    // Nothing to add to if no chain is attached (i.e. no track selected).
+    // Still show the menu so the user gets feedback, but do nothing on click.
     QMenu menu(this);
 
     // Build categorized submenus
@@ -244,36 +309,27 @@ void EffectsRackWidget::showAddEffectMenu()
         }
 
         categories[category]->addAction(name, this, [this, name] {
-            // Instantiate the effect if we have a concrete implementation
+            if (!m_chain) return;  // No track selected — nothing to append to
+
+            // Instantiate the effect if we have a concrete implementation.
             IEffectUnit* effect = nullptr;
 
-            if (name == QLatin1String("Noise Reduction")) {
-                effect = new NoiseReduction();
-            }
-            // Other effect types can be instantiated here as they are implemented
+            if      (name == QLatin1String("Parametric EQ"))    effect = new ParametricEQ();
+            else if (name == QLatin1String("Graphic EQ"))       effect = new GraphicEQ31();
+            else if (name == QLatin1String("Compressor"))       effect = new Compressor();
+            else if (name == QLatin1String("Limiter"))          effect = new Limiter();
+            else if (name == QLatin1String("Gate"))             effect = new NoiseGate();
+            else if (name == QLatin1String("De-Esser"))         effect = new DeEsser();
+            else if (name == QLatin1String("Reverb"))           effect = new Reverb();
+            else if (name == QLatin1String("Noise Reduction"))  effect = new NoiseReduction();
+            // Remaining slots ("High/Low-Pass Filter", "Delay", "Chorus",
+            // "Phaser", "Flanger", "Loudness Meter") have no dedicated DSP
+            // class yet — skip them until implementation lands.
 
-            if (effect) {
-                // Add to the DSP chain if we have one
-                if (m_chain) {
-                    m_chain->addEffect(effect);
-                }
-                addEffect(effect);
-            } else {
-                // Placeholder slot for effects not yet implemented
-                addEffect(nullptr);
+            if (!effect) return;
 
-                // Update the name label of the just-added slot
-                int lastSlotIdx = m_effectCount - 1;
-                if (lastSlotIdx >= 0 && lastSlotIdx < m_slotLayout->count()) {
-                    auto* slotWidget = m_slotLayout->itemAt(lastSlotIdx)->widget();
-                    if (slotWidget) {
-                        auto labels = slotWidget->findChildren<QLabel*>();
-                        if (labels.size() >= 2) {
-                            labels[1]->setText(name);
-                        }
-                    }
-                }
-            }
+            m_chain->addEffect(effect);
+            addEffect(effect);
         });
     }
 

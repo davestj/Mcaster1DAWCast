@@ -88,6 +88,35 @@ float AudioMixer::stripPan(int strip) const
     return 0.0f;
 }
 
+void AudioMixer::ensureMeterCapacity(int count) const
+{
+    while (static_cast<int>(m_meters.size()) < count) {
+        m_meters.emplace_back(std::make_unique<StripMeters>());
+    }
+}
+
+float AudioMixer::stripPeakL(int strip) const
+{
+    if (strip < 0 || strip >= static_cast<int>(m_meters.size()) || !m_meters[strip]) return 0.0f;
+    return m_meters[strip]->peakL.load(std::memory_order_relaxed);
+}
+
+float AudioMixer::stripPeakR(int strip) const
+{
+    if (strip < 0 || strip >= static_cast<int>(m_meters.size()) || !m_meters[strip]) return 0.0f;
+    return m_meters[strip]->peakR.load(std::memory_order_relaxed);
+}
+
+float AudioMixer::masterPeakL() const
+{
+    return m_masterPeakL.load(std::memory_order_relaxed);
+}
+
+float AudioMixer::masterPeakR() const
+{
+    return m_masterPeakR.load(std::memory_order_relaxed);
+}
+
 void AudioMixer::setSoloMode(SoloMode mode)
 {
     if (m_soloMode != mode) {
@@ -120,7 +149,16 @@ void AudioMixer::process(AudioBuffer& output)
     // Start with silence
     output.silence();
 
-    if (m_strips.isEmpty()) return;
+    // Make sure the meter slots match the current strip count. This is
+    // technically an allocation, but only when the strip count grows —
+    // steady-state processing is allocation-free.
+    ensureMeterCapacity(m_strips.size());
+
+    if (m_strips.isEmpty()) {
+        m_masterPeakL.store(0.0f, std::memory_order_relaxed);
+        m_masterPeakR.store(0.0f, std::memory_order_relaxed);
+        return;
+    }
 
     // Determine if any strip is soloed
     bool anySoloed = false;
@@ -140,17 +178,40 @@ void AudioMixer::process(AudioBuffer& output)
     const int frames   = output.frames;
     const int channels = output.channels;
 
+    int stripIdx = -1;
     for (const auto& strip : m_strips) {
+        ++stripIdx;
+
+        // Default this strip's meters to silence; overridden below if audible.
+        float stripPeakL = 0.0f;
+        float stripPeakR = 0.0f;
+
         // Skip strips with no input buffer
-        if (!strip.inputBuffer || !strip.inputBuffer->data) continue;
+        if (!strip.inputBuffer || !strip.inputBuffer->data) {
+            if (stripIdx < static_cast<int>(m_meters.size()) && m_meters[stripIdx]) {
+                m_meters[stripIdx]->peakL.store(0.0f, std::memory_order_relaxed);
+                m_meters[stripIdx]->peakR.store(0.0f, std::memory_order_relaxed);
+            }
+            continue;
+        }
 
         // Mute logic — always applies
-        if (strip.muted) continue;
+        if (strip.muted) {
+            if (stripIdx < static_cast<int>(m_meters.size()) && m_meters[stripIdx]) {
+                m_meters[stripIdx]->peakL.store(0.0f, std::memory_order_relaxed);
+                m_meters[stripIdx]->peakR.store(0.0f, std::memory_order_relaxed);
+            }
+            continue;
+        }
 
         // Solo routing logic
         if (anySoloed && !strip.solo) {
             if (m_soloMode == SoloInPlace) {
                 // SIP: non-soloed tracks are fully muted
+                if (stripIdx < static_cast<int>(m_meters.size()) && m_meters[stripIdx]) {
+                    m_meters[stripIdx]->peakL.store(0.0f, std::memory_order_relaxed);
+                    m_meters[stripIdx]->peakR.store(0.0f, std::memory_order_relaxed);
+                }
                 continue;
             }
             // SIF: non-soloed tracks will be dimmed (handled below via dimGain)
@@ -185,15 +246,27 @@ void AudioMixer::process(AudioBuffer& output)
             for (int f = 0; f < srcFrames; ++f) {
                 const float inL = src[f * srcChannels];
                 const float inR = src[f * srcChannels + 1];
-                dst[f * channels]     += inL * leftGain;
-                dst[f * channels + 1] += inR * rightGain;
+                const float outL = inL * leftGain;
+                const float outR = inR * rightGain;
+                dst[f * channels]     += outL;
+                dst[f * channels + 1] += outR;
+                const float aL = std::fabs(outL);
+                const float aR = std::fabs(outR);
+                if (aL > stripPeakL) stripPeakL = aL;
+                if (aR > stripPeakR) stripPeakR = aR;
             }
         } else if (channels >= 2 && srcChannels == 1) {
             // Mono input -> stereo output
             for (int f = 0; f < srcFrames; ++f) {
                 const float mono = src[f];
-                dst[f * channels]     += mono * leftGain;
-                dst[f * channels + 1] += mono * rightGain;
+                const float outL = mono * leftGain;
+                const float outR = mono * rightGain;
+                dst[f * channels]     += outL;
+                dst[f * channels + 1] += outR;
+                const float aL = std::fabs(outL);
+                const float aR = std::fabs(outR);
+                if (aL > stripPeakL) stripPeakL = aL;
+                if (aR > stripPeakR) stripPeakR = aR;
             }
         } else if (channels == 1) {
             // Mono output — sum with linear gain only (pan has no effect)
@@ -203,10 +276,40 @@ void AudioMixer::process(AudioBuffer& output)
                     monoIn += src[f * srcChannels + c];
                 }
                 monoIn /= static_cast<float>(srcChannels);
-                dst[f] += monoIn * linearGain;
+                const float outM = monoIn * linearGain;
+                dst[f] += outM;
+                const float aM = std::fabs(outM);
+                if (aM > stripPeakL) stripPeakL = aM;
             }
+            // Mirror the mono peak to the right channel for UI consistency
+            stripPeakR = stripPeakL;
+        }
+
+        if (stripIdx < static_cast<int>(m_meters.size()) && m_meters[stripIdx]) {
+            m_meters[stripIdx]->peakL.store(stripPeakL, std::memory_order_relaxed);
+            m_meters[stripIdx]->peakR.store(stripPeakR, std::memory_order_relaxed);
         }
     }
+
+    // Master output peak (post-mix). Walk the summed output buffer once.
+    float masterPeakL = 0.0f;
+    float masterPeakR = 0.0f;
+    if (channels >= 2) {
+        for (int f = 0; f < frames; ++f) {
+            float aL = std::fabs(output.data[f * channels]);
+            float aR = std::fabs(output.data[f * channels + 1]);
+            if (aL > masterPeakL) masterPeakL = aL;
+            if (aR > masterPeakR) masterPeakR = aR;
+        }
+    } else if (channels == 1) {
+        for (int f = 0; f < frames; ++f) {
+            float a = std::fabs(output.data[f]);
+            if (a > masterPeakL) masterPeakL = a;
+        }
+        masterPeakR = masterPeakL;
+    }
+    m_masterPeakL.store(masterPeakL, std::memory_order_relaxed);
+    m_masterPeakR.store(masterPeakR, std::memory_order_relaxed);
 }
 
 } // namespace dawcast

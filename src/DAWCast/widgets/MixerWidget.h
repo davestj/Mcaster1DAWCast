@@ -9,6 +9,7 @@
 #include <QMap>
 
 class QFrame;
+class QTimer;
 
 namespace dawcast { class AudioMixer; }
 namespace dawcast { class BusRouter; }
@@ -18,6 +19,7 @@ namespace dawcast { class ParametricEQ; }
 namespace dawcast::widgets {
 
 class EmbossedKnob;
+class VUMeterWidget;
 
 /// Per-channel inline EQ knob state, stored alongside the mixer strip widget.
 struct ChannelEQKnobs {
@@ -61,6 +63,14 @@ private:
 
     /// Per-channel EQ knob references, keyed by strip index.
     QMap<int, ChannelEQKnobs> m_channelEQKnobs;
+
+    /// Per-strip VU meters, indexed by strip number. The last entry is the
+    /// master strip meter (bound to the mixer's master peak accessors).
+    QList<VUMeterWidget*> m_vuMeters;
+    VUMeterWidget*        m_masterVuMeter = nullptr;
+
+    /// Per-frame meter refresh timer (~30 ms).
+    QTimer* m_meterTimer = nullptr;
 };
 
 } // namespace dawcast::widgets
