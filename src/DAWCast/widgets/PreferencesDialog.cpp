@@ -203,13 +203,12 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
 
     auto* themeFormLayout = new QFormLayout;
     m_themeCombo = new QComboBox(themeTab);
-    // Populate from actually available themes
+    // DAWCast is a light-only application — only the Default theme ships.
     QStringList themes = ThemeEngine::instance()->availableThemes();
     if (themes.isEmpty()) {
-        themes << QStringLiteral("DarkStudio") << QStringLiteral("Default") << QStringLiteral("BroadcastPro");
+        themes << QStringLiteral("Default");
     }
     m_themeCombo->addItems(themes);
-    // Select current theme
     QString current = ThemeEngine::instance()->currentTheme();
     int idx = m_themeCombo->findText(current);
     if (idx >= 0) m_themeCombo->setCurrentIndex(idx);
@@ -221,12 +220,12 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     m_themePreview->setFrameShape(QFrame::Box);
     m_themePreview->setMinimumHeight(120);
     m_themePreview->setStyleSheet(QStringLiteral(
-        "QFrame { background: #2a2a30; border: 1px solid #555; border-radius: 4px; }"));
+        "QFrame { background: #f0f0f4; border: 1px solid #c8c8d0; border-radius: 4px; }"));
 
     auto* previewLayout = new QVBoxLayout(m_themePreview);
     auto* previewLabel = new QLabel(tr("Theme Preview"), m_themePreview);
     previewLabel->setAlignment(Qt::AlignCenter);
-    previewLabel->setStyleSheet(QStringLiteral("QLabel { color: #aaa; font-size: 12px; }"));
+    previewLabel->setStyleSheet(QStringLiteral("QLabel { color: #1a1a1a; font-size: 12px; }"));
     previewLayout->addWidget(previewLabel);
 
     // Sample UI elements in preview

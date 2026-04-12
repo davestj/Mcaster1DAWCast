@@ -4,6 +4,7 @@
 
 #include "MainWindow.h"
 #include "TimelineWidget.h"
+#include "TimelineScrollBar.h"
 #include "TrackHeaderPanel.h"
 #include "MixerWidget.h"
 #include "VideoPreview.h"
@@ -67,6 +68,8 @@
 #include <QInputDialog>
 #include <QStatusBar>
 #include <QScrollBar>
+#include <QGridLayout>
+#include <QTimer>
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -285,6 +288,19 @@ void MainWindow::setupMenus()
     actZoomSel->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z));
     connect(actZoomSel, &QAction::triggered, this, [this] {
         if (m_timeline) m_timeline->zoomToSelection();
+    });
+
+    auto* actZoomArea = editMenu->addAction(tr("Zoom to &Area"));
+    actZoomArea->setShortcut(QKeySequence(Qt::Key_Z));
+    actZoomArea->setToolTip(tr("Press Z then drag a rectangle to zoom into that area. Esc cancels."));
+    connect(actZoomArea, &QAction::triggered, this, [this] {
+        if (m_timeline) {
+            auto mode = m_timeline->interactionMode();
+            m_timeline->setInteractionMode(
+                mode == TimelineWidget::ModeZoomArea
+                    ? TimelineWidget::ModeNormal
+                    : TimelineWidget::ModeZoomArea);
+        }
     });
 
     editMenu->addSeparator();
@@ -555,6 +571,7 @@ void MainWindow::setupMenus()
 void MainWindow::setupToolbars()
 {
     m_toolBar = addToolBar(tr("Transport"));
+    m_toolBar->setObjectName(QStringLiteral("TransportToolbar"));
     m_toolBar->setMovable(false);
     m_toolBar->setFloatable(false);
 
@@ -601,11 +618,105 @@ void MainWindow::setupCentralWidget()
     m_timelineSplitter->setChildrenCollapsible(false);
 
     m_trackHeaders = new TrackHeaderPanel(m_timelineSplitter);
-    m_timeline = new TimelineWidget(m_timelineSplitter);
+
+    // Timeline + scrollbars: native QScrollBar widgets that drive the
+    // TimelineWidget's internal m_scroll / m_vScroll. The TimelineWidget
+    // itself paints in its own coordinate system; the scrollbars only
+    // shift what the user sees.
+    auto* timelineContainer = new QWidget(m_timelineSplitter);
+    auto* timelineGrid = new QGridLayout(timelineContainer);
+    timelineGrid->setContentsMargins(0, 0, 0, 0);
+    timelineGrid->setSpacing(0);
+
+    m_timeline = new TimelineWidget(timelineContainer);
     m_timeline->setMinimumHeight(200);
 
+    auto* hScroll = new TimelineScrollBar(Qt::Horizontal, timelineContainer);
+    auto* vScroll = new TimelineScrollBar(Qt::Vertical,   timelineContainer);
+
+    timelineGrid->addWidget(m_timeline, 0, 0);
+    timelineGrid->addWidget(vScroll,    0, 1);
+    timelineGrid->addWidget(hScroll,    1, 0);
+    timelineGrid->setColumnStretch(0, 1);
+    timelineGrid->setRowStretch(0, 1);
+
+    // Sync scrollbar extents from current timeline state.
+    auto syncScrollbars = [this, hScroll, vScroll]() {
+        const int viewportW = m_timeline->width();
+        const int viewportH = m_timeline->height();
+        const int contentW  = m_timeline->contentWidthPx();
+        const int contentH  = m_timeline->contentHeightPx();
+
+        hScroll->setUpdatesQuietly(true);
+        hScroll->setContentSize(qMax(viewportW, contentW));
+        hScroll->setViewportSize(viewportW);
+        hScroll->setValue(m_timeline->horizontalScrollPx());
+        hScroll->setUpdatesQuietly(false);
+
+        vScroll->setUpdatesQuietly(true);
+        vScroll->setContentSize(qMax(viewportH, contentH));
+        vScroll->setViewportSize(viewportH);
+        vScroll->setValue(m_timeline->verticalScrollPx());
+        vScroll->setUpdatesQuietly(false);
+    };
+
+    // Pan: scrollbar body drag → just scroll
+    connect(hScroll, &TimelineScrollBar::valueChanged,
+            m_timeline, &TimelineWidget::setHorizontalScrollPx);
+    connect(vScroll, &TimelineScrollBar::valueChanged,
+            m_timeline, &TimelineWidget::setVerticalScrollPx);
+
+    // Zoom: drag a grip → recompute timeline zoom so the new viewport
+    // exactly matches the new thumb size, then re-sync.
+    //
+    // The scrollbar reports the *original* viewport at drag-start as the
+    // third arg, so we get the real multiplicative zoom factor:
+    //   zoomFactor = oldViewport / newViewport
+    // Earlier versions read viewportSize() back from the scrollbar after
+    // it had already updated its own state, which collapsed the ratio to
+    // 1.0 and made grip-drag a no-op.
+    connect(hScroll, &TimelineScrollBar::zoomChanged, this,
+            [this, syncScrollbars](int newViewportPx, int newValuePx, int oldViewportPx) {
+        if (newViewportPx <= 0 || oldViewportPx <= 0) return;
+        const double zoomFactor =
+            static_cast<double>(oldViewportPx) / static_cast<double>(newViewportPx);
+        if (qFuzzyCompare(zoomFactor, 1.0)) return;
+
+        m_timeline->zoomBy(static_cast<float>(zoomFactor),
+                           newValuePx > 0 ? newValuePx : 0);
+        syncScrollbars();
+    });
+
+    connect(vScroll, &TimelineScrollBar::zoomChanged, this,
+            [this, syncScrollbars](int newViewportPx, int newValuePx, int oldViewportPx) {
+        if (newViewportPx <= 0 || oldViewportPx <= 0) return;
+        const double zoomFactor =
+            static_cast<double>(oldViewportPx) / static_cast<double>(newViewportPx);
+        if (qFuzzyCompare(zoomFactor, 1.0)) return;
+
+        m_timeline->zoomVerticalBy(static_cast<float>(zoomFactor));
+        m_timeline->setVerticalScrollPx(newValuePx);
+        syncScrollbars();
+    });
+
+    connect(m_timeline, &TimelineWidget::horizontalScrollChanged,
+            hScroll, &TimelineScrollBar::setValue);
+    connect(m_timeline, &TimelineWidget::verticalScrollChanged,
+            vScroll, &TimelineScrollBar::setValue);
+    connect(m_timeline, &TimelineWidget::contentSizeChanged,
+            this, syncScrollbars);
+    // Any time the timeline content extent changes (clip drop, zoom, track
+    // add) we mark the playback engine's audio readers as needing rebuild
+    // so the next play() picks up new clips without blocking the GUI.
+    connect(m_timeline, &TimelineWidget::contentSizeChanged, this, [this]() {
+        if (m_playbackEngine) m_playbackEngine->invalidateReaders();
+    });
+
+    // Run once on first idle so the initial extents are set
+    QTimer::singleShot(0, this, syncScrollbars);
+
     m_timelineSplitter->addWidget(m_trackHeaders);
-    m_timelineSplitter->addWidget(m_timeline);
+    m_timelineSplitter->addWidget(timelineContainer);
     m_timelineSplitter->setStretchFactor(0, 0);  // headers: fixed width
     m_timelineSplitter->setStretchFactor(1, 1);  // timeline: stretches
 
@@ -666,6 +777,26 @@ void MainWindow::setupDockWidgets()
     m_effectsRack = new EffectsRackWidget(m_effectsDock);
     m_effectsDock->setWidget(m_effectsRack);
     addDockWidget(Qt::RightDockWidgetArea, m_effectsDock);
+
+    // Auto-create a track if the user clicks Add Effect with no track selected
+    connect(m_effectsRack, &EffectsRackWidget::chainRequested, this, [this]() {
+        qDebug() << "[MW] chainRequested received, m_timelineModel ="
+                 << (m_timelineModel ? "OK" : "NULL");
+        if (!m_timelineModel) return;
+        // Use the first existing track if any, otherwise create one
+        dawcast::AudioTrack* track = nullptr;
+        if (m_timelineModel->trackCount() > 0) {
+            track = qobject_cast<dawcast::AudioTrack*>(m_timelineModel->track(0));
+        }
+        if (!track) {
+            track = m_timelineModel->addAudioTrack();
+        }
+        if (track && m_effectsRack) {
+            m_effectsRack->setDspChain(track->effectChain());
+            statusBar()->showMessage(
+                tr("Effects rack auto-bound to Track %1").arg(1), 2000);
+        }
+    });
     tabifyDockWidget(m_videoDock, m_effectsDock);
 
     // Right dock — LUFS Meter
@@ -828,6 +959,79 @@ void MainWindow::setupAudioPipeline()
         m_effectsRack->setDspChain(track->effectChain());
         statusBar()->showMessage(
             tr("Effects rack bound to track %1").arg(trackIndex + 1), 2000);
+    });
+
+    // Files dropped onto a track header (or onto the empty header area).
+    // trackIndex == -1 means "create a new audio track and add the files there".
+    connect(m_trackHeaders, &TrackHeaderPanel::filesDroppedOnTrack,
+            this, [this](int trackIndex, const QStringList& filePaths) {
+        if (!m_timelineModel || filePaths.isEmpty()) return;
+
+        dawcast::AudioTrack* track = nullptr;
+        if (trackIndex >= 0) {
+            track = qobject_cast<dawcast::AudioTrack*>(
+                m_timelineModel->track(trackIndex));
+        }
+        if (!track) {
+            track = m_timelineModel->addAudioTrack();
+            if (m_effectsRack && track) {
+                m_effectsRack->setDspChain(track->effectChain());
+            }
+        }
+        if (!track) return;
+
+        const int sampleRate = m_audioEngine
+            ? m_audioEngine->sampleRate() : 48000;
+        int64_t cursorPos = m_timelineModel->playhead();
+
+        for (const QString& filePath : filePaths) {
+            int64_t durationSamples = static_cast<int64_t>(sampleRate) * 60;
+            dawcast::WaveformCache::instance()->requestWaveform(filePath);
+
+            auto* clip = new dawcast::Clip(track);
+            clip->setSourcePath(filePath);
+            clip->setSourceIn(0);
+            clip->setSourceOut(durationSamples);
+            clip->setTimelinePosition(cursorPos);
+            track->addClip(clip);
+            cursorPos += durationSamples;
+        }
+        if (m_timeline) m_timeline->update();
+        if (m_playbackEngine) m_playbackEngine->invalidateReaders();
+        statusBar()->showMessage(
+            tr("Dropped %1 file(s) onto track %2")
+                .arg(filePaths.size()).arg(trackIndex + 1), 3000);
+    });
+
+    // Per-track transport buttons → drive the global playback engine.
+    connect(m_trackHeaders, &TrackHeaderPanel::trackPlayClicked,
+            this, [this](int) {
+        if (m_playbackEngine) m_playbackEngine->play();
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackStopClicked,
+            this, [this](int) {
+        if (m_playbackEngine) m_playbackEngine->stop();
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackPauseClicked,
+            this, [this](int) {
+        if (m_playbackEngine) m_playbackEngine->pause();
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackRewindClicked,
+            this, [this](int) {
+        if (m_timelineModel) m_timelineModel->setPlayhead(0);
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackFastForwardClicked,
+            this, [this](int) {
+        if (m_timelineModel) m_timelineModel->setPlayhead(m_timelineModel->duration());
+    });
+    connect(m_trackHeaders, &TrackHeaderPanel::trackRecordClicked,
+            this, [this](int trackIndex) {
+        // Open the live recorder for this track. The captured clip will
+        // be inserted at the playhead on the target track when recording
+        // finishes (full hookup is staged for the next round).
+        statusBar()->showMessage(
+            tr("Recording into track %1 — opening recorder...")
+                .arg(trackIndex + 1), 3000);
     });
 
     // Project manager — handles save/load serialization to/from JSON
@@ -1463,9 +1667,15 @@ void MainWindow::addAudioTrack()
 {
     if (m_timelineModel) {
         dawcast::AudioTrack* track = m_timelineModel->addAudioTrack();
-        Q_UNUSED(track)
         // TimelineWidget repaints via Timeline::trackAdded signal
         m_timeline->update();
+
+        // Auto-bind the effects rack to the new track so the user can
+        // immediately drop effects on it without having to click the
+        // track header first.
+        if (m_effectsRack && track) {
+            m_effectsRack->setDspChain(track->effectChain());
+        }
 
         // Update transport bar with timeline duration
         int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
@@ -1974,10 +2184,47 @@ void MainWindow::clearRecentFiles()
 void MainWindow::saveWindowState()
 {
     auto* config = dawcast::config::AppConfig::instance();
+
+    // Main window geometry (position + size on screen)
     config->setValue(QStringLiteral("window/geometry"),
                      QString::fromLatin1(saveGeometry().toBase64()));
+
+    // QMainWindow dock layout, toolbar positions, dock visibility
     config->setValue(QStringLiteral("window/state"),
                      QString::fromLatin1(saveState().toBase64()));
+
+    // Splitter sizes — saveState() doesn't reach into the central widget
+    if (m_centralSplitter) {
+        config->setValue(QStringLiteral("window/centralSplitter"),
+                         QString::fromLatin1(m_centralSplitter->saveState().toBase64()));
+    }
+    if (m_timelineSplitter) {
+        config->setValue(QStringLiteral("window/timelineSplitter"),
+                         QString::fromLatin1(m_timelineSplitter->saveState().toBase64()));
+    }
+
+    // Per-dock visibility (in case the user closed individual docks).
+    // QMainWindow::saveState already covers this for normal docks, but we
+    // store it explicitly so non-Qt-managed widgets can be restored too.
+    auto saveDockVisible = [config](const char* key, QWidget* w) {
+        if (w) {
+            config->setValue(QString::fromLatin1(key), w->isVisible());
+        }
+    };
+    saveDockVisible("window/visible/mixer",         m_mixerDock);
+    saveDockVisible("window/visible/video",         m_videoDock);
+    saveDockVisible("window/visible/mediaBrowser",  m_mediaBrowserDock);
+    saveDockVisible("window/visible/effects",       m_effectsDock);
+    saveDockVisible("window/visible/lufs",          m_lufsDock);
+    saveDockVisible("window/visible/ai",            m_aiDock);
+    saveDockVisible("window/visible/markerList",    m_markerListDock);
+
+    // Active workspace / view mode so the user comes back to where they were
+    if (auto* vmm = dawcast::ViewModeManager::instance()) {
+        config->setValue(QStringLiteral("window/viewMode"),
+                         static_cast<int>(vmm->currentMode()));
+    }
+
     config->save();
 }
 
@@ -1994,6 +2241,20 @@ void MainWindow::restoreWindowState()
 
     if (!geo.isEmpty()) restoreGeometry(geo);
     if (!state.isEmpty()) restoreState(state);
+
+    // Splitter sizes
+    if (m_centralSplitter) {
+        QByteArray cs = QByteArray::fromBase64(
+            config->value(QStringLiteral("window/centralSplitter"), QString())
+                .toString().toLatin1());
+        if (!cs.isEmpty()) m_centralSplitter->restoreState(cs);
+    }
+    if (m_timelineSplitter) {
+        QByteArray ts = QByteArray::fromBase64(
+            config->value(QStringLiteral("window/timelineSplitter"), QString())
+                .toString().toLatin1());
+        if (!ts.isEmpty()) m_timelineSplitter->restoreState(ts);
+    }
 }
 
 // ── Export Pipeline ───────────────────────────────────────────────────────

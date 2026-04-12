@@ -100,16 +100,23 @@ void WaveformCache::clearCache()
 
 void WaveformCache::decodeAndCache(const QString& filePath)
 {
+    qInfo() << "[Waveform] decoding" << filePath;
+
     // Decode the audio file to float32 PCM
     FFmpegCodec codec;
     AudioBuffer buf = codec.decode(filePath);
 
     if (!buf.data || buf.frames <= 0 || buf.channels <= 0) {
-        qWarning() << "WaveformCache: decode failed for" << filePath;
+        qWarning() << "[Waveform] decode FAILED for" << filePath
+                   << " data=" << (buf.data ? "ok" : "null")
+                   << " frames=" << buf.frames
+                   << " channels=" << buf.channels;
         QMutexLocker lock(&m_mutex);
         m_pending.remove(filePath);
         return;
     }
+    qInfo() << "[Waveform] decoded ok:" << buf.frames << "frames,"
+            << buf.channels << "ch," << buf.sampleRate << "Hz";
 
     // Build peak/RMS data
     WaveformData waveform;
@@ -158,6 +165,7 @@ void WaveformCache::decodeAndCache(const QString& filePath)
     buf.data = nullptr;
 
     // Store in cache (with LRU eviction if needed)
+    int cachedBlocks = numBlocks;
     {
         QMutexLocker lock(&m_mutex);
         m_pending.remove(filePath);
@@ -166,6 +174,7 @@ void WaveformCache::decodeAndCache(const QString& filePath)
         m_accessOrder.append(filePath);
         evictLRU();
     }
+    qInfo() << "[Waveform] cached" << cachedBlocks << "blocks for" << filePath;
 
     // Emit signal on the GUI thread
     QMetaObject::invokeMethod(this, [this, filePath]() {

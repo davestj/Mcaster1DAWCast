@@ -15,6 +15,9 @@
 #include "DeEsser.h"
 #include "Reverb.h"
 #include "GraphicEQ31.h"
+#include "mc1/Mc1EffectRegistry.h"
+#include "mc1/Mc1EffectAdapter.h"
+#include "mc1/Mc1DialogFactory.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -28,26 +31,28 @@
 #include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
+#include <QMessageBox>
+#include <QDebug>
 
 namespace dawcast::widgets {
 
 namespace {
 const QString kSlotStyle = QStringLiteral(
-    "QWidget#effectSlot { background: #2a2a30; border: 1px solid #3a3a42; "
+    "QWidget#effectSlot { background: #ffffff; border: 1px solid #c8c8d0; "
     "border-radius: 3px; padding: 2px; }");
 const QString kSlotBypassedStyle = QStringLiteral(
-    "QWidget#effectSlot { background: #222228; border: 1px solid #333; "
+    "QWidget#effectSlot { background: #f0f0f4; border: 1px solid #c8c8d0; "
     "border-radius: 3px; padding: 2px; }");
 const QString kDragHandleStyle = QStringLiteral(
-    "QLabel { color: #666; font-size: 14px; font-weight: bold; padding: 0 2px; }");
+    "QLabel { color: #888; font-size: 14px; font-weight: bold; padding: 0 2px; }");
 const QString kEffectNameStyle = QStringLiteral(
-    "QLabel { color: #ccc; font-size: 11px; font-weight: bold; }");
+    "QLabel { color: #1a1a1a; font-size: 11px; font-weight: bold; }");
 const QString kEffectNameBypassedStyle = QStringLiteral(
-    "QLabel { color: #666; font-size: 11px; font-weight: bold; font-style: italic; }");
+    "QLabel { color: #888; font-size: 11px; font-weight: bold; font-style: italic; }");
 const QString kAddBtnStyle = QStringLiteral(
-    "QPushButton { background: #353540; color: #aaa; border: 1px dashed #555; "
+    "QPushButton { background: #f0f0f4; color: #1a1a1a; border: 1px dashed #b0b0b8; "
     "border-radius: 3px; padding: 6px; font-size: 11px; }"
-    "QPushButton:hover { background: #404050; color: #ccc; }");
+    "QPushButton:hover { background: #e4e4ea; color: #1a1a1a; border-color: #8a8aa0; }");
 
 // Available built-in effects for the Add Effect menu
 struct EffectDef {
@@ -78,15 +83,15 @@ constexpr int kBuiltinEffectCount = sizeof(kBuiltinEffects) / sizeof(kBuiltinEff
 EffectsRackWidget::EffectsRackWidget(QWidget* parent)
     : QWidget(parent)
 {
-    setStyleSheet(QStringLiteral("EffectsRackWidget { background: #222228; }"));
+    setStyleSheet(QStringLiteral("EffectsRackWidget { background: #ffffff; }"));
 
     auto* scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setStyleSheet(QStringLiteral("QScrollArea { background: #222228; border: none; }"));
+    scrollArea->setStyleSheet(QStringLiteral("QScrollArea { background: #ffffff; border: none; }"));
 
     auto* container = new QWidget(scrollArea);
-    container->setStyleSheet(QStringLiteral("background: #222228;"));
+    container->setStyleSheet(QStringLiteral("background: #ffffff;"));
     m_slotLayout = new QVBoxLayout(container);
     m_slotLayout->setContentsMargins(4, 4, 4, 4);
     m_slotLayout->setSpacing(3);
@@ -219,9 +224,9 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
     auto* editBtn = new QPushButton(tr("Edit"), slot);
     editBtn->setFixedSize(40, 24);
     editBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #3a3a42; color: #bbb; border: 1px solid #555; "
+        "QPushButton { background: #f0f0f4; color: #1a1a1a; border: 1px solid #c0c0c8; "
         "border-radius: 2px; font-size: 10px; }"
-        "QPushButton:hover { background: #4a4a52; }"));
+        "QPushButton:hover { background: #e4e4ea; color: #1a1a1a; border-color: #8a8aa0; }"));
     layout->addWidget(editBtn);
 
     connect(editBtn, &QPushButton::clicked, this, [this, slot] {
@@ -230,7 +235,17 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
                               ? m_chain->effect(idx) : nullptr;
         if (!fx) return;
 
-        // ParametricEQ gets its bespoke visual editor
+        // Official MC1 (Mediacast One) effects open their own original
+        // VST-style hand-built editor — they do NOT inherit the host
+        // theme. Every plugin keeps its unique look and preset bank.
+        if (auto* mc1 = dynamic_cast<dawcast::dsp::Mc1EffectAdapter*>(fx)) {
+            if (auto* dlg = dawcast::dsp::openMc1EditorFor(mc1->mc1(), this)) {
+                dlg->show();
+                return;
+            }
+        }
+
+        // Legacy ParametricEQ gets its bespoke visual editor
         if (auto* peq = dynamic_cast<ParametricEQ*>(fx)) {
             auto* dialog = new ParametricEQDialog(peq, this);
             dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -238,7 +253,7 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
             return;
         }
 
-        // Every other effect falls back to the generic param-per-spinbox dialog
+        // Every other legacy effect falls back to the generic param-per-spinbox dialog
         openGenericEffectEditor(fx, this);
     });
 
@@ -291,25 +306,37 @@ int EffectsRackWidget::effectCount() const
     return m_effectCount;
 }
 
+void EffectsRackWidget::ensureChain()
+{
+    if (m_chain) return;
+    emit chainRequested();
+}
+
 void EffectsRackWidget::showAddEffectMenu()
 {
-    // Nothing to add to if no chain is attached (i.e. no track selected).
-    // Still show the menu so the user gets feedback, but do nothing on click.
+    // Always show the menu. Each action lambda calls ensureChain() before
+    // doing anything — this gives MainWindow a chance to auto-create a track.
     QMenu menu(this);
 
-    // Build categorized submenus
+    // Build categorized submenus, preserving insertion order so the
+    // built-in legacy effects appear before the official MC1 series.
     QMap<QString, QMenu*> categories;
+    auto getCategory = [&](const QString& cat) -> QMenu* {
+        auto it = categories.find(cat);
+        if (it != categories.end()) return *it;
+        QMenu* sub = menu.addMenu(cat);
+        categories.insert(cat, sub);
+        return sub;
+    };
 
+    // ── Legacy built-in effects ──────────────────────────────────────
     for (int i = 0; i < kBuiltinEffectCount; ++i) {
         QString category = QString::fromLatin1(kBuiltinEffects[i].category);
-        QString name = QString::fromLatin1(kBuiltinEffects[i].name);
+        QString name     = QString::fromLatin1(kBuiltinEffects[i].name);
 
-        if (!categories.contains(category)) {
-            categories[category] = menu.addMenu(category);
-        }
-
-        categories[category]->addAction(name, this, [this, name] {
-            if (!m_chain) return;  // No track selected — nothing to append to
+        getCategory(category)->addAction(name, this, [this, name] {
+            ensureChain();
+            if (!m_chain) return;
 
             // Instantiate the effect if we have a concrete implementation.
             IEffectUnit* effect = nullptr;
@@ -330,6 +357,42 @@ void EffectsRackWidget::showAddEffectMenu()
 
             m_chain->addEffect(effect);
             addEffect(effect);
+        });
+    }
+
+    menu.addSeparator();
+
+    // ── Official MC1 (Mediacast One) DSP series ──────────────────────
+    // Header-only header pack lives in src/DAWCast/dsp/mc1/.
+    // The Mc1EffectAdapter wraps each mc1dsp::DspEffect into a
+    // dawcast::IEffectUnit so DspChain can host them unchanged.
+    int mc1Count = 0;
+    const dawcast::dsp::Mc1EffectInfo* mc1Catalog =
+        dawcast::dsp::mc1EffectCatalog(&mc1Count);
+
+    for (int i = 0; i < mc1Count; ++i) {
+        const auto& info = mc1Catalog[i];
+        QString category = QString::fromUtf8(info.category);
+        QString display  = QString::fromUtf8(info.displayName);
+        auto    factory  = info.create;
+
+        getCategory(category)->addAction(display, this, [this, factory, display] {
+            ensureChain();
+            if (!m_chain) return;
+            auto* effect = factory(48000);
+            if (!effect) {
+                qWarning() << "[MC1] factory returned null for" << display;
+                return;
+            }
+            m_chain->addEffect(effect);
+            addEffect(effect);
+            qDebug() << "[MC1] Added" << display
+                     << "to chain. count=" << m_chain->effectCount();
+
+            // Auto-open the flagship editor dialog for MC1 plugins
+            if (auto* dlg = dawcast::dsp::openMc1EditorFor(effect->mc1(), this)) {
+                dlg->show();
+            }
         });
     }
 

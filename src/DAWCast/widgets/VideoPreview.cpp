@@ -20,9 +20,9 @@ constexpr int kPlayBtnSize      = 24;
 constexpr int kControlPadding   = 6;
 
 const QColor kBarBg(0, 0, 0, 140);
-const QColor kPlayBtnBg(255, 255, 255, 50);
-const QColor kPlayBtnIcon(220, 220, 220);
-const QColor kNoVideoText(120, 120, 130);
+const QColor kPlayBtnBg(255, 255, 255, 80);
+const QColor kPlayBtnIcon(240, 240, 240);
+const QColor kNoVideoText(90, 90, 100);
 } // anonymous namespace
 
 VideoPreview::VideoPreview(QWidget* parent)
@@ -56,10 +56,11 @@ void VideoPreview::paintEvent(QPaintEvent* /*event*/)
     const int w = width();
     const int h = height();
 
-    // Dark background (letterbox/pillarbox bars)
-    p.fillRect(rect(), Qt::black);
-
+    // No-video state: light background; when a video frame is present we
+    // still letterbox in black so the picture isn't washed out by white bars.
     if (m_frame.isNull()) {
+        p.fillRect(rect(), QColor(244, 244, 248));
+
         // "No Video" message centered
         QFont noVideoFont = font();
         noVideoFont.setPointSize(16);
@@ -72,8 +73,8 @@ void VideoPreview::paintEvent(QPaintEvent* /*event*/)
         int iconSize = 48;
         int cx = w / 2;
         int cy = h / 2 - 30;
-        p.setPen(QPen(QColor(80, 80, 90), 2));
-        p.setBrush(QColor(40, 40, 48));
+        p.setPen(QPen(QColor(170, 170, 180), 2));
+        p.setBrush(QColor(220, 220, 226));
         p.drawRoundedRect(cx - iconSize / 2, cy - iconSize / 2, iconSize, iconSize, 4, 4);
         // Play triangle inside
         QPainterPath tri;
@@ -81,12 +82,15 @@ void VideoPreview::paintEvent(QPaintEvent* /*event*/)
         tri.lineTo(cx - 8, cy + 12);
         tri.lineTo(cx + 12, cy);
         tri.closeSubpath();
-        p.setBrush(QColor(80, 80, 90));
+        p.setBrush(QColor(140, 140, 150));
         p.setPen(Qt::NoPen);
         p.drawPath(tri);
 
         return;
     }
+
+    // Letterbox/pillarbox bars when frame is present
+    p.fillRect(rect(), Qt::black);
 
     // Compute scaled frame rect preserving aspect ratio
     QSize frameSize = m_frame.size();

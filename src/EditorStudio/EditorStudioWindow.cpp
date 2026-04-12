@@ -81,8 +81,25 @@ EditorStudioWindow::~EditorStudioWindow() = default;
 
 void EditorStudioWindow::createCentralWidget()
 {
-    m_waveformView = new ForensicWaveformView(this);
-    setCentralWidget(m_waveformView);
+    auto* central = new QWidget(this);
+    auto* layout  = new QVBoxLayout(central);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    m_waveformView   = new ForensicWaveformView(central);
+    m_playerControls = new PlayerControls(m_waveformView, central);
+
+    layout->addWidget(m_waveformView, 1);
+    layout->addWidget(m_playerControls, 0);
+
+    setCentralWidget(central);
+
+    connect(m_waveformView, &ForensicWaveformView::fileLoaded,
+            m_playerControls, &PlayerControls::handleFileLoaded);
+    connect(m_waveformView, &ForensicWaveformView::positionChanged,
+            m_playerControls, &PlayerControls::handlePosition);
+    connect(m_waveformView, &ForensicWaveformView::playStateChanged,
+            m_playerControls, &PlayerControls::handlePlayState);
 }
 
 // ── Spectral dock (bottom) ─────────────────────────────────────────────────
@@ -258,44 +275,122 @@ void EditorStudioWindow::createMenuBar()
 void EditorStudioWindow::createToolBar()
 {
     auto* toolbar = addToolBar(QStringLiteral("Main"));
+    toolbar->setObjectName(QStringLiteral("MainToolbar"));
     toolbar->setMovable(false);
     toolbar->setIconSize(QSize(20, 20));
+    toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
 
-    // Open
-    toolbar->addAction(QStringLiteral("Open"), this, &EditorStudioWindow::onOpen);
+    // ── File ──
+    auto* openAct = toolbar->addAction(QStringLiteral("Open"), this,
+                                       &EditorStudioWindow::onOpen);
+    openAct->setToolTip(QStringLiteral("Open audio or video file (Cmd+O)"));
 
     toolbar->addSeparator();
 
-    // Transport controls
-    auto* rewindAction = toolbar->addAction(QStringLiteral("|<"), this, [this]() {
-        if (m_waveformView->hasFile()) {
-            m_waveformView->stop();
-        }
+    // ── Transport ──
+    auto* goStartAct = toolbar->addAction(QStringLiteral("|<<"), this, [this]() {
+        m_waveformView->goToStart();
     });
-    rewindAction->setToolTip(QStringLiteral("Rewind to start"));
+    goStartAct->setToolTip(QStringLiteral("Go to start (Home)"));
 
-    m_playAction = toolbar->addAction(QStringLiteral("Play"), this, [this]() {
+    auto* skipBackAct = toolbar->addAction(QStringLiteral("<<"), this, [this]() {
+        m_waveformView->skipSeconds(-5.0);
+    });
+    skipBackAct->setToolTip(QStringLiteral("Skip back 5 seconds"));
+
+    auto* playAct = toolbar->addAction(QStringLiteral("Play"), this, [this]() {
         m_waveformView->play();
     });
-    m_playAction->setToolTip(QStringLiteral("Play (Space)"));
+    playAct->setToolTip(QStringLiteral("Play (Space)"));
 
-    m_pauseAction = toolbar->addAction(QStringLiteral("Pause"), this, [this]() {
+    auto* pauseAct = toolbar->addAction(QStringLiteral("Pause"), this, [this]() {
         m_waveformView->pause();
     });
-    m_pauseAction->setToolTip(QStringLiteral("Pause"));
+    pauseAct->setToolTip(QStringLiteral("Pause (Space)"));
 
-    m_stopAction = toolbar->addAction(QStringLiteral("Stop"), this, [this]() {
+    auto* stopAct = toolbar->addAction(QStringLiteral("Stop"), this, [this]() {
         m_waveformView->stop();
     });
-    m_stopAction->setToolTip(QStringLiteral("Stop"));
+    stopAct->setToolTip(QStringLiteral("Stop and rewind"));
+
+    auto* skipFwdAct = toolbar->addAction(QStringLiteral(">>"), this, [this]() {
+        m_waveformView->skipSeconds(5.0);
+    });
+    skipFwdAct->setToolTip(QStringLiteral("Skip forward 5 seconds"));
+
+    auto* goEndAct = toolbar->addAction(QStringLiteral(">>|"), this, [this]() {
+        m_waveformView->goToEnd();
+    });
+    goEndAct->setToolTip(QStringLiteral("Go to end (End)"));
 
     toolbar->addSeparator();
 
-    // Zoom controls
-    toolbar->addAction(QStringLiteral("Zoom +"), this, &EditorStudioWindow::onZoomIn);
-    toolbar->addAction(QStringLiteral("Zoom -"), this, &EditorStudioWindow::onZoomOut);
-    toolbar->addAction(QStringLiteral("Fit"), this, &EditorStudioWindow::onZoomToFit);
-    toolbar->addAction(QStringLiteral("Sel"), this, &EditorStudioWindow::onZoomToSelection);
+    // ── Loop / Mark ──
+    auto* loopAct = toolbar->addAction(QStringLiteral("Loop"), this, [this](bool on) {
+        m_waveformView->setLooping(on);
+    });
+    loopAct->setCheckable(true);
+    loopAct->setToolTip(QStringLiteral("Toggle loop playback (L)"));
+
+    auto* markInAct = toolbar->addAction(QStringLiteral("Mark In"), this, [this]() {
+        int64_t pos = m_waveformView->playPosition();
+        int64_t end = m_waveformView->selectionEnd();
+        if (end <= pos) end = m_waveformView->audioFrames();
+        m_waveformView->setSelection(pos, end);
+    });
+    markInAct->setToolTip(QStringLiteral("Set in-point at playhead (I)"));
+
+    auto* markOutAct = toolbar->addAction(QStringLiteral("Mark Out"), this, [this]() {
+        int64_t pos = m_waveformView->playPosition();
+        int64_t start = m_waveformView->selectionStart();
+        if (start >= pos) start = 0;
+        m_waveformView->setSelection(start, pos);
+    });
+    markOutAct->setToolTip(QStringLiteral("Set out-point at playhead (O)"));
+
+    toolbar->addSeparator();
+
+    // ── Zoom ──
+    auto* zoomInAct = toolbar->addAction(QStringLiteral("Zoom +"), this,
+                                         &EditorStudioWindow::onZoomIn);
+    zoomInAct->setToolTip(QStringLiteral("Zoom in (+)"));
+
+    auto* zoomOutAct = toolbar->addAction(QStringLiteral("Zoom -"), this,
+                                          &EditorStudioWindow::onZoomOut);
+    zoomOutAct->setToolTip(QStringLiteral("Zoom out (-)"));
+
+    auto* fitAct = toolbar->addAction(QStringLiteral("Fit"), this,
+                                      &EditorStudioWindow::onZoomToFit);
+    fitAct->setToolTip(QStringLiteral("Zoom to fit entire file"));
+
+    auto* selAct = toolbar->addAction(QStringLiteral("Sel"), this,
+                                      &EditorStudioWindow::onZoomToSelection);
+    selAct->setToolTip(QStringLiteral("Zoom to current selection"));
+
+    // Smooth visual styling — subtle dividers, comfortable spacing
+    toolbar->setStyleSheet(QStringLiteral(
+        "QToolBar { spacing: 2px; padding: 4px 6px; }"
+        "QToolBar::separator {"
+        "  background: palette(mid);"
+        "  width: 1px;"
+        "  margin: 4px 6px;"
+        "}"
+        "QToolButton {"
+        "  padding: 4px 10px;"
+        "  border-radius: 4px;"
+        "  font-weight: 500;"
+        "}"
+        "QToolButton:hover {"
+        "  background: palette(midlight);"
+        "}"
+        "QToolButton:pressed {"
+        "  background: palette(mid);"
+        "}"
+        "QToolButton:checked {"
+        "  background: palette(highlight);"
+        "  color: palette(highlighted-text);"
+        "}"
+    ));
 }
 
 // ── File operations ────────────────────────────────────────────────────────

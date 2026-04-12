@@ -4,6 +4,7 @@
 
 #include "MediaLibrary.h"
 #include "../codec/TagTransfer.h"
+#include "../config/AppConfig.h"
 
 #include <QDir>
 #include <QDirIterator>
@@ -100,10 +101,7 @@ MediaLibrary::~MediaLibrary()
 
 QString MediaLibrary::databasePath()
 {
-    QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-                  + QStringLiteral("/mcaster1");
-    QDir().mkpath(dir);
-    return dir + QStringLiteral("/media_library.json");
+    return dawcast::config::AppConfig::mediaLibraryPath();
 }
 
 // ---------------------------------------------------------------------------

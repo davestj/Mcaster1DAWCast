@@ -15,6 +15,7 @@ AM_CPPFLAGS = \
     -I$(srcdir)/video_engine \
     -I$(srcdir)/timeline \
     -I$(srcdir)/dsp \
+    -I$(srcdir)/dsp/mc1 \
     -I$(srcdir)/vfx \
     -I$(srcdir)/podcast \
     -I$(srcdir)/broadcast \
@@ -38,7 +39,8 @@ AM_CPPFLAGS = \
     $(AVFORMAT_CFLAGS) \
     $(TAGLIB_CFLAGS) \
     $(SQLITE3_CFLAGS) \
-    $(LIBYAML_CFLAGS)
+    $(LIBYAML_CFLAGS) \
+    $(YAMLCPP_CFLAGS)
 
 AM_OBJCXXFLAGS = $(AM_CPPFLAGS)
 
@@ -53,6 +55,7 @@ mcaster1dawcast_LDADD = \
     $(TAGLIB_LIBS) \
     $(SQLITE3_LIBS) \
     $(LIBYAML_LIBS) \
+    $(YAMLCPP_LIBS) \
     $(MACOS_FRAMEWORKS)
 
 # ── Codec flags (optional, added per-codec) ──────────────────────────────────
@@ -297,6 +300,9 @@ moc_MainWindow.cpp: $(srcdir)/widgets/MainWindow.h
 moc_TimelineWidget.cpp: $(srcdir)/widgets/TimelineWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_TimelineScrollBar.cpp: $(srcdir)/widgets/TimelineScrollBar.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 moc_TrackHeaderWidget.cpp: $(srcdir)/widgets/TrackHeaderWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
@@ -437,6 +443,87 @@ moc_ImportAudioDialog.cpp: $(srcdir)/widgets/ImportAudioDialog.h
 
 # -- config --
 moc_AppConfig.cpp: $(srcdir)/config/AppConfig.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+# -- mc1 (Mediacast One) DSP plugin UI dialogs (Q_OBJECT) --
+# Prefixed `moc_mc1_*` to avoid case-insensitive filesystem collisions
+# with DAWCast's existing `moc_ParametricEQDialog.cpp` etc.
+moc_mc1_ParametricEqDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/ParametricEqDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_DualEq15Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/DualEq15Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_GraphicEq31Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/GraphicEq31Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_CompressorDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/CompressorDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_Dbx166xsDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/Dbx166xsDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_BroadcastAgcDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/BroadcastAgcDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_DbxVoiceDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/DbxVoiceDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_XenyxPreampDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/XenyxPreampDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_SonicEnhancerDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/SonicEnhancerDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_TubePreampDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/TubePreampDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_CasterTubeDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/CasterTubeDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_MicModelerDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/MicModelerDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_Lexicon224Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/Lexicon224Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_LexiconPcm70Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/LexiconPcm70Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_LexiconPcm96Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/LexiconPcm96Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_Lexicon480LDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/Lexicon480LDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_LexiconMpx1Dialog.cpp: $(srcdir)/dsp/mc1/fx_ui/LexiconMpx1Dialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_PodcastPluginDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/PodcastPluginDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_MusicStudioDialogs.cpp: $(srcdir)/dsp/mc1/fx_ui/MusicStudioDialogs.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_BBESonicSweetDialogs.cpp: $(srcdir)/dsp/mc1/fx_ui/BBESonicSweetDialogs.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_DbxDialogs.cpp: $(srcdir)/dsp/mc1/fx_ui/DbxDialogs.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_FlagshipDialogs.cpp: $(srcdir)/dsp/mc1/fx_ui/FlagshipDialogs.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_SignalHillStudioDialog.cpp: $(srcdir)/dsp/mc1/fx_ui/SignalHillStudioDialog.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_RackKnob.cpp: $(srcdir)/dsp/mc1/fx_ui/RackKnob.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_RackMeter.cpp: $(srcdir)/dsp/mc1/fx_ui/RackMeter.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
+moc_mc1_EqCurveWidget.cpp: $(srcdir)/dsp/mc1/fx_ui/EqCurveWidget.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
 # -- ai --
@@ -581,6 +668,83 @@ mcaster1dawcast_SOURCES = \
     dsp/NoiseReduction.cpp \
     dsp/TimeStretch.h \
     dsp/TimeStretch.cpp \
+    dsp/mc1/Mc1EffectAdapter.h \
+    dsp/mc1/Mc1EffectRegistry.h \
+    dsp/mc1/Mc1DialogFactory.h \
+    dsp/mc1/patchbay/dsp/dsp_effect.h \
+    dsp/mc1/patchbay/dsp/effect_factory.h \
+    dsp/mc1/patchbay/dsp/preset_manager.h \
+    dsp/mc1/patchbay/dsp/preset_manager.cpp \
+    dsp/mc1/patchbay/dsp/fx_parametric_eq.h \
+    dsp/mc1/patchbay/dsp/fx_dual_eq15.h \
+    dsp/mc1/patchbay/dsp/fx_graphic_eq31.h \
+    dsp/mc1/patchbay/dsp/fx_compressor.h \
+    dsp/mc1/patchbay/dsp/fx_dbx166xs.h \
+    dsp/mc1/patchbay/dsp/fx_broadcast_agc.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_voice.h \
+    dsp/mc1/patchbay/dsp/fx_xenyx_preamp.h \
+    dsp/mc1/patchbay/dsp/fx_sonic_enhancer.h \
+    dsp/mc1/patchbay/dsp/fx_tube_preamp.h \
+    dsp/mc1/patchbay/dsp/fx_castertube.h \
+    dsp/mc1/patchbay/dsp/fx_mic_modeler.h \
+    dsp/mc1/patchbay/dsp/fx_lexicon_224.h \
+    dsp/mc1/patchbay/dsp/fx_lexicon_pcm70.h \
+    dsp/mc1/patchbay/dsp/fx_lexicon_pcm96.h \
+    dsp/mc1/patchbay/dsp/fx_lexicon_480l.h \
+    dsp/mc1/patchbay/dsp/fx_lexicon_mpx1.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_voice_lift.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_plosive_killer.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_mouth_click.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_bleed_suppressor.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_phone_line.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_remote_restorer.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_loudness_match.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_stinger_bed.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_vodcast_lipsync.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_signal_hill_a.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_tidemark_a.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_tidemark_b.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_tidemark_vault.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_granite_a.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_vocal_producer.h \
+    dsp/mc1/patchbay/dsp/fx_mc1_key_finder.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_676.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_580.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_266xs.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_560a.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_520.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_510.h \
+    dsp/mc1/patchbay/dsp/fx_dbx_530.h \
+    dsp/mc1/patchbay/dsp/fx_bbe_d82.h \
+    dsp/mc1/patchbay/dsp/fx_bbe_h82.h \
+    dsp/mc1/patchbay/dsp/fx_bbe_l82.h \
+    dsp/mc1/patchbay/dsp/fx_bbe_mach3.h \
+    dsp/mc1/fx_ui/RackKnob.h \
+    dsp/mc1/fx_ui/RackMeter.h \
+    dsp/mc1/fx_ui/EqCurveWidget.h \
+    dsp/mc1/fx_ui/ParametricEqDialog.h \
+    dsp/mc1/fx_ui/DualEq15Dialog.h \
+    dsp/mc1/fx_ui/GraphicEq31Dialog.h \
+    dsp/mc1/fx_ui/CompressorDialog.h \
+    dsp/mc1/fx_ui/Dbx166xsDialog.h \
+    dsp/mc1/fx_ui/BroadcastAgcDialog.h \
+    dsp/mc1/fx_ui/DbxVoiceDialog.h \
+    dsp/mc1/fx_ui/XenyxPreampDialog.h \
+    dsp/mc1/fx_ui/SonicEnhancerDialog.h \
+    dsp/mc1/fx_ui/TubePreampDialog.h \
+    dsp/mc1/fx_ui/CasterTubeDialog.h \
+    dsp/mc1/fx_ui/MicModelerDialog.h \
+    dsp/mc1/fx_ui/Lexicon224Dialog.h \
+    dsp/mc1/fx_ui/LexiconPcm70Dialog.h \
+    dsp/mc1/fx_ui/LexiconPcm96Dialog.h \
+    dsp/mc1/fx_ui/Lexicon480LDialog.h \
+    dsp/mc1/fx_ui/LexiconMpx1Dialog.h \
+    dsp/mc1/fx_ui/PodcastPluginDialog.h \
+    dsp/mc1/fx_ui/SignalHillStudioDialog.h \
+    dsp/mc1/fx_ui/MusicStudioDialogs.h \
+    dsp/mc1/fx_ui/BBESonicSweetDialogs.h \
+    dsp/mc1/fx_ui/DbxDialogs.h \
+    dsp/mc1/fx_ui/FlagshipDialogs.h \
     vfx/VideoEffectChain.h \
     vfx/VideoEffectChain.cpp \
     vfx/CrossDissolve.h \
@@ -661,6 +825,8 @@ mcaster1dawcast_SOURCES = \
     widgets/MainWindow.cpp \
     widgets/TimelineWidget.h \
     widgets/TimelineWidget.cpp \
+    widgets/TimelineScrollBar.h \
+    widgets/TimelineScrollBar.cpp \
     widgets/TrackHeaderWidget.h \
     widgets/TrackHeaderWidget.cpp \
     widgets/TrackHeaderPanel.h \
@@ -835,6 +1001,7 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_GraphicsRenderer.cpp \
     moc_MainWindow.cpp \
     moc_TimelineWidget.cpp \
+    moc_TimelineScrollBar.cpp \
     moc_TrackHeaderWidget.cpp \
     moc_TrackHeaderPanel.cpp \
     moc_WaveformView.cpp \
@@ -885,6 +1052,32 @@ nodist_mcaster1dawcast_SOURCES = \
     moc_TranscriptionEngine.cpp \
     moc_AIAssistant.cpp \
     moc_AIPanel.cpp \
+    moc_mc1_ParametricEqDialog.cpp \
+    moc_mc1_DualEq15Dialog.cpp \
+    moc_mc1_GraphicEq31Dialog.cpp \
+    moc_mc1_CompressorDialog.cpp \
+    moc_mc1_Dbx166xsDialog.cpp \
+    moc_mc1_BroadcastAgcDialog.cpp \
+    moc_mc1_DbxVoiceDialog.cpp \
+    moc_mc1_XenyxPreampDialog.cpp \
+    moc_mc1_SonicEnhancerDialog.cpp \
+    moc_mc1_TubePreampDialog.cpp \
+    moc_mc1_CasterTubeDialog.cpp \
+    moc_mc1_MicModelerDialog.cpp \
+    moc_mc1_Lexicon224Dialog.cpp \
+    moc_mc1_LexiconPcm70Dialog.cpp \
+    moc_mc1_LexiconPcm96Dialog.cpp \
+    moc_mc1_Lexicon480LDialog.cpp \
+    moc_mc1_LexiconMpx1Dialog.cpp \
+    moc_mc1_PodcastPluginDialog.cpp \
+    moc_mc1_SignalHillStudioDialog.cpp \
+    moc_mc1_MusicStudioDialogs.cpp \
+    moc_mc1_BBESonicSweetDialogs.cpp \
+    moc_mc1_DbxDialogs.cpp \
+    moc_mc1_FlagshipDialogs.cpp \
+    moc_mc1_RackKnob.cpp \
+    moc_mc1_RackMeter.cpp \
+    moc_mc1_EqCurveWidget.cpp \
     qrc_mcaster1dawcast.cpp
 
 # ── Build ordering ───────────────────────────────────────────────────────────
@@ -945,6 +1138,7 @@ BUILT_SOURCES = \
     moc_GraphicsRenderer.cpp \
     moc_MainWindow.cpp \
     moc_TimelineWidget.cpp \
+    moc_TimelineScrollBar.cpp \
     moc_TrackHeaderWidget.cpp \
     moc_TrackHeaderPanel.cpp \
     moc_WaveformView.cpp \
@@ -995,6 +1189,32 @@ BUILT_SOURCES = \
     moc_TranscriptionEngine.cpp \
     moc_AIAssistant.cpp \
     moc_AIPanel.cpp \
+    moc_mc1_ParametricEqDialog.cpp \
+    moc_mc1_DualEq15Dialog.cpp \
+    moc_mc1_GraphicEq31Dialog.cpp \
+    moc_mc1_CompressorDialog.cpp \
+    moc_mc1_Dbx166xsDialog.cpp \
+    moc_mc1_BroadcastAgcDialog.cpp \
+    moc_mc1_DbxVoiceDialog.cpp \
+    moc_mc1_XenyxPreampDialog.cpp \
+    moc_mc1_SonicEnhancerDialog.cpp \
+    moc_mc1_TubePreampDialog.cpp \
+    moc_mc1_CasterTubeDialog.cpp \
+    moc_mc1_MicModelerDialog.cpp \
+    moc_mc1_Lexicon224Dialog.cpp \
+    moc_mc1_LexiconPcm70Dialog.cpp \
+    moc_mc1_LexiconPcm96Dialog.cpp \
+    moc_mc1_Lexicon480LDialog.cpp \
+    moc_mc1_LexiconMpx1Dialog.cpp \
+    moc_mc1_PodcastPluginDialog.cpp \
+    moc_mc1_SignalHillStudioDialog.cpp \
+    moc_mc1_MusicStudioDialogs.cpp \
+    moc_mc1_BBESonicSweetDialogs.cpp \
+    moc_mc1_DbxDialogs.cpp \
+    moc_mc1_FlagshipDialogs.cpp \
+    moc_mc1_RackKnob.cpp \
+    moc_mc1_RackMeter.cpp \
+    moc_mc1_EqCurveWidget.cpp \
     qrc_mcaster1dawcast.cpp
 
 # ── Clean generated files ────────────────────────────────────────────────────

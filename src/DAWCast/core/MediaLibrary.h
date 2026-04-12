@@ -43,7 +43,7 @@ struct LibraryItem
 
 // ---------------------------------------------------------------------------
 // MediaLibrary — singleton library manager with import, search, and
-// category management.  Persists to ~/.mcaster1/media_library.json.
+// category management.  Persists to ~/.mcaster1/Mcaster1DAWCast/media_library.json.
 // ---------------------------------------------------------------------------
 
 class MediaLibrary : public QObject

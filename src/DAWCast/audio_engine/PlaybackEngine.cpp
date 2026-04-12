@@ -68,13 +68,23 @@ void PlaybackEngine::setTimeline(Timeline* timeline)
 
     if (m_timeline) {
         connect(m_timeline, &Timeline::trackAdded,
-                this, [this]() { m_needsRebuild = true; });
+                this, [this](int) { m_needsRebuild = true; });
         connect(m_timeline, &Timeline::trackRemoved,
-                this, [this]() { m_needsRebuild = true; });
+                this, [this](int) { m_needsRebuild = true; });
+        // Timeline has no fine-grained clip signals; mark dirty whenever
+        // tracks change. The drop handler in TimelineWidget also manually
+        // calls invalidateReaders() to flag the rebuild.
     }
 
     m_needsRebuild = true;
-    rebuildReaders();
+    // Defer the actual decode to the next play() call, which dispatches
+    // it onto a worker thread. Calling rebuildReaders() here would block
+    // the GUI for several seconds on large MP3s.
+}
+
+void PlaybackEngine::invalidateReaders()
+{
+    m_needsRebuild = true;
 }
 
 void PlaybackEngine::setAudioEngine(AudioEngine* engine)
@@ -119,10 +129,13 @@ void PlaybackEngine::play()
         }
     }
 
-    // If readers need rebuilding (clips changed while stopped), do it
-    // in a worker thread so file decoding doesn't block the GUI.
-    if (m_needsRebuild) {
-        m_needsRebuild = false;
+    // ALWAYS rebuild on a worker thread. The previous "fast path" branch
+    // ran rebuildReaders synchronously on the GUI thread, which froze
+    // the UI for several seconds while large MP3s decoded.
+    const bool needsRebuild = m_needsRebuild;
+    m_needsRebuild = false;
+
+    if (needsRebuild) {
         QThreadPool::globalInstance()->start([this]() {
             // rebuildReaders decodes files — runs off the GUI thread.
             // It only touches m_tracks (not accessed by audio thread
@@ -138,8 +151,7 @@ void PlaybackEngine::play()
             }, Qt::QueuedConnection);
         });
     } else {
-        // Readers are current — start immediately
-        rebuildReaders();
+        // Readers are already current — start immediately, no decode.
         syncMixerStrips();
         m_playing.store(true, std::memory_order_release);
         m_positionTimer->start(kPositionPollMs);

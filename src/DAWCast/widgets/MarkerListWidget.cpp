@@ -82,16 +82,16 @@ MarkerListWidget::MarkerListWidget(QWidget* parent)
     m_table->setAlternatingRowColors(true);
     m_table->verticalHeader()->setVisible(false);
     m_table->setStyleSheet(QStringLiteral(
-        "QTableWidget { background-color: #1e2230; color: #ccc; font-size: 11px; }"
-        "QTableWidget::item:selected { background-color: #3a4a6a; }"
-        "QHeaderView::section { background-color: #252838; color: #aaa; "
-        "  padding: 3px; border: 1px solid #333; font-size: 10px; }"));
+        "QTableWidget { background-color: #ffffff; color: #1a1a1a; font-size: 11px; }"
+        "QTableWidget::item:selected { background-color: #d8e0f0; color: #1a1a1a; }"
+        "QHeaderView::section { background-color: #ececf0; color: #1a1a1a; "
+        "  padding: 3px; border: 1px solid #c8c8d0; font-size: 10px; font-weight: bold; }"));
     layout->addWidget(m_table);
 
     // ── Bottom ─────────────────────────────────────────────────────────
     m_countLabel = new QLabel(tr("0 markers"), this);
     m_countLabel->setStyleSheet(
-        QStringLiteral("QLabel { color: #888; font-size: 10px; }"));
+        QStringLiteral("QLabel { color: #555; font-size: 10px; }"));
     layout->addWidget(m_countLabel);
 
     // ── Connections ────────────────────────────────────────────────────

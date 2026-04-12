@@ -67,28 +67,15 @@ int main(int argc, char* argv[])
     {
         QSettings settings;
 
-        // One-time migration: if the user never explicitly chose a theme
-        // (no "theme_user_set" flag), reset to Default so old persisted
-        // DarkStudio settings don't override the intended default.
-        if (!settings.contains(QStringLiteral("appearance/theme_user_set"))) {
-            settings.setValue(QStringLiteral("appearance/theme"),
-                              QStringLiteral("Default"));
-            settings.setValue(QStringLiteral("appearance/theme_user_set"), true);
-        }
-
-        QString themeName = settings.value(
-            QStringLiteral("appearance/theme"),
-            QStringLiteral("Default")).toString();
+        // DAWCast is a light-only application. Force the Default theme on
+        // every startup so any stale persisted dark theme name is ignored.
+        // (DarkStudio / BroadcastPro theme packs have been removed.)
+        settings.setValue(QStringLiteral("appearance/theme"),
+                          QStringLiteral("Default"));
+        settings.setValue(QStringLiteral("appearance/theme_user_set"), true);
 
         auto* themeEngine = dawcast::widgets::ThemeEngine::instance();
-        if (!themeEngine->loadTheme(themeName)) {
-            // Fallback chain: try Default first (system colors), then DarkStudio
-            if (themeName != QStringLiteral("Default")) {
-                if (!themeEngine->loadTheme(QStringLiteral("Default"))) {
-                    themeEngine->loadTheme(QStringLiteral("DarkStudio"));
-                }
-            }
-        }
+        themeEngine->loadTheme(QStringLiteral("Default"));
 
         // Log available themes for debugging
         QStringList available = themeEngine->availableThemes();

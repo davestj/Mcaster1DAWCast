@@ -9,6 +9,8 @@
 #include <QList>
 #include <QTimer>
 
+#include <atomic>
+
 #include "ForensicDetector.h"
 
 #ifdef HAVE_PORTAUDIO
@@ -86,6 +88,27 @@ public:
     /// Current playback position in samples.
     int64_t playPosition() const { return m_playPosition; }
 
+    /// Seek to a specific sample (clamped to file range).
+    void seek(int64_t sample);
+
+    /// Master output gain (linear, 0.0 - 2.0). Applied in audio callback.
+    void setVolume(float gain);
+    float volume() const { return m_volume.load(std::memory_order_relaxed); }
+
+    /// Loop playback over current selection (or whole file if no selection).
+    void setLooping(bool on) { m_looping = on; }
+    bool isLooping() const { return m_looping; }
+
+    /// Skip back/forward by N seconds.
+    void skipSeconds(double seconds);
+
+    /// Jump to start / end of file (or selection if active).
+    void goToStart();
+    void goToEnd();
+
+    /// Step one frame at a time (1 / 30 sec) for video files.
+    void stepFrame(int direction);
+
     // ── Analysis overlay ─────────────────────────────────────────────────
 
     void setOverlayMode(OverlayMode mode);
@@ -106,6 +129,8 @@ signals:
     void zoomChanged(double samplesPerPixel);
     /// Emitted when overlay analysis produces new markers.
     void markersUpdated(const QList<DetectionMarker>& markers);
+    /// Emitted when playback starts/stops/pauses (true = playing).
+    void playStateChanged(bool playing);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -169,9 +194,14 @@ private:
     // ── Playback ─────────────────────────────────────────────────────────
     bool    m_playing      = false;
     bool    m_paused       = false;
+    bool    m_looping      = false;
     int64_t m_playPosition = 0;
     PaStream* m_stream     = nullptr;
     QTimer  m_playbackTimer;
+    std::atomic<float> m_volume{1.0f};
+
+    // ── Mouse mode ───────────────────────────────────────────────────────
+    bool m_seekingPlayhead = false;
 
     // ── Overlay / analysis ───────────────────────────────────────────────
     OverlayMode m_overlayMode = OverlayMode::None;

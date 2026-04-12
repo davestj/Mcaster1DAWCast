@@ -105,8 +105,8 @@ void LUFSMeterWidget::paintEvent(QPaintEvent* /*event*/)
 
     const QRect widgetRect = rect();
 
-    // Background
-    p.fillRect(widgetRect, QColor(30, 30, 30));
+    // Background — light theme
+    p.fillRect(widgetRect, QColor(240, 240, 244));
 
     // ── "LUFS" label at top ────────────────────────────────────────────
     QFont labelFont;
@@ -114,7 +114,7 @@ void LUFSMeterWidget::paintEvent(QPaintEvent* /*event*/)
     labelFont.setFamily(QStringLiteral("Menlo"));
     labelFont.setBold(true);
     p.setFont(labelFont);
-    p.setPen(QColor(200, 200, 200));
+    p.setPen(QColor(26, 26, 26));
     QRect labelRect(widgetRect.left(), widgetRect.top() + 2,
                     widgetRect.width(), kLabelHeight);
     p.drawText(labelRect, Qt::AlignCenter, QStringLiteral("LUFS"));
@@ -128,8 +128,8 @@ void LUFSMeterWidget::paintEvent(QPaintEvent* /*event*/)
     int barX = widgetRect.right() - kMeterBarWidth - 2;
     QRect meterRect(barX, meterTop, kMeterBarWidth, meterHeight);
 
-    // Black background for meter bar
-    p.fillRect(meterRect, QColor(10, 10, 10));
+    // Light background for meter bar (so the bright gradient still pops)
+    p.fillRect(meterRect, QColor(220, 220, 226));
 
     // ── Draw target zone band ──────────────────────────────────────────
     drawTargetZone(p, meterRect);
@@ -158,12 +158,12 @@ void LUFSMeterWidget::paintEvent(QPaintEvent* /*event*/)
     float shortTermNorm = lufsToNormalized(m_displayShortTerm);
     if (shortTermNorm > 0.001f) {
         int stY = meterRect.bottom() - static_cast<int>(shortTermNorm * meterRect.height());
-        p.setPen(QPen(QColor(255, 255, 255, 220), 2));
+        p.setPen(QPen(QColor(20, 20, 20, 220), 2));
         p.drawLine(meterRect.left(), stY, meterRect.right(), stY);
     }
 
     // ── Thin border around meter bar ───────────────────────────────────
-    p.setPen(QPen(QColor(60, 60, 60), 1));
+    p.setPen(QPen(QColor(170, 170, 178), 1));
     p.setBrush(Qt::NoBrush);
     p.drawRect(meterRect);
 
@@ -207,7 +207,7 @@ void LUFSMeterWidget::drawScaleMarkings(QPainter& p, const QRect& meterRect) con
     f.setFamily(QStringLiteral("Menlo"));
     f.setStyleHint(QFont::Monospace);
     p.setFont(f);
-    p.setPen(QColor(180, 180, 180));
+    p.setPen(QColor(60, 60, 70));
 
     QFontMetrics fm(f);
 
@@ -246,7 +246,7 @@ void LUFSMeterWidget::drawReadouts(QPainter& p, const QRect& area) const
     int y = area.top();
 
     // Integrated LUFS
-    p.setPen(QColor(200, 200, 200));
+    p.setPen(QColor(26, 26, 26));
     QString intText = QStringLiteral("INT:%1")
         .arg(m_integratedLUFS <= kMinLUFS
              ? QStringLiteral(" ---")
@@ -255,7 +255,7 @@ void LUFSMeterWidget::drawReadouts(QPainter& p, const QRect& area) const
     y += lineH;
 
     // LRA
-    p.setPen(QColor(180, 180, 200));
+    p.setPen(QColor(60, 60, 70));
     QString lraText = QStringLiteral("LRA:%1")
         .arg(m_loudnessRange < 0.1f
              ? QStringLiteral(" ---")
@@ -265,7 +265,7 @@ void LUFSMeterWidget::drawReadouts(QPainter& p, const QRect& area) const
 
     // True Peak — red if above -1.0 dBTP
     bool tpHot = m_truePeak > -1.0f;
-    p.setPen(tpHot ? QColor(255, 60, 60) : QColor(180, 200, 180));
+    p.setPen(tpHot ? QColor(200, 0, 0) : QColor(40, 90, 40));
     QString tpText = QStringLiteral("TP: %1")
         .arg(m_truePeak <= kMinLUFS
              ? QStringLiteral("---")

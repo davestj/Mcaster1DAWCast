@@ -88,8 +88,8 @@ void VUMeterWidget::paintEvent(QPaintEvent* /*event*/)
 
     const QRect widgetRect = rect();
 
-    // Background
-    p.fillRect(widgetRect, QColor(30, 30, 30));
+    // Background — light theme
+    p.fillRect(widgetRect, QColor(240, 240, 244));
 
     // Compute meter bar area (right side for vertical, leaving room for scale on left)
     QRect meterRect;
@@ -103,8 +103,8 @@ void VUMeterWidget::paintEvent(QPaintEvent* /*event*/)
                           widgetRect.width() - 8, kMeterBarWidth);
     }
 
-    // Black background for meter bar
-    p.fillRect(meterRect, QColor(10, 10, 10));
+    // Light background for meter bar (gradient still pops on top)
+    p.fillRect(meterRect, QColor(220, 220, 226));
 
     // ── Build meter gradient ────────────────────────────────────────────
     QLinearGradient gradient;
@@ -185,9 +185,9 @@ void VUMeterWidget::paintEvent(QPaintEvent* /*event*/)
         }
     }
 
-    // ── Draw instantaneous peak as a thin bright line ───────────────────
+    // ── Draw instantaneous peak as a thin dark line ─────────────────────
     if (peakNorm > rmsNorm) {
-        QColor peakColor(255, 255, 200, 180);
+        QColor peakColor(20, 20, 20, 200);
         p.setPen(QPen(peakColor, 1));
         if (m_orientation == Qt::Vertical) {
             int peakY = meterRect.bottom() - static_cast<int>(peakNorm * meterRect.height());
@@ -200,7 +200,7 @@ void VUMeterWidget::paintEvent(QPaintEvent* /*event*/)
 
     // ── Draw peak hold indicator ────────────────────────────────────────
     if (holdNorm > 0.001f) {
-        p.setPen(QPen(Qt::white, 2));
+        p.setPen(QPen(QColor(20, 20, 20), 2));
         if (m_orientation == Qt::Vertical) {
             int holdY = meterRect.bottom() - static_cast<int>(holdNorm * meterRect.height());
             p.drawLine(meterRect.left(), holdY, meterRect.right(), holdY);
@@ -214,7 +214,7 @@ void VUMeterWidget::paintEvent(QPaintEvent* /*event*/)
     drawScaleMarkings(p, meterRect);
 
     // Thin border around meter bar
-    p.setPen(QPen(QColor(60, 60, 60), 1));
+    p.setPen(QPen(QColor(170, 170, 178), 1));
     p.setBrush(Qt::NoBrush);
     p.drawRect(meterRect);
 }
@@ -229,7 +229,7 @@ void VUMeterWidget::drawScaleMarkings(QPainter& p, const QRect& meterRect) const
     f.setFamily(QStringLiteral("Menlo"));
     f.setStyleHint(QFont::Monospace);
     p.setFont(f);
-    p.setPen(QColor(180, 180, 180));
+    p.setPen(QColor(60, 60, 70));
 
     QFontMetrics fm(f);
 

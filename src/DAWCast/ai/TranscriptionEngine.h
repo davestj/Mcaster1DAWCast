@@ -21,7 +21,7 @@ class TranscriptionEngine : public QObject {
 
 public:
     struct Config {
-        QString modelPath;              ///< e.g. ~/.mcaster1/whisper-models/ggml-base.bin
+        QString modelPath;              ///< e.g. ~/.mcaster1/Mcaster1DAWCast/whisper-models/ggml-base.bin
         QString language  = QStringLiteral("en");
         bool    translateToEnglish = false;
         bool    timestamps         = true;
@@ -58,7 +58,7 @@ public:
     /// Scan the default model directory for available .bin files.
     static QStringList availableModels();
 
-    /// Default directory for Whisper model files (~/.mcaster1/whisper-models/).
+    /// Default directory for Whisper model files (~/.mcaster1/Mcaster1DAWCast/whisper-models/).
     static QString defaultModelDir();
 
 signals:

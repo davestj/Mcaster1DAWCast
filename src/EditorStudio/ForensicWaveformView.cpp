@@ -174,29 +174,32 @@ void ForensicWaveformView::play()
         Pa_StartStream(m_stream);
 #endif
         m_playbackTimer.start();
+        emit playStateChanged(true);
         return;
     }
 
     if (m_playing) stop();
 
-    // Start from selection start, or current position, or beginning
-    if (hasSelection()) {
-        m_playPosition = m_selStart;
-    } else if (m_playPosition >= m_frames) {
-        m_playPosition = 0;
+    // Resume from current position; only jump to selection start if at file end
+    if (m_playPosition >= m_frames) {
+        m_playPosition = hasSelection() ? m_selStart : 0;
     }
 
     if (initPlayback()) {
         m_playing = true;
         m_paused = false;
         m_playbackTimer.start();
+        emit playStateChanged(true);
     }
 }
 
 void ForensicWaveformView::stop()
 {
+    bool wasPlaying = m_playing || m_paused;
     stopPlayback();
     m_playPosition = hasSelection() ? m_selStart : 0;
+    emit positionChanged(m_playPosition);
+    if (wasPlaying) emit playStateChanged(false);
     update();
 }
 
@@ -209,7 +212,49 @@ void ForensicWaveformView::pause()
     if (m_stream) Pa_StopStream(m_stream);
 #endif
     m_playbackTimer.stop();
+    emit playStateChanged(false);
     update();
+}
+
+void ForensicWaveformView::seek(int64_t sample)
+{
+    if (m_frames <= 0) return;
+    sample = std::max(static_cast<int64_t>(0), std::min(sample, m_frames - 1));
+    m_playPosition = sample;
+    emit positionChanged(m_playPosition);
+    update();
+}
+
+void ForensicWaveformView::setVolume(float gain)
+{
+    if (gain < 0.0f) gain = 0.0f;
+    if (gain > 4.0f) gain = 4.0f;
+    m_volume.store(gain, std::memory_order_relaxed);
+}
+
+void ForensicWaveformView::skipSeconds(double seconds)
+{
+    if (m_sampleRate <= 0) return;
+    int64_t delta = static_cast<int64_t>(seconds * m_sampleRate);
+    seek(m_playPosition + delta);
+}
+
+void ForensicWaveformView::goToStart()
+{
+    seek(hasSelection() ? m_selStart : 0);
+}
+
+void ForensicWaveformView::goToEnd()
+{
+    seek(hasSelection() ? m_selEnd : m_frames - 1);
+}
+
+void ForensicWaveformView::stepFrame(int direction)
+{
+    if (m_sampleRate <= 0) return;
+    // Assume 30fps step (1/30 sec)
+    int64_t delta = static_cast<int64_t>(m_sampleRate / 30) * direction;
+    seek(m_playPosition + delta);
 }
 
 bool ForensicWaveformView::initPlayback()
@@ -282,19 +327,31 @@ int ForensicWaveformView::paCallback(const void* /*input*/, void* output,
 {
     auto* self = static_cast<ForensicWaveformView*>(userData);
     auto* out = static_cast<float*>(output);
+    const float gain = self->m_volume.load(std::memory_order_relaxed);
 
+    int64_t startPosition = 0;
     int64_t endPosition = self->m_frames;
     if (self->hasSelection()) {
+        startPosition = self->m_selStart;
         endPosition = self->m_selEnd;
     }
 
     int64_t pos = self->m_playPosition;
+    const int channels = self->m_channels;
+    const bool looping = self->m_looping;
     unsigned long written = 0;
 
-    while (written < frameCount && pos < endPosition) {
-        for (int ch = 0; ch < self->m_channels; ++ch) {
-            out[written * static_cast<unsigned long>(self->m_channels) + static_cast<unsigned long>(ch)] =
-                self->m_data[pos * self->m_channels + ch];
+    while (written < frameCount) {
+        if (pos >= endPosition) {
+            if (looping) {
+                pos = startPosition;
+            } else {
+                break;
+            }
+        }
+        for (int ch = 0; ch < channels; ++ch) {
+            out[written * static_cast<unsigned long>(channels) + static_cast<unsigned long>(ch)] =
+                self->m_data[pos * channels + ch] * gain;
         }
         ++pos;
         ++written;
@@ -303,14 +360,14 @@ int ForensicWaveformView::paCallback(const void* /*input*/, void* output,
     // Zero-fill remainder
     unsigned long remaining = frameCount - written;
     if (remaining > 0) {
-        std::memset(out + written * static_cast<unsigned long>(self->m_channels),
+        std::memset(out + written * static_cast<unsigned long>(channels),
                     0,
-                    remaining * static_cast<unsigned long>(self->m_channels) * sizeof(float));
+                    remaining * static_cast<unsigned long>(channels) * sizeof(float));
     }
 
     self->m_playPosition = pos;
 
-    if (pos >= endPosition) {
+    if (pos >= endPosition && !looping) {
         return 1; // paComplete
     }
     return 0; // paContinue
@@ -754,40 +811,64 @@ void ForensicWaveformView::mousePressEvent(QMouseEvent* event)
 {
     if (!m_data) return;
 
+    const int rulerHeight = 24;
+    const int x = event->pos().x();
+    const int y = event->pos().y();
+
     if (event->button() == Qt::LeftButton) {
+        // Click in time ruler OR plain click anywhere = seek/scrub the playhead
+        // Shift+click in waveform = make/extend selection
+        // Cmd/Ctrl+click+drag in waveform = pan view
         if (event->modifiers() & Qt::ShiftModifier) {
-            // Shift+click: extend selection
-            int64_t clickSample = xToSample(event->pos().x());
-            if (clickSample < m_selStart) {
-                m_selStart = clickSample;
+            // Shift+click: start (or extend) selection
+            int64_t clickSample = xToSample(x);
+            if (hasSelection()) {
+                if (clickSample < m_selStart) {
+                    m_selStart = clickSample;
+                } else {
+                    m_selEnd = clickSample;
+                }
             } else {
+                m_selecting = true;
+                m_selectAnchor = clickSample;
+                m_selStart = clickSample;
                 m_selEnd = clickSample;
             }
             emit selectionChanged(m_selStart, m_selEnd);
             update();
+        } else if (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) {
+            // Cmd/Ctrl+drag: pan view
+            m_dragging = true;
+            m_dragStartX = x;
+            m_dragStartView = m_viewStart;
+            setCursor(Qt::ClosedHandCursor);
         } else {
-            // Start new selection
-            m_selecting = true;
-            m_selectAnchor = xToSample(event->pos().x());
-            m_selStart = m_selectAnchor;
-            m_selEnd = m_selectAnchor;
-            // Also set playback position
-            m_playPosition = m_selectAnchor;
-            emit positionChanged(m_playPosition);
-            update();
+            // Plain left-click anywhere: scrub playhead. Drag continues to scrub.
+            m_seekingPlayhead = true;
+            // Clear any selection — user is just seeking
+            if (y < rulerHeight) {
+                m_selStart = m_selEnd = 0;
+                emit selectionChanged(m_selStart, m_selEnd);
+            }
+            seek(xToSample(x));
         }
     } else if (event->button() == Qt::MiddleButton) {
-        // Middle-click: start scrolling
+        // Middle-click: pan view
         m_dragging = true;
-        m_dragStartX = event->pos().x();
+        m_dragStartX = x;
         m_dragStartView = m_viewStart;
         setCursor(Qt::ClosedHandCursor);
+    } else if (event->button() == Qt::RightButton) {
+        // Right-click also seeks
+        seek(xToSample(x));
     }
 }
 
 void ForensicWaveformView::mouseMoveEvent(QMouseEvent* event)
 {
-    if (m_selecting) {
+    if (m_seekingPlayhead) {
+        seek(xToSample(event->pos().x()));
+    } else if (m_selecting) {
         int64_t current = xToSample(event->pos().x());
         m_selStart = std::min(m_selectAnchor, current);
         m_selEnd   = std::max(m_selectAnchor, current);
@@ -808,6 +889,11 @@ void ForensicWaveformView::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
         m_selecting = false;
+        m_seekingPlayhead = false;
+        if (m_dragging) {
+            m_dragging = false;
+            setCursor(Qt::ArrowCursor);
+        }
     } else if (event->button() == Qt::MiddleButton) {
         m_dragging = false;
         setCursor(Qt::ArrowCursor);

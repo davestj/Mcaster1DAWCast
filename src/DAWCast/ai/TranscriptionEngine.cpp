@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "TranscriptionEngine.h"
+#include "../config/AppConfig.h"
 
 #include <QProcess>
 #include <QFileInfo>
@@ -62,9 +63,7 @@ bool TranscriptionEngine::isRunning() const
 
 QString TranscriptionEngine::defaultModelDir()
 {
-    // ~/.mcaster1/whisper-models/
-    QString home = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
-    return home + QStringLiteral("/.mcaster1/whisper-models");
+    return dawcast::config::AppConfig::whisperModelsDir();
 }
 
 QStringList TranscriptionEngine::availableModels()

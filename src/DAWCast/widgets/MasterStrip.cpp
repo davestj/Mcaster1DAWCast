@@ -74,9 +74,9 @@ MasterStrip::MasterStrip(QWidget* parent)
 
     setStyleSheet(QStringLiteral(
         "QWidget#MasterStrip {"
-        "  background-color: #161a28;"
-        "  border-top: 1px solid #2a2f42;"
-        "  border-bottom: 1px solid #2a2f42;"
+        "  background-color: #ececf0;"
+        "  border-top: 1px solid #c8c8d0;"
+        "  border-bottom: 1px solid #c8c8d0;"
         "}"
     ));
 
@@ -90,7 +90,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     m_masterLabel->setToolTip(tr("Master output level - Controls the final volume of the entire mix"));
     m_masterLabel->setStyleSheet(QStringLiteral(
         "QLabel {"
-        "  color: #d0d4e0;"
+        "  color: #1a1a1a;"
         "  font-size: 11px;"
         "  font-weight: bold;"
         "  letter-spacing: 1px;"
@@ -115,7 +115,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     m_fader->setStyleSheet(QStringLiteral(
         "QSlider::groove:horizontal {"
         "  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,"
-        "    stop:0 #1e2236, stop:1 #2a3050);"
+        "    stop:0 #d0d0d8, stop:1 #c0c0c8);"
         "  height: 6px;"
         "  border-radius: 3px;"
         "}"
@@ -126,7 +126,7 @@ MasterStrip::MasterStrip(QWidget* parent)
         "  border-radius: 3px;"
         "}"
         "QSlider::handle:horizontal {"
-        "  background: #e0e4f0;"
+        "  background: #ffffff;"
         "  border: 2px solid #3ea8a0;"
         "  width: 14px;"
         "  height: 14px;"
@@ -134,7 +134,7 @@ MasterStrip::MasterStrip(QWidget* parent)
         "  border-radius: 8px;"
         "}"
         "QSlider::handle:horizontal:hover {"
-        "  background: #ffffff;"
+        "  background: #f0f0f0;"
         "  border-color: #4bbab2;"
         "}"
     ));
@@ -150,7 +150,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     m_percentLabel->setAlignment(Qt::AlignCenter);
     m_percentLabel->setStyleSheet(QStringLiteral(
         "QLabel {"
-        "  color: #b0b8d0;"
+        "  color: #1a1a1a;"
         "  font-size: 11px;"
         "  font-family: monospace;"
         "  background: transparent;"
@@ -171,7 +171,7 @@ MasterStrip::MasterStrip(QWidget* parent)
     m_lufsLabel->setAlignment(Qt::AlignCenter);
     m_lufsLabel->setStyleSheet(QStringLiteral(
         "QLabel {"
-        "  color: #7880a0;"
+        "  color: #1a1a1a;"
         "  font-size: 10px;"
         "  font-family: monospace;"
         "  background: transparent;"
@@ -188,11 +188,11 @@ MasterStrip::MasterStrip(QWidget* parent)
     m_limIndicator->setAlignment(Qt::AlignCenter);
     m_limIndicator->setStyleSheet(QStringLiteral(
         "QLabel {"
-        "  color: #555870;"
+        "  color: #888;"
         "  font-size: 9px;"
         "  font-weight: bold;"
-        "  background-color: #1e2236;"
-        "  border: 1px solid #2a2f42;"
+        "  background-color: #f0f0f4;"
+        "  border: 1px solid #c8c8d0;"
         "  border-radius: 3px;"
         "}"
     ));

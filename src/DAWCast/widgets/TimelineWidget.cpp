@@ -35,6 +35,7 @@
 #include <QFontMetrics>
 #include <QFileInfo>
 #include <QToolTip>
+#include <QKeyEvent>
 
 #ifdef HAVE_AVFORMAT
 extern "C" {
@@ -51,23 +52,24 @@ namespace dawcast::widgets {
 
 namespace {
 constexpr int kRulerHeight     = 28;
-constexpr int kTrackHeight     = 80;
+constexpr int kBaseTrackHeight = 80;
+inline int kTrackHeightFor(float zoom) { return qMax(24, static_cast<int>(kBaseTrackHeight * zoom)); }
 constexpr int kMarkerSize      = 8;
 constexpr float kMinZoom       = 0.001f;
 constexpr float kMaxZoom       = 100.0f;
 constexpr float kZoomFactor    = 1.15f;
 
-// Alternating track lane colors — subtle dark gray matching web version
-const QColor kTrackEven(38, 42, 56);
-const QColor kTrackOdd(42, 46, 62);
-const QColor kRulerBg(30, 30, 36);
-const QColor kRulerText(180, 180, 180);
-const QColor kRulerTick(100, 100, 100);
+// Alternating track lane colors — light theme (white DAW)
+const QColor kTrackEven(255, 255, 255);
+const QColor kTrackOdd(244, 244, 248);
+const QColor kRulerBg(232, 232, 238);
+const QColor kRulerText(40, 40, 50);
+const QColor kRulerTick(140, 140, 150);
 const QColor kPlayheadColor(220, 40, 40);
-const QColor kClipBorder(200, 200, 200, 100);
-const QColor kSelectionHighlight(100, 160, 255, 80);
-const QColor kRubberBandFill(100, 160, 255, 40);
-const QColor kRubberBandBorder(100, 160, 255, 160);
+const QColor kClipBorder(40, 40, 50, 160);
+const QColor kSelectionHighlight(60, 120, 220, 80);
+const QColor kRubberBandFill(60, 120, 220, 40);
+const QColor kRubberBandBorder(60, 120, 220, 200);
 
 // Default clip colors when none is set
 const QColor kClipColors[] = {
@@ -117,15 +119,37 @@ TimelineWidget::TimelineWidget(QWidget* parent)
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setAcceptDrops(true);
-    setMinimumHeight(kRulerHeight + kTrackHeight * 2);
+    setMinimumHeight(kRulerHeight + kTrackHeightFor(m_trackHeightZoom) * 2);
 
     // Repaint when waveform data becomes available
     connect(WaveformCache::instance(), &WaveformCache::waveformReady,
             this, &TimelineWidget::onWaveformReady);
 }
 
-void TimelineWidget::onWaveformReady(const QString& /*filePath*/)
+void TimelineWidget::onWaveformReady(const QString& filePath)
 {
+    // Patch up clip durations: dropEvent uses an estimated duration so
+    // the GUI doesn't block on FFmpeg probing. Once the waveform decode
+    // finishes we know the true frame count, so resize any clip whose
+    // sourceOut was an estimate to the real value.
+    if (m_timeline) {
+        auto* cache = WaveformCache::instance();
+        const WaveformData* wf = cache->getWaveform(filePath);
+        if (wf && wf->totalFrames > 0) {
+            int64_t realFrames = wf->totalFrames;
+            for (int t = 0; t < m_timeline->trackCount(); ++t) {
+                auto* at = qobject_cast<AudioTrack*>(m_timeline->track(t));
+                if (!at) continue;
+                for (int c = 0; c < at->clipCount(); ++c) {
+                    Clip* clip = at->clip(c);
+                    if (clip && clip->sourcePath() == filePath) {
+                        clip->setSourceOut(realFrames);
+                    }
+                }
+            }
+            emit contentSizeChanged();
+        }
+    }
     update();
 }
 
@@ -141,9 +165,15 @@ void TimelineWidget::setTimeline(Timeline* timeline)
                 this, [this](int64_t) { update(); });
         // Repaint when tracks are added or removed
         connect(m_timeline, &Timeline::trackAdded,
-                this, [this](int) { update(); });
+                this, [this](int) {
+            emit contentSizeChanged();
+            update();
+        });
         connect(m_timeline, &Timeline::trackRemoved,
-                this, [this](int) { update(); });
+                this, [this](int) {
+            emit contentSizeChanged();
+            update();
+        });
         // Repaint when markers or loop region change
         connect(m_timeline, &Timeline::markersChanged,
                 this, [this]() { update(); });
@@ -157,12 +187,96 @@ void TimelineWidget::setTimeline(Timeline* timeline)
 void TimelineWidget::setZoom(float zoom)
 {
     m_zoom = qBound(kMinZoom, zoom, kMaxZoom);
+    emit contentSizeChanged();
     update();
 }
 
 void TimelineWidget::setScroll(int64_t position)
 {
     m_scroll = qMax(int64_t(0), position);
+    emit horizontalScrollChanged(horizontalScrollPx());
+    update();
+}
+
+// ── Scroll/content extent API for external scrollbars ────────────────────
+
+int TimelineWidget::contentWidthPx() const
+{
+    int64_t totalSamples = 0;
+    if (m_timeline) {
+        totalSamples = m_timeline->duration();
+    }
+    // Always allow scrolling at least one screen past the end so the user
+    // can drop clips beyond the current content edge.
+    int contentPx = static_cast<int>(totalSamples * static_cast<double>(m_zoom));
+    return qMax(contentPx + width(), width() * 2);
+}
+
+int TimelineWidget::contentHeightPx() const
+{
+    int trackCount = (m_timeline ? m_timeline->trackCount() : 0);
+    return kRulerHeight + qMax(trackCount, 4) * kTrackHeightFor(m_trackHeightZoom) + 60;
+}
+
+int TimelineWidget::horizontalScrollPx() const
+{
+    return static_cast<int>(m_scroll * static_cast<double>(m_zoom));
+}
+
+void TimelineWidget::setHorizontalScrollPx(int px)
+{
+    px = qMax(0, px);
+    m_scroll = static_cast<int64_t>(px / static_cast<double>(m_zoom));
+    emit horizontalScrollChanged(px);
+    update();
+}
+
+void TimelineWidget::setVerticalScrollPx(int px)
+{
+    int maxScroll = qMax(0, contentHeightPx() - height());
+    m_vScroll = qBound(0, px, maxScroll);
+    emit verticalScrollChanged(m_vScroll);
+    update();
+}
+
+void TimelineWidget::zoomBy(float factor, int anchorPx)
+{
+    if (factor <= 0.0f) return;
+
+    // Anchor sample under the mouse so it stays at the same screen X
+    // when zoom changes (Logic-style "zoom around point").
+    int64_t anchorSample = m_scroll;
+    int    anchorScreenPx = -1;
+    if (anchorPx >= 0) {
+        anchorScreenPx = anchorPx;
+        anchorSample = m_scroll +
+            static_cast<int64_t>(anchorPx / static_cast<double>(m_zoom));
+    }
+
+    float newZoom = qBound(kMinZoom, m_zoom * factor, kMaxZoom);
+    if (newZoom == m_zoom) return;
+    m_zoom = newZoom;
+
+    if (anchorScreenPx >= 0) {
+        // Adjust scroll so that anchorSample maps back to anchorScreenPx
+        int64_t newScroll = anchorSample -
+            static_cast<int64_t>(anchorScreenPx / static_cast<double>(m_zoom));
+        if (newScroll < 0) newScroll = 0;
+        m_scroll = newScroll;
+        emit horizontalScrollChanged(horizontalScrollPx());
+    }
+
+    emit contentSizeChanged();
+    update();
+}
+
+void TimelineWidget::zoomVerticalBy(float factor)
+{
+    if (factor <= 0.0f) return;
+    float newZoom = qBound(0.4f, m_trackHeightZoom * factor, 4.0f);
+    if (newZoom == m_trackHeightZoom) return;
+    m_trackHeightZoom = newZoom;
+    emit contentSizeChanged();
     update();
 }
 
@@ -191,8 +305,8 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
     const int w = width();
     const int h = height();
 
-    // Background — slightly darker than track headers
-    p.fillRect(rect(), QColor(30, 34, 48));
+    // Background — white DAW theme
+    p.fillRect(rect(), QColor(255, 255, 255));
 
     // --- Time ruler ---
     drawRuler(p, w);
@@ -208,16 +322,17 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
     }
 
     for (int t = 0; t < trackCount; ++t) {
-        int yTop = kRulerHeight + t * kTrackHeight;
-        if (yTop > h) break;
+        int yTop = kRulerHeight + t * kTrackHeightFor(m_trackHeightZoom) - m_vScroll;
+        if (yTop + kTrackHeightFor(m_trackHeightZoom) < kRulerHeight) continue;  // above viewport
+        if (yTop > h) break;                                // below viewport
 
         // Alternating lane background
         QColor laneBg = (t % 2 == 0) ? kTrackEven : kTrackOdd;
-        p.fillRect(0, yTop, w, kTrackHeight, laneBg);
+        p.fillRect(0, yTop, w, kTrackHeightFor(m_trackHeightZoom), laneBg);
 
-        // Lane separator line — subtle dark gray
-        p.setPen(QPen(QColor(42, 46, 62), 1));
-        p.drawLine(0, yTop + kTrackHeight - 1, w, yTop + kTrackHeight - 1);
+        // Lane separator line — subtle gray
+        p.setPen(QPen(QColor(220, 220, 226), 1));
+        p.drawLine(0, yTop + kTrackHeightFor(m_trackHeightZoom) - 1, w, yTop + kTrackHeightFor(m_trackHeightZoom) - 1);
 
         // Track name is now rendered by TrackHeaderPanel (left of timeline).
         // Resolve track pointers for clip and automation drawing below.
@@ -300,6 +415,47 @@ void TimelineWidget::paintEvent(QPaintEvent* /*event*/)
         p.setBrush(kRubberBandFill);
         p.setPen(QPen(kRubberBandBorder, 1, Qt::DashLine));
         p.drawRect(m_rubberBand);
+    }
+
+    // --- Zoom-to-Area rubber band ---
+    if (m_zoomAreaDragging && !m_zoomAreaRect.isNull()) {
+        p.setBrush(QColor(255, 200, 0, 40));
+        p.setPen(QPen(QColor(255, 200, 0, 200), 1.5, Qt::SolidLine));
+        p.drawRect(m_zoomAreaRect);
+
+        // Dimension readout inside the rectangle
+        if (m_zoomAreaRect.width() > 60 && m_zoomAreaRect.height() > 20) {
+            int64_t leftSample = pixelToSample(m_zoomAreaRect.left(), m_scroll, m_zoom);
+            int64_t rightSample = pixelToSample(m_zoomAreaRect.right(), m_scroll, m_zoom);
+            double ms = static_cast<double>(rightSample - leftSample) / 48000.0 * 1000.0;
+            int topTrack = (m_zoomAreaRect.top() + m_vScroll - kRulerHeight)
+                         / kTrackHeightFor(m_trackHeightZoom);
+            int botTrack = (m_zoomAreaRect.bottom() + m_vScroll - kRulerHeight)
+                         / kTrackHeightFor(m_trackHeightZoom);
+            int trackSpan = qMax(1, botTrack - topTrack + 1);
+            QString label;
+            if (ms >= 1000.0)
+                label = QStringLiteral("%1 s x %2 trk").arg(ms / 1000.0, 0, 'f', 1).arg(trackSpan);
+            else
+                label = QStringLiteral("%1 ms x %2 trk").arg(ms, 0, 'f', 0).arg(trackSpan);
+            p.setPen(QColor(255, 200, 0, 230));
+            QFont f = font();
+            f.setPointSize(9);
+            f.setBold(true);
+            p.setFont(f);
+            p.drawText(m_zoomAreaRect.adjusted(4, 2, 0, 0), Qt::AlignTop | Qt::AlignLeft, label);
+        }
+    }
+
+    // --- Zoom-to-Area crosshair mode indicator ---
+    if (m_interactionMode == ModeZoomArea && !m_zoomAreaDragging) {
+        p.setPen(QColor(255, 200, 0, 180));
+        QFont f = font();
+        f.setPointSize(10);
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRect(0, 0, w, h), Qt::AlignCenter,
+                   QStringLiteral("Drag to zoom into area  (Esc to cancel)"));
     }
 }
 
@@ -567,7 +723,7 @@ void TimelineWidget::drawClip(QPainter& p, Clip* clip, int trackIndex, int clipI
     if (x2 < 0 || x1 > width()) return;
 
     int clipY = yTop + 4;
-    int clipH = kTrackHeight - 8;
+    int clipH = kTrackHeightFor(m_trackHeightZoom) - 8;
     int clipW = qMax(4, x2 - x1);
 
     QColor baseColor = kClipColors[(trackIndex * 3 + clipIndex) % kClipColorCount];
@@ -643,7 +799,7 @@ void TimelineWidget::drawMidiClip(QPainter& p, MidiClip* clip, int trackIndex, i
     if (x2 < 0 || x1 > width()) return;
 
     int clipY = yTop + 4;
-    int clipH = kTrackHeight - 8;
+    int clipH = kTrackHeightFor(m_trackHeightZoom) - 8;
     int clipW = qMax(4, x2 - x1);
 
     // MIDI clips use a purple/teal color scheme
@@ -717,6 +873,15 @@ void TimelineWidget::drawMidiClip(QPainter& p, MidiClip* clip, int trackIndex, i
 
 void TimelineWidget::mousePressEvent(QMouseEvent* event)
 {
+    // ── Zoom-to-Area: begin rubber-band ─────────────────────────────
+    if (m_interactionMode == ModeZoomArea && event->button() == Qt::LeftButton) {
+        m_zoomAreaDragging = true;
+        m_zoomAreaOrigin = event->pos();
+        m_zoomAreaRect = QRect(m_zoomAreaOrigin, QSize(0, 0));
+        update();
+        return;
+    }
+
     m_dragging = false;  // Only set true when we confirm a drag target
     m_draggingAuto = false;
     m_draggingAutoPoint = -1;
@@ -822,7 +987,7 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
 
     // Click in track area
     if (m_timeline && event->pos().y() >= kRulerHeight) {
-        int trackIdx = (event->pos().y() - kRulerHeight) / kTrackHeight;
+        int trackIdx = (event->pos().y() + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
         if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
             QObject* trackObj = m_timeline->track(trackIdx);
             auto* audioTrack = qobject_cast<AudioTrack*>(trackObj);
@@ -857,9 +1022,9 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
                     Automation* automation = audioTrack->automation(m_editingAutoParam);
                     if (automation) {
                         int64_t clickSample = pixelToSample(event->pos().x(), m_scroll, m_zoom);
-                        int yTop = kRulerHeight + trackIdx * kTrackHeight;
+                        int yTop = kRulerHeight + trackIdx * kTrackHeightFor(m_trackHeightZoom);
                         float value = 1.0f - static_cast<float>(event->pos().y() - yTop)
-                                           / static_cast<float>(kTrackHeight);
+                                           / static_cast<float>(kTrackHeightFor(m_trackHeightZoom));
                         value = std::clamp(value, 0.0f, 1.0f);
                         automation->addPoint(clickSample, value);
                         emit automationPointAdded(trackIdx, m_editingAutoParam,
@@ -904,8 +1069,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
                     // Compute clip pixel geometry for hit-testing
                     int cx1 = sampleToPixel(clip->timelinePosition(), m_scroll, m_zoom);
                     int cx2 = sampleToPixel(clip->endPosition(), m_scroll, m_zoom);
-                    int cY = kRulerHeight + trackIdx * kTrackHeight + 4;
-                    int cH = kTrackHeight - 8;
+                    int cY = kRulerHeight + trackIdx * kTrackHeightFor(m_trackHeightZoom) + 4;
+                    int cH = kTrackHeightFor(m_trackHeightZoom) - 8;
                     int cW = qMax(4, cx2 - cx1);
 
                     // Check if Alt+right-click on an existing gain point -> delete
@@ -984,6 +1149,13 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event)
 
 void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    // ── Zoom-to-Area rubber band ─────────────────────────────────────
+    if (m_zoomAreaDragging) {
+        m_zoomAreaRect = QRect(m_zoomAreaOrigin, event->pos()).normalized();
+        update();
+        return;
+    }
+
     // ── Slip editing drag ────────────────────────────────────────────
     if (m_slipEditing && m_slipClip) {
         int dx = event->pos().x() - m_slipDragOrigin.x();
@@ -1013,8 +1185,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
             int64_t newOffset = clickSample - clip->timelinePosition();
             newOffset = std::clamp(newOffset, int64_t(0), clip->duration());
 
-            int cY = kRulerHeight + m_gainPointTrack * kTrackHeight + 4;
-            int cH = kTrackHeight - 8;
+            int cY = kRulerHeight + m_gainPointTrack * kTrackHeightFor(m_trackHeightZoom) + 4;
+            int cH = kTrackHeightFor(m_trackHeightZoom) - 8;
             float frac = 1.0f - static_cast<float>(event->pos().y() - cY)
                               / static_cast<float>(cH);
             frac = std::clamp(frac, 0.0f, 1.0f);
@@ -1048,9 +1220,9 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
                 Automation* automation = audioTrack->automation(m_editingAutoParam);
                 if (automation && m_draggingAutoPoint < automation->pointCount()) {
                     int64_t newTime = pixelToSample(event->pos().x(), m_scroll, m_zoom);
-                    int yTop = kRulerHeight + m_editingAutoTrack * kTrackHeight;
+                    int yTop = kRulerHeight + m_editingAutoTrack * kTrackHeightFor(m_trackHeightZoom);
                     float newValue = 1.0f - static_cast<float>(event->pos().y() - yTop)
-                                         / static_cast<float>(kTrackHeight);
+                                         / static_cast<float>(kTrackHeightFor(m_trackHeightZoom));
                     newValue = std::clamp(newValue, 0.0f, 1.0f);
                     newTime = qMax(int64_t(0), newTime);
 
@@ -1121,7 +1293,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
                                  - pixelToSample(m_dragStart.x(), 0, m_zoom);
             if (deltaSamples != 0) {
                 // Find the track and move each selected clip
-                int trackIdx = (m_dragStart.y() - kRulerHeight) / kTrackHeight;
+                int trackIdx = (m_dragStart.y() + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
                 if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
                     auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(trackIdx));
                     if (audioTrack) {
@@ -1151,6 +1323,47 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event)
 
 void TimelineWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    // ── Zoom-to-Area: apply the zoom from the rubber band ────────────
+    if (m_zoomAreaDragging && event->button() == Qt::LeftButton) {
+        m_zoomAreaDragging = false;
+        const QRect area = m_zoomAreaRect.normalized();
+        m_zoomAreaRect = QRect();
+
+        // Need a minimum drag of 10px in each dimension to count
+        if (area.width() >= 10 && area.height() >= 10 && m_timeline) {
+            // Horizontal zoom: fit area.width() pixels to the full widget width
+            const float hFactor = static_cast<float>(width()) / static_cast<float>(area.width());
+            // Vertical zoom: fit area.height() pixels to the full widget height
+            const float vFactor = static_cast<float>(height()) / static_cast<float>(area.height());
+
+            // Compute the sample position at the left edge of the selection
+            int64_t leftSample = pixelToSample(area.left(), m_scroll, m_zoom);
+            if (leftSample < 0) leftSample = 0;
+
+            // Apply horizontal zoom
+            float newZoom = qBound(kMinZoom, m_zoom * hFactor, kMaxZoom);
+            m_zoom = newZoom;
+            m_scroll = leftSample;
+
+            // Apply vertical zoom
+            float newVZoom = qBound(0.4f, m_trackHeightZoom * vFactor, 4.0f);
+            m_trackHeightZoom = newVZoom;
+
+            // Scroll vertically so the top of the selection area is at the top
+            m_vScroll = static_cast<int>(m_vScroll + area.top() - kRulerHeight);
+            if (m_vScroll < 0) m_vScroll = 0;
+
+            emit contentSizeChanged();
+            emit horizontalScrollChanged(horizontalScrollPx());
+            emit verticalScrollChanged(m_vScroll);
+        }
+
+        // Auto-exit zoom mode back to normal
+        setInteractionMode(ModeNormal);
+        update();
+        return;
+    }
+
     // If we were dragging a marker, re-sort markers
     if (m_draggingMarkerIdx >= 0 && m_timeline) {
         m_timeline->sortMarkers();
@@ -1189,7 +1402,7 @@ void TimelineWidget::wheelEvent(QWheelEvent* event)
         && m_timeline) {
         int mouseY = static_cast<int>(event->position().y());
         if (mouseY >= kRulerHeight) {
-            int trackIdx = (mouseY - kRulerHeight) / kTrackHeight;
+            int trackIdx = (mouseY + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
             if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
                 float current = m_trackVerticalZoom.value(trackIdx, 1.0f);
                 if (event->angleDelta().y() > 0)
@@ -1538,7 +1751,7 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
 
     // ── Edit Crossfade — shown when two clips overlap or are adjacent ──
     if (m_timeline && event->pos().y() >= kRulerHeight) {
-        int xfTrackIdx = (event->pos().y() - kRulerHeight) / kTrackHeight;
+        int xfTrackIdx = (event->pos().y() + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
         if (xfTrackIdx >= 0 && xfTrackIdx < m_timeline->trackCount()) {
             auto* xfTrack = qobject_cast<AudioTrack*>(m_timeline->track(xfTrackIdx));
             if (xfTrack && xfTrack->clipCount() >= 2) {
@@ -1587,7 +1800,7 @@ void TimelineWidget::contextMenuEvent(QContextMenuEvent* event)
 
     // Automation lane selection submenu
     if (m_timeline && event->pos().y() >= kRulerHeight) {
-        int trackIdx = (event->pos().y() - kRulerHeight) / kTrackHeight;
+        int trackIdx = (event->pos().y() + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
         if (trackIdx >= 0 && trackIdx < m_timeline->trackCount()) {
             auto* audioTrack = qobject_cast<AudioTrack*>(m_timeline->track(trackIdx));
             if (audioTrack) {
@@ -1657,6 +1870,26 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
 {
     auto* cache = WaveformCache::instance();
 
+    static bool s_logged = false;
+    if (!s_logged && clip && !clip->sourcePath().isEmpty()) {
+        s_logged = true;
+        qInfo() << "[drawWaveform] first call: path=" << clip->sourcePath()
+                << " hasCache=" << cache->hasWaveform(clip->sourcePath())
+                << " srcIn=" << clip->sourceIn()
+                << " srcOut=" << clip->sourceOut()
+                << " clipW=" << clipW;
+    }
+
+    // Empty source path → can't render anything
+    if (clip->sourcePath().isEmpty()) {
+        p.setPen(QColor(120, 120, 120));
+        QFont f = font();
+        f.setPointSize(8);
+        p.setFont(f);
+        p.drawText(clipX + 6, clipY + clipH / 2 + 4, tr("(no source)"));
+        return;
+    }
+
     // Check if waveform is cached WITHOUT triggering a decode
     // (never do I/O or heavy work inside paintEvent)
     if (!cache->hasWaveform(clip->sourcePath())) {
@@ -1664,7 +1897,7 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
         cache->requestWaveform(clip->sourcePath());
 
         // Draw a simple "Loading..." placeholder
-        p.setPen(QColor(180, 180, 180, 120));
+        p.setPen(QColor(80, 80, 80));
         QFont loadFont = font();
         loadFont.setPointSize(8);
         p.setFont(loadFont);
@@ -1708,9 +1941,19 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
     // fall under it and take the max peak and max RMS.
     p.setRenderHint(QPainter::Antialiasing, false);
 
-    // Cap pixel iteration to visible area to prevent huge loops on zoomed-in clips
-    int visibleDrawW = qMin(drawW, width() + 100);
-    for (int px = 0; px < visibleDrawW; ++px) {
+    // Iterate only the columns that fall inside the on-screen viewport,
+    // BUT preserve the full clip width when computing the source-sample
+    // mapping. The previous code iterated columns 0..N off the clip's
+    // local origin, which collapsed huge clips to a tiny window at the
+    // very start of the audio. We now compute the visible local pixel
+    // range [pxLocal0, pxLocal1) inside the clip and iterate that.
+    const int viewportLeft  = 0;
+    const int viewportRight = width();
+    int pxLocal0 = qMax(0,        viewportLeft  - drawX);
+    int pxLocal1 = qMin(drawW,    viewportRight - drawX + 1);
+    if (pxLocal1 <= pxLocal0) return;
+
+    for (int px = pxLocal0; px < pxLocal1; ++px) {
         // Source sample range covered by this pixel column
         double srcFrac0 = static_cast<double>(px)     / drawW;
         double srcFrac1 = static_cast<double>(px + 1) / drawW;
@@ -1787,8 +2030,8 @@ void TimelineWidget::drawAutomation(QPainter& painter, AudioTrack* track, int tr
 
     if (automations.isEmpty()) return;
 
-    int yTop = kRulerHeight + trackIndex * kTrackHeight;
-    int laneH = kTrackHeight;
+    int yTop = kRulerHeight + trackIndex * kTrackHeightFor(m_trackHeightZoom);
+    int laneH = kTrackHeightFor(m_trackHeightZoom);
 
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, true);
@@ -1900,8 +2143,8 @@ int TimelineWidget::hitTestAutomationPoint(int trackIndex, int x, int y) const
     Automation* automation = audioTrack->automation(m_editingAutoParam);
     if (!automation) return -1;
 
-    int yTop = kRulerHeight + trackIndex * kTrackHeight;
-    int laneH = kTrackHeight;
+    int yTop = kRulerHeight + trackIndex * kTrackHeightFor(m_trackHeightZoom);
+    int laneH = kTrackHeightFor(m_trackHeightZoom);
 
     auto points = automation->points();
     for (int i = 0; i < points.size(); ++i) {
@@ -1963,64 +2206,52 @@ int64_t TimelineWidget::probeDuration(const QString& filePath) const
     if (m_timeline)
         sampleRate = m_timeline->sampleRate() > 0 ? m_timeline->sampleRate() : 48000;
 
-#ifdef HAVE_AVFORMAT
-    AVFormatContext* fmtCtx = nullptr;
-    QByteArray pathUtf8 = filePath.toUtf8();
-    if (avformat_open_input(&fmtCtx, pathUtf8.constData(), nullptr, nullptr) < 0)
-        return sampleRate * 10; // fallback: 10 seconds
-
-    if (avformat_find_stream_info(fmtCtx, nullptr) < 0) {
-        avformat_close_input(&fmtCtx);
-        return sampleRate * 10;
-    }
-
-    // Use the overall container duration (in AV_TIME_BASE units)
-    int64_t durationSamples = sampleRate * 10; // fallback
-    if (fmtCtx->duration > 0) {
-        double durationSec = static_cast<double>(fmtCtx->duration) / AV_TIME_BASE;
-        durationSamples = static_cast<int64_t>(durationSec * sampleRate);
-    }
-
-    avformat_close_input(&fmtCtx);
-    return durationSamples;
-#else
-    // Without FFmpeg, fall back to WaveformCache data if available
+    // Fast path: if the WaveformCache already has a decoded entry, use the
+    // real frame count. This is the common case after the user drops a file
+    // a second time, or scrubs / re-imports.
     auto* cache = WaveformCache::instance();
     const WaveformData* wf = cache->getWaveform(filePath);
     if (wf && wf->totalFrames > 0) {
         return wf->totalFrames;
     }
-    // Last resort: assume 10 seconds
+
+    // First-drop fast path: estimate from file size and a typical encoded
+    // bitrate so we don't have to open the file with FFmpeg on the GUI
+    // thread. The real duration is patched in by onWaveformReady() once
+    // the async decode completes.
+    QFileInfo fi(filePath);
+    if (fi.exists()) {
+        const qint64 bytes = fi.size();
+        QString ext = fi.suffix().toLower();
+        // Rough average bitrates (kbps) by container.
+        int kbps = 192;
+        if (ext == QLatin1String("mp3"))   kbps = 192;
+        else if (ext == QLatin1String("aac") || ext == QLatin1String("m4a")) kbps = 192;
+        else if (ext == QLatin1String("ogg") || ext == QLatin1String("opus")) kbps = 160;
+        else if (ext == QLatin1String("flac")) kbps = 1000;
+        else if (ext == QLatin1String("wav") || ext == QLatin1String("aiff")) kbps = 1411;
+        else if (ext == QLatin1String("mp4") || ext == QLatin1String("mov")
+              || ext == QLatin1String("mkv") || ext == QLatin1String("webm")) kbps = 2000;
+
+        const double seconds = static_cast<double>(bytes) /
+                               (static_cast<double>(kbps) * 125.0);  // kbps→bytes/s
+        return static_cast<int64_t>(seconds * sampleRate);
+    }
+
+    // Last resort
     return static_cast<int64_t>(sampleRate) * 10;
-#endif
 }
 
 void TimelineWidget::probeStreams(const QString& filePath, bool& hasAudio, bool& hasVideo)
 {
+    // Extension-based fast path — no FFmpeg I/O on the GUI thread.
+    // The previous implementation called avformat_open_input +
+    // avformat_find_stream_info synchronously which blocked the UI on
+    // every drag-drop. The waveform decode that runs on the thread pool
+    // afterwards will surface any real stream information.
     hasAudio = false;
     hasVideo = false;
 
-#ifdef HAVE_AVFORMAT
-    AVFormatContext* fmtCtx = nullptr;
-    QByteArray pathUtf8 = filePath.toUtf8();
-    if (avformat_open_input(&fmtCtx, pathUtf8.constData(), nullptr, nullptr) < 0)
-        return;
-
-    if (avformat_find_stream_info(fmtCtx, nullptr) < 0) {
-        avformat_close_input(&fmtCtx);
-        return;
-    }
-
-    for (unsigned i = 0; i < fmtCtx->nb_streams; ++i) {
-        if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)
-            hasAudio = true;
-        else if (fmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
-            hasVideo = true;
-    }
-
-    avformat_close_input(&fmtCtx);
-#else
-    // Without FFmpeg, infer from file extension
     QFileInfo fi(filePath);
     QString ext = fi.suffix().toLower();
     QStringList vidExts = supportedVideoExtensions();
@@ -2028,11 +2259,10 @@ void TimelineWidget::probeStreams(const QString& filePath, bool& hasAudio, bool&
 
     if (vidExts.contains(ext)) {
         hasVideo = true;
-        hasAudio = true;  // Most video files have audio
+        hasAudio = true;  // Most video files carry an audio stream
     } else if (audExts.contains(ext)) {
         hasAudio = true;
     }
-#endif
 }
 
 void TimelineWidget::dragEnterEvent(QDragEnterEvent* event)
@@ -2069,7 +2299,7 @@ void TimelineWidget::dropEvent(QDropEvent* event)
     int dropTrackIdx = -1;
     int dropY = static_cast<int>(event->position().y());
     if (dropY >= kRulerHeight) {
-        dropTrackIdx = (dropY - kRulerHeight) / kTrackHeight;
+        dropTrackIdx = (dropY + m_vScroll - kRulerHeight) / kTrackHeightFor(m_trackHeightZoom);
         if (dropTrackIdx >= m_timeline->trackCount())
             dropTrackIdx = -1; // dropped below existing tracks
     }
@@ -2191,6 +2421,9 @@ void TimelineWidget::dropEvent(QDropEvent* event)
         cursorPos += durationSamples;
     }
 
+    // Notify external scrollbars that content extent grew.
+    emit contentSizeChanged();
+
     // If this is the first content on the timeline (single track, single clip),
     // snap the clip to position 0 and reset the playhead so the user hears
     // audio immediately on pressing Play.
@@ -2287,7 +2520,7 @@ void TimelineWidget::drawSnapGrid(QPainter& painter, int viewWidth)
     if (gridInterval <= 0) return;
 
     int trackCount = m_timeline->trackCount();
-    int totalH = kRulerHeight + trackCount * kTrackHeight;
+    int totalH = kRulerHeight + trackCount * kTrackHeightFor(m_trackHeightZoom);
     if (totalH < kRulerHeight) totalH = height();
 
     // Subtle dotted grid lines
@@ -2538,6 +2771,30 @@ void TimelineWidget::zoomToSelection()
     update();
 }
 
+// ── Zoom-to-Area Mode ───────────────────────────────────────────────────────
+
+void TimelineWidget::setInteractionMode(InteractionMode mode)
+{
+    if (m_interactionMode == mode) return;
+    m_interactionMode = mode;
+    m_zoomAreaDragging = false;
+    m_zoomAreaRect = QRect();
+    setCursor(mode == ModeZoomArea ? Qt::CrossCursor : Qt::ArrowCursor);
+    emit interactionModeChanged(mode);
+    update();
+}
+
+void TimelineWidget::keyPressEvent(QKeyEvent* event)
+{
+    // Esc cancels zoom-to-area mode
+    if (event->key() == Qt::Key_Escape && m_interactionMode == ModeZoomArea) {
+        setInteractionMode(ModeNormal);
+        event->accept();
+        return;
+    }
+    QWidget::keyPressEvent(event);
+}
+
 // ── Clip Gain Envelope Drawing ───────────────────────────────────────────────
 
 void TimelineWidget::drawGainEnvelope(QPainter& painter, Clip* clip,
@@ -2752,7 +3009,7 @@ void TimelineWidget::drawFreezeIndicator(QPainter& painter, AudioTrack* track, i
 
     // Draw a slight blue tint over the frozen track lane
     QColor frozenTint(120, 180, 255, 20);
-    painter.fillRect(0, yTop, width(), kTrackHeight, frozenTint);
+    painter.fillRect(0, yTop, width(), kTrackHeightFor(m_trackHeightZoom), frozenTint);
 
     // Draw snowflake icon in the top-right corner of the track lane
     QFont freezeFont = font();

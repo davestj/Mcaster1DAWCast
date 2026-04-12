@@ -114,6 +114,9 @@ moc_SpectralAnalysisPanel.cpp: $(srcdir)/SpectralAnalysisPanel.h
 moc_ForensicDetector.cpp: $(srcdir)/ForensicDetector.h
 	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
 
+moc_PlayerControls.cpp: $(srcdir)/PlayerControls.h
+	$(MOC) $(MOCFLAGS_CLEAN) $< -o $@
+
 # ── Source files ─────────────────────────────────────────────────────────────
 # Editor Studio's own sources + shared codec/core sources from DAWCast
 dawcast_editor_studio_SOURCES = \
@@ -126,6 +129,8 @@ dawcast_editor_studio_SOURCES = \
     SpectralAnalysisPanel.cpp \
     ForensicDetector.h \
     ForensicDetector.cpp \
+    PlayerControls.h \
+    PlayerControls.cpp \
     $(DAWCAST_SRC)/core/AudioBuffer.h \
     $(DAWCAST_SRC)/core/VideoFrame.h \
     $(DAWCAST_SRC)/dsp/FFT.h \
@@ -139,14 +144,16 @@ nodist_dawcast_editor_studio_SOURCES = \
     moc_EditorStudioWindow.cpp \
     moc_ForensicWaveformView.cpp \
     moc_SpectralAnalysisPanel.cpp \
-    moc_ForensicDetector.cpp
+    moc_ForensicDetector.cpp \
+    moc_PlayerControls.cpp
 
 # ── Build ordering ──────────────────────────────────────────────────────────
 BUILT_SOURCES = \
     moc_EditorStudioWindow.cpp \
     moc_ForensicWaveformView.cpp \
     moc_SpectralAnalysisPanel.cpp \
-    moc_ForensicDetector.cpp
+    moc_ForensicDetector.cpp \
+    moc_PlayerControls.cpp
 
 # ── Clean generated files ──────────────────────────────────────────────────
 CLEANFILES = moc_*.cpp

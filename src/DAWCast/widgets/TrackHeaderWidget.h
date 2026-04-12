@@ -75,6 +75,24 @@ signals:
     void saveTrackPresetRequested(int trackIndex);
     void loadTrackPresetRequested(int trackIndex, const QString& presetName);
 
+    // ── Per-track transport ──────────────────────────────────────────
+    void trackPlayClicked(int trackIndex);
+    void trackStopClicked(int trackIndex);
+    void trackRewindClicked(int trackIndex);
+    void trackFastForwardClicked(int trackIndex);
+    void trackPauseClicked(int trackIndex);
+    /// Record button on a track header — opens the live recorder; the
+    /// captured clip is dropped into this track when the user finishes.
+    void trackRecordClicked(int trackIndex);
+
+    // ── File drop ────────────────────────────────────────────────────
+    /// User dropped one or more local files onto this track header.
+    void filesDroppedOnTrack(int trackIndex, const QStringList& filePaths);
+
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+
 private:
     void buildUI();
     void updateButtonStyle(QPushButton* btn, bool active,
@@ -109,6 +127,14 @@ private:
     QWidget*     m_colorDot     = nullptr;
     QLabel*      m_freezeLabel  = nullptr;   // snowflake indicator
     QLabel*      m_zoomLabel    = nullptr;   // vertical zoom factor label
+
+    // Per-track transport buttons (row 5)
+    QPushButton* m_tRewindBtn   = nullptr;
+    QPushButton* m_tPlayBtn     = nullptr;
+    QPushButton* m_tPauseBtn    = nullptr;
+    QPushButton* m_tStopBtn     = nullptr;
+    QPushButton* m_tFwdBtn      = nullptr;
+    QPushButton* m_tRecBtn      = nullptr;
 };
 
 } // namespace dawcast::widgets

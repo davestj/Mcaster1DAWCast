@@ -5,6 +5,7 @@
 #include "AppConfig.h"
 
 #include <QFile>
+#include <QDir>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QCoreApplication>
@@ -73,6 +74,48 @@ void AppConfig::setValue(const QString& key, const QVariant& value)
 {
     m_data.insert(key, QJsonValue::fromVariant(value));
     emit configChanged(key);
+}
+
+// ── Centralized app data paths ──────────────────────────────────────────────
+
+QString AppConfig::appDataDir()
+{
+    QString dir = QDir::homePath() + QStringLiteral("/.mcaster1/") + appName();
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString AppConfig::presetsDir()
+{
+    QString dir = appDataDir() + QStringLiteral("/presets");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString AppConfig::trackPresetsDir()
+{
+    QString dir = appDataDir() + QStringLiteral("/track_presets");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString AppConfig::whisperModelsDir()
+{
+    QString dir = appDataDir() + QStringLiteral("/whisper-models");
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString AppConfig::pluginDataDir(const QString& pluginName)
+{
+    QString dir = appDataDir() + QStringLiteral("/plugins/") + pluginName;
+    QDir().mkpath(dir);
+    return dir;
+}
+
+QString AppConfig::mediaLibraryPath()
+{
+    return appDataDir() + QStringLiteral("/media_library.json");
 }
 
 } // namespace dawcast::config

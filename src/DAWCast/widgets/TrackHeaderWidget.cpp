@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "TrackHeaderWidget.h"
+#include "../config/AppConfig.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -14,6 +15,10 @@
 #include <QToolTip>
 #include <QDir>
 #include <QFileInfo>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 
 #include <algorithm>
 
@@ -22,27 +27,29 @@ namespace dawcast::widgets {
 namespace {
 
 // Track header dimensions
-constexpr int kTrackHeight   = 80;
+constexpr int kTrackHeight   = 108;
 constexpr int kBtnSize       = 24;
 constexpr int kColorDotSize  = 12;
 
-// Base button style: flat, dark, rounded
+// Base button style: flat, light, rounded — black text always readable
 const QString kBtnBase = QStringLiteral(
     "QPushButton {"
-    "  background-color: #2e3248;"
-    "  color: #aab;"
-    "  border: 1px solid #3a3e55;"
+    "  background-color: #f0f0f0;"
+    "  color: #1a1a1a;"
+    "  border: 1px solid #c0c0c0;"
     "  border-radius: 3px;"
     "  font-size: 10px;"
     "  font-weight: bold;"
     "  padding: 0px;"
     "}"
     "QPushButton:hover {"
-    "  background-color: #3a3e58;"
-    "  border-color: #505578;"
+    "  background-color: #e0e0e8;"
+    "  border-color: #8a8aa0;"
+    "  color: #1a1a1a;"
     "}"
     "QPushButton:pressed {"
-    "  background-color: #252840;"
+    "  background-color: #d0d0d8;"
+    "  color: #1a1a1a;"
     "}");
 
 } // anonymous namespace
@@ -53,7 +60,7 @@ TrackHeaderWidget::TrackHeaderWidget(QWidget* parent)
     setFixedWidth(kHeaderWidth);
     setFixedHeight(kTrackHeight);
     setStyleSheet(QStringLiteral(
-        "TrackHeaderWidget { background-color: #1e2235; border-bottom: 1px solid #2a2e3e; }"));
+        "TrackHeaderWidget { background-color: #f5f5f7; border-bottom: 1px solid #c8c8d0; }"));
 
     buildUI();
 }
@@ -75,7 +82,7 @@ void TrackHeaderWidget::buildUI()
     auto* gripLabel = new QLabel(QStringLiteral("::"), this);  // grip dots
     gripLabel->setFixedWidth(14);
     gripLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #556; font-size: 10px; padding: 0; }"));
+        "QLabel { color: #555; font-size: 10px; padding: 0; }"));
     gripLabel->setToolTip(tr("Drag to reorder"));
     gripLabel->setCursor(Qt::OpenHandCursor);
     row1->addWidget(gripLabel);
@@ -90,7 +97,7 @@ void TrackHeaderWidget::buildUI()
     // Freeze indicator (snowflake) — hidden by default
     m_freezeLabel = new QLabel(QStringLiteral("*"), this);  // frozen indicator
     m_freezeLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #78b4ff; font-size: 12px; padding: 0; }"));
+        "QLabel { color: #1976d2; font-size: 12px; padding: 0; }"));
     m_freezeLabel->setToolTip(tr("Frozen"));
     m_freezeLabel->setFixedWidth(16);
     m_freezeLabel->setVisible(false);
@@ -101,11 +108,11 @@ void TrackHeaderWidget::buildUI()
     m_nameEdit->setPlaceholderText(tr("Track Name"));
     m_nameEdit->setStyleSheet(QStringLiteral(
         "QLineEdit {"
-        "  background: transparent; color: #dde; border: none;"
+        "  background: transparent; color: #1a1a1a; border: none;"
         "  font-size: 11px; font-weight: bold; padding: 1px 2px;"
         "}"
         "QLineEdit:focus {"
-        "  background: #252840; border: 1px solid #4a4e68; border-radius: 2px;"
+        "  background: #ffffff; border: 1px solid #8a8aa0; border-radius: 2px;"
         "}"));
     row1->addWidget(m_nameEdit, 1);
 
@@ -125,7 +132,7 @@ void TrackHeaderWidget::buildUI()
     // Vertical waveform zoom indicator — hidden at 1.0x
     m_zoomLabel = new QLabel(this);
     m_zoomLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #99a; font-size: 8px; padding: 0 2px; }"));
+        "QLabel { color: #555; font-size: 8px; padding: 0 2px; }"));
     m_zoomLabel->setFixedWidth(30);
     m_zoomLabel->setVisible(false);
     row1->addWidget(m_zoomLabel);
@@ -289,6 +296,94 @@ void TrackHeaderWidget::buildUI()
     });
 
     mainLayout->addLayout(row4);
+
+    // ── Row 5: Per-track transport (rev / play / pause / stop / fwd / rec)
+    auto* row5 = new QHBoxLayout;
+    row5->setSpacing(2);
+    row5->setContentsMargins(0, 0, 0, 0);
+
+    auto makeTransportBtn = [this](const QString& text, const QString& tip) {
+        auto* b = new QPushButton(text, this);
+        b->setFixedSize(28, 18);
+        b->setStyleSheet(kBtnBase + QStringLiteral(
+            " QPushButton { font-size: 9px; padding: 0; }"));
+        b->setToolTip(tip);
+        return b;
+    };
+
+    m_tRewindBtn = makeTransportBtn(QStringLiteral("|<"),
+        tr("Rewind this track to start"));
+    m_tPlayBtn   = makeTransportBtn(QStringLiteral(">"),
+        tr("Play from current playhead (this track soloed)"));
+    m_tPauseBtn  = makeTransportBtn(QStringLiteral("II"),
+        tr("Pause"));
+    m_tStopBtn   = makeTransportBtn(QStringLiteral("[]"),
+        tr("Stop"));
+    m_tFwdBtn    = makeTransportBtn(QStringLiteral(">|"),
+        tr("Fast forward"));
+    m_tRecBtn    = makeTransportBtn(QStringLiteral("REC"),
+        tr("Record into this track — opens the live recorder; the captured "
+           "clip is dropped into this track when you finish"));
+    // Make REC visually red so it's distinguishable
+    m_tRecBtn->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        "  background-color: #d04040; color: #ffffff;"
+        "  border: 1px solid #a02020; border-radius: 3px;"
+        "  font-size: 9px; font-weight: bold; padding: 0px;"
+        "}"
+        "QPushButton:hover { background-color: #e05050; color: #ffffff; }"
+        "QPushButton:pressed { background-color: #b03030; color: #ffffff; }"));
+
+    row5->addWidget(m_tRewindBtn);
+    row5->addWidget(m_tPlayBtn);
+    row5->addWidget(m_tPauseBtn);
+    row5->addWidget(m_tStopBtn);
+    row5->addWidget(m_tFwdBtn);
+    row5->addSpacing(4);
+    row5->addWidget(m_tRecBtn);
+    row5->addStretch();
+
+    connect(m_tRewindBtn, &QPushButton::clicked, this,
+        [this]() { emit trackRewindClicked(m_trackIndex); });
+    connect(m_tPlayBtn, &QPushButton::clicked, this,
+        [this]() { emit trackPlayClicked(m_trackIndex); });
+    connect(m_tPauseBtn, &QPushButton::clicked, this,
+        [this]() { emit trackPauseClicked(m_trackIndex); });
+    connect(m_tStopBtn, &QPushButton::clicked, this,
+        [this]() { emit trackStopClicked(m_trackIndex); });
+    connect(m_tFwdBtn, &QPushButton::clicked, this,
+        [this]() { emit trackFastForwardClicked(m_trackIndex); });
+    connect(m_tRecBtn, &QPushButton::clicked, this,
+        [this]() { emit trackRecordClicked(m_trackIndex); });
+
+    mainLayout->addLayout(row5);
+
+    // Accept dropped audio/video files on the header itself
+    setAcceptDrops(true);
+}
+
+void TrackHeaderWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        for (const QUrl& u : event->mimeData()->urls()) {
+            if (u.isLocalFile()) { event->acceptProposedAction(); return; }
+        }
+    }
+    QWidget::dragEnterEvent(event);
+}
+
+void TrackHeaderWidget::dropEvent(QDropEvent* event)
+{
+    QStringList paths;
+    for (const QUrl& u : event->mimeData()->urls()) {
+        if (u.isLocalFile()) paths << u.toLocalFile();
+    }
+    if (!paths.isEmpty()) {
+        emit filesDroppedOnTrack(m_trackIndex, paths);
+        event->acceptProposedAction();
+    } else {
+        QWidget::dropEvent(event);
+    }
 }
 
 void TrackHeaderWidget::updateButtonStyle(QPushButton* btn, bool active,
@@ -314,7 +409,7 @@ QString TrackHeaderWidget::sliderStyleSheet(const QColor& accentColor) const
 {
     return QStringLiteral(
         "QSlider::groove:horizontal {"
-        "  background: #252840; height: 4px; border-radius: 2px;"
+        "  background: #d8d8e0; height: 4px; border-radius: 2px;"
         "}"
         "QSlider::handle:horizontal {"
         "  background: %1; width: 10px; height: 10px;"
@@ -335,8 +430,8 @@ void TrackHeaderWidget::showTrackMenu()
 {
     QMenu menu(this);
     menu.setStyleSheet(QStringLiteral(
-        "QMenu { background: #1e2235; color: #dde; border: 1px solid #3a3e55; }"
-        "QMenu::item:selected { background: #3a3e58; }"));
+        "QMenu { background: #ffffff; color: #1a1a1a; border: 1px solid #c8c8d0; }"
+        "QMenu::item:selected { background: #d8d8e8; color: #1a1a1a; }"));
 
     menu.addAction(tr("Rename Track"), this, [this]() {
         m_nameEdit->setFocus();
@@ -392,8 +487,8 @@ void TrackHeaderWidget::showTrackMenu()
         });
     }
 
-    // User presets from ~/.mcaster1/track_presets/
-    QDir presetDir(QDir::homePath() + QStringLiteral("/.mcaster1/track_presets"));
+    // User presets from app-specific track_presets dir
+    QDir presetDir(dawcast::config::AppConfig::trackPresetsDir());
     if (presetDir.exists()) {
         QStringList yamlFiles = presetDir.entryList(
             {QStringLiteral("*.yaml"), QStringLiteral("*.yml")},

@@ -31,18 +31,18 @@ constexpr int kBusStripWidth    = 80;
 constexpr int kMaxSendsPerStrip = 4;
 
 const QString kStripStyle = QStringLiteral(
-    "QWidget#channelStrip { background: #2a2a30; border: 1px solid #3a3a42; border-radius: 3px; }");
+    "QWidget#channelStrip { background: #f0f0f4; border: 1px solid #c8c8d0; border-radius: 3px; }");
 const QString kMasterStripStyle = QStringLiteral(
-    "QWidget#masterStrip { background: #302a30; border: 1px solid #4a3a4a; border-radius: 3px; }");
+    "QWidget#masterStrip { background: #f4eef4; border: 1px solid #c8b8c8; border-radius: 3px; }");
 const QString kBusStripStyle = QStringLiteral(
-    "QWidget#busStrip { background: #2a302a; border: 1px solid #3a4a3a; border-radius: 3px; }");
+    "QWidget#busStrip { background: #eef4ee; border: 1px solid #b8c8b8; border-radius: 3px; }");
 const QString kLabelStyle = QStringLiteral(
-    "QLabel { color: #ccc; font-size: 10px; font-weight: bold; }");
+    "QLabel { color: #1a1a1a; font-size: 10px; font-weight: bold; }");
 const QString kFaderStyle = QStringLiteral(
-    "QSlider::groove:vertical { background: #1e1e24; width: 8px; border-radius: 4px; }"
-    "QSlider::handle:vertical { background: #7090b0; height: 14px; margin: 0 -4px; border-radius: 4px; }");
+    "QSlider::groove:vertical { background: #d0d0d8; width: 8px; border-radius: 4px; }"
+    "QSlider::handle:vertical { background: #4a6a90; height: 14px; margin: 0 -4px; border-radius: 4px; }");
 const QString kSendLabelStyle = QStringLiteral(
-    "QLabel { color: #8a8; font-size: 9px; }");
+    "QLabel { color: #2a6a2a; font-size: 9px; }");
 
 /// Convert the 0..127 slider value into a working dB value for the audio
 /// engine. 100 -> 0 dB, 0 -> -inf (treated as -96 dB).
@@ -103,7 +103,7 @@ QWidget* createChannelStrip(QWidget* parent, const QString& name,
     // dB label below fader
     auto* dbLabel = new QLabel(QStringLiteral("0.0 dB"), strip);
     dbLabel->setAlignment(Qt::AlignCenter);
-    dbLabel->setStyleSheet(QStringLiteral("QLabel { color: #888; font-size: 9px; }"));
+    dbLabel->setStyleSheet(QStringLiteral("QLabel { color: #1a1a1a; font-size: 9px; }"));
     layout->addWidget(dbLabel);
 
     // Update dB label on fader change
@@ -256,7 +256,7 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     // dB label
     auto* dbLabel = new QLabel(QStringLiteral("0.0 dB"), strip);
     dbLabel->setAlignment(Qt::AlignCenter);
-    dbLabel->setStyleSheet(QStringLiteral("QLabel { color: #888; font-size: 9px; }"));
+    dbLabel->setStyleSheet(QStringLiteral("QLabel { color: #1a1a1a; font-size: 9px; }"));
     layout->addWidget(dbLabel);
 
     // Fader drives both the dB label AND the actual mixer strip volume.
@@ -340,7 +340,7 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
         auto* busSel = new QComboBox(sendsContainer);
         busSel->setFixedHeight(18);
         busSel->setStyleSheet(QStringLiteral(
-            "QComboBox { background: #252840; color: #aab; border: 1px solid #3a3e55;"
+            "QComboBox { background: #ffffff; color: #1a1a1a; border: 1px solid #c0c0c0;"
             " border-radius: 2px; font-size: 9px; padding: 0 2px; }"
             "QComboBox::drop-down { width: 12px; }"));
         busSel->addItem(QStringLiteral("--"));
@@ -369,9 +369,9 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
     auto* addSendBtn = new QPushButton(QStringLiteral("+"), sendsContainer);
     addSendBtn->setFixedSize(20, 16);
     addSendBtn->setStyleSheet(QStringLiteral(
-        "QPushButton { background: #2e3248; color: #8a8; border: 1px solid #3a4a3a;"
+        "QPushButton { background: #f0f0f0; color: #1a1a1a; border: 1px solid #c0c0c0;"
         " border-radius: 2px; font-size: 10px; font-weight: bold; }"
-        "QPushButton:hover { background: #3a4060; }"));
+        "QPushButton:hover { background: #e0e0e8; color: #1a1a1a; border-color: #8a8aa0; }"));
     addSendBtn->setToolTip(QObject::tr("Add Send"));
     sendsLayout->addWidget(addSendBtn, 0, Qt::AlignHCenter);
 
@@ -385,17 +385,17 @@ QWidget* createChannelStripWithSends(QWidget* parent, const QString& name,
 MixerWidget::MixerWidget(QWidget* parent)
     : QWidget(parent)
 {
-    setStyleSheet(QStringLiteral("MixerWidget { background: #222228; }"));
+    setStyleSheet(QStringLiteral("MixerWidget { background: #ececf0; }"));
 
     auto* scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setStyleSheet(QStringLiteral("QScrollArea { background: #222228; border: none; }"));
+    scrollArea->setStyleSheet(QStringLiteral("QScrollArea { background: #ececf0; border: none; }"));
 
     auto* container = new QWidget(scrollArea);
-    container->setStyleSheet(QStringLiteral("background: #222228;"));
+    container->setStyleSheet(QStringLiteral("background: #ececf0;"));
     m_stripLayout = new QHBoxLayout(container);
     m_stripLayout->setContentsMargins(6, 6, 6, 6);
     m_stripLayout->setSpacing(4);
@@ -404,7 +404,7 @@ MixerWidget::MixerWidget(QWidget* parent)
     // Bus separator (before bus strips)
     m_busSeparator = new QFrame(container);
     m_busSeparator->setFrameShape(QFrame::VLine);
-    m_busSeparator->setStyleSheet(QStringLiteral("QFrame { color: #484; }"));
+    m_busSeparator->setStyleSheet(QStringLiteral("QFrame { color: #c0c0c8; }"));
     m_busSeparator->hide();
 
     // Master strip on the right
@@ -608,9 +608,9 @@ void MixerWidget::rebuildBusStrips()
         auto* fxBtn = new QPushButton(QStringLiteral("FX"), busStrip);
         fxBtn->setFixedSize(30, 20);
         fxBtn->setStyleSheet(QStringLiteral(
-            "QPushButton { background: #2e4238; color: #8c8; border: 1px solid #3a5a3a;"
+            "QPushButton { background: #f0f0f0; color: #1a4a1a; border: 1px solid #b8c8b8;"
             " border-radius: 2px; font-size: 9px; font-weight: bold; }"
-            "QPushButton:hover { background: #3a5248; }"));
+            "QPushButton:hover { background: #e0e8e0; color: #1a1a1a; border-color: #6a8a6a; }"));
         auto* busLayout = qobject_cast<QVBoxLayout*>(busStrip->layout());
         if (busLayout) {
             busLayout->addWidget(fxBtn, 0, Qt::AlignHCenter);
@@ -625,8 +625,8 @@ void MixerWidget::rebuildBusStrips()
         auto* tagLabel = new QLabel(typeTag, busStrip);
         tagLabel->setAlignment(Qt::AlignCenter);
         tagLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #6a6; font-size: 8px; font-weight: bold;"
-            " background: #1e2e1e; border-radius: 2px; padding: 1px 3px; }"));
+            "QLabel { color: #1a4a1a; font-size: 8px; font-weight: bold;"
+            " background: #e0eee0; border-radius: 2px; padding: 1px 3px; }"));
         if (busLayout) {
             busLayout->addWidget(tagLabel, 0, Qt::AlignHCenter);
         }

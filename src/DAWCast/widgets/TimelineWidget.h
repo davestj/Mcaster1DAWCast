@@ -36,6 +36,34 @@ public:
     void setZoom(float zoom);
     void setScroll(int64_t position);
 
+    // ── Scrolling API (drives external QScrollBars) ──────────────────
+    /// Total content width in pixels (timeline length × zoom).
+    int contentWidthPx() const;
+    /// Total content height in pixels (track count × track height + ruler).
+    int contentHeightPx() const;
+    /// Current horizontal scroll, in pixels (0 = left edge of content).
+    int horizontalScrollPx() const;
+    /// Set horizontal scroll position in pixels.
+    void setHorizontalScrollPx(int px);
+    /// Current vertical scroll, in pixels (0 = top of ruler).
+    int verticalScrollPx() const { return m_vScroll; }
+    /// Set vertical scroll position in pixels.
+    void setVerticalScrollPx(int px);
+
+    /// Zoom horizontally by a multiplicative factor (>1 zooms in, <1 zooms out).
+    /// Optional anchor pixel (in current widget coords) keeps that point fixed.
+    void zoomBy(float factor, int anchorPx = -1);
+
+    /// Vertical zoom factor — scales kTrackHeight. 1.0 = normal track height.
+    float verticalZoom() const { return m_trackHeightZoom; }
+    void zoomVerticalBy(float factor);
+
+signals:
+    void contentSizeChanged();
+    void horizontalScrollChanged(int px);
+    void verticalScrollChanged(int px);
+
+public:
     QList<int> selectedClips() const;
 
     // ── Time Region Selection ─────────────────────────────────────────
@@ -83,6 +111,12 @@ public:
     void zoomToFit();
     void zoomToSelection();
 
+    // ── Zoom-to-Area mode ────────────────────────────────────────────
+    enum InteractionMode { ModeNormal = 0, ModeZoomArea };
+    Q_ENUM(InteractionMode)
+    void setInteractionMode(InteractionMode mode);
+    [[nodiscard]] InteractionMode interactionMode() const { return m_interactionMode; }
+
     // ── Selection Query (for external use) ────────────────────────────
     [[nodiscard]] int64_t selectionStartSamples() const { return m_selectionStart; }
     [[nodiscard]] int64_t selectionEndSamples() const { return m_selectionEnd; }
@@ -98,6 +132,7 @@ signals:
     void gainEnvelopeChanged(int trackIndex, int clipIndex);
     void rippleModeChanged(bool enabled);
     void selectionChanged(int64_t start, int64_t end);
+    void interactionModeChanged(InteractionMode mode);
 
 private slots:
     void onWaveformReady(const QString& filePath);
@@ -109,6 +144,7 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void contextMenuEvent(QContextMenuEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
@@ -154,6 +190,8 @@ private:
     Timeline* m_timeline = nullptr;
     float           m_zoom     = 1.0f;
     int64_t         m_scroll   = 0;
+    int             m_vScroll  = 0;   // vertical scroll position in pixels
+    float           m_trackHeightZoom = 1.0f;  // multiplier for kTrackHeight
     QList<int>      m_selectedClips;
     bool            m_dragging = false;
     QPoint          m_dragStart;
@@ -197,6 +235,12 @@ private:
     int             m_slipTrackIndex = -1;       // Track of clip being slipped
     int64_t         m_slipStartSourceIn = 0;     // Original sourceIn at drag start
     QPoint          m_slipDragOrigin;            // Mouse position at slip start
+
+    // ── Zoom-to-Area ─────────────────────────────────────────────────
+    InteractionMode m_interactionMode = ModeNormal;
+    bool            m_zoomAreaDragging = false;
+    QPoint          m_zoomAreaOrigin;
+    QRect           m_zoomAreaRect;
 
     // ── Clipboard ──────────────────────────────────────────────────────
     struct ClipData {

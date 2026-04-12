@@ -20,6 +20,7 @@
 #include "ForensicWaveformView.h"
 #include "SpectralAnalysisPanel.h"
 #include "ForensicDetector.h"
+#include "PlayerControls.h"
 
 namespace dawcast::editor {
 
@@ -98,6 +99,7 @@ private:
     // ── Core widgets ─────────────────────────────────────────────────────
     ForensicWaveformView*  m_waveformView   = nullptr;
     SpectralAnalysisPanel* m_spectralPanel   = nullptr;
+    PlayerControls*        m_playerControls  = nullptr;
 
     // ── Docks ────────────────────────────────────────────────────────────
     QDockWidget* m_spectralDock = nullptr;
@@ -114,11 +116,6 @@ private:
     QScrollArea* m_videoScroll     = nullptr;
     QList<QImage> m_videoFrames;
     int           m_currentVideoFrame = 0;
-
-    // ── Toolbar actions ──────────────────────────────────────────────────
-    QAction* m_playAction  = nullptr;
-    QAction* m_pauseAction = nullptr;
-    QAction* m_stopAction  = nullptr;
 
     // ── State ────────────────────────────────────────────────────────────
     QString m_currentFilePath;

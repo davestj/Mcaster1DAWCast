@@ -25,7 +25,14 @@ public:
 
     int effectCount() const;
 
+signals:
+    /// Emitted when the user tries to add an effect but no DspChain is
+    /// bound (no track selected). The consumer should create a track,
+    /// call setDspChain(), then re-invoke showAddEffectMenu().
+    void chainRequested();
+
 private:
+    void ensureChain();
     void showAddEffectMenu();
 
     DspChain* m_chain = nullptr;

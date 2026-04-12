@@ -44,6 +44,11 @@ public:
     void setTimeline(Timeline* timeline);
     void setAudioEngine(AudioEngine* engine);
 
+    /// Mark per-track audio readers as needing a rebuild on the next
+    /// play() call. Call this from the GUI thread when clips change
+    /// (drop / paste / delete) so PlaybackEngine knows to re-decode.
+    void invalidateReaders();
+
     /// Set the multitrack recorder that receives input during recording.
     void setRecorder(MultitrackRecorder* recorder);
     [[nodiscard]] MultitrackRecorder* recorder() const { return m_recorder; }

@@ -20,6 +20,10 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QApplication>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 
 namespace dawcast::widgets {
 
@@ -42,7 +46,8 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
     : QWidget(parent)
 {
     setFixedWidth(TrackHeaderWidget::kHeaderWidth);
-    setStyleSheet(QStringLiteral("background-color: #1a1e30;"));
+    setStyleSheet(QStringLiteral("background-color: #ececf0;"));
+    setAcceptDrops(true);
 
     auto* outerLayout = new QVBoxLayout(this);
     outerLayout->setContentsMargins(0, 0, 0, 0);
@@ -52,7 +57,7 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
     auto* titleBar = new QWidget(this);
     titleBar->setFixedHeight(kRulerHeight);
     titleBar->setStyleSheet(QStringLiteral(
-        "background-color: #1e2030; border-bottom: 1px solid #2a2e3e;"));
+        "background-color: #e4e4ea; border-bottom: 1px solid #c8c8d0;"));
 
     auto* titleLayout = new QHBoxLayout(titleBar);
     titleLayout->setContentsMargins(8, 0, 4, 0);
@@ -60,7 +65,7 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
 
     auto* titleLabel = new QLabel(tr("TRACKS"), titleBar);
     titleLabel->setStyleSheet(QStringLiteral(
-        "QLabel { color: #8890a8; font-size: 10px; font-weight: bold;"
+        "QLabel { color: #1a1a1a; font-size: 10px; font-weight: bold;"
         " letter-spacing: 1px; }"));
     titleLayout->addWidget(titleLabel);
     titleLayout->addStretch();
@@ -70,10 +75,10 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
     addBtn->setToolTip(tr("Add a new audio track to the timeline"));
     addBtn->setStyleSheet(QStringLiteral(
         "QPushButton {"
-        "  background-color: #2e3248; color: #8890a8; border: 1px solid #3a3e55;"
+        "  background-color: #f0f0f0; color: #1a1a1a; border: 1px solid #c0c0c0;"
         "  border-radius: 3px; font-size: 14px; font-weight: bold;"
         "}"
-        "QPushButton:hover { background-color: #3a4060; color: #bbc; }"));
+        "QPushButton:hover { background-color: #e0e0e8; color: #1a1a1a; border-color: #8a8aa0; }"));
     titleLayout->addWidget(addBtn);
 
     connect(addBtn, &QPushButton::clicked, this, &TrackHeaderPanel::addTrackRequested);
@@ -100,6 +105,33 @@ TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
 }
 
 TrackHeaderPanel::~TrackHeaderPanel() = default;
+
+// ── File drop on the empty area below all track headers ──────────────────
+
+void TrackHeaderPanel::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        for (const QUrl& u : event->mimeData()->urls()) {
+            if (u.isLocalFile()) { event->acceptProposedAction(); return; }
+        }
+    }
+    QWidget::dragEnterEvent(event);
+}
+
+void TrackHeaderPanel::dropEvent(QDropEvent* event)
+{
+    QStringList paths;
+    for (const QUrl& u : event->mimeData()->urls()) {
+        if (u.isLocalFile()) paths << u.toLocalFile();
+    }
+    if (!paths.isEmpty()) {
+        // -1 = "create a new track for these files"
+        emit filesDroppedOnTrack(-1, paths);
+        event->acceptProposedAction();
+    } else {
+        QWidget::dropEvent(event);
+    }
+}
 
 void TrackHeaderPanel::setTimeline(dawcast::Timeline* timeline)
 {
@@ -174,8 +206,8 @@ void TrackHeaderPanel::rebuildHeaders()
         groupBar->setFixedWidth(TrackHeaderWidget::kHeaderWidth);
         groupBar->setFixedHeight(28);
         groupBar->setStyleSheet(
-            QStringLiteral("background-color: %1; border-bottom: 1px solid #2a2e3e;")
-                .arg(group->color().darker(160).name()));
+            QStringLiteral("background-color: %1; border-bottom: 1px solid #c8c8d0;")
+                .arg(group->color().lighter(150).name()));
 
         auto* layout = new QHBoxLayout(groupBar);
         layout->setContentsMargins(6, 2, 6, 2);
@@ -188,8 +220,8 @@ void TrackHeaderPanel::rebuildHeaders()
             groupBar);
         arrowBtn->setFixedSize(20, 20);
         arrowBtn->setStyleSheet(QStringLiteral(
-            "QPushButton { background: transparent; color: #ccc; border: none;"
-            " font-size: 10px; } QPushButton:hover { color: #fff; }"));
+            "QPushButton { background: transparent; color: #1a1a1a; border: none;"
+            " font-size: 10px; } QPushButton:hover { color: #000; }"));
         layout->addWidget(arrowBtn);
 
         connect(arrowBtn, &QPushButton::clicked, this, [this, group, groupIdx]() {
@@ -208,7 +240,7 @@ void TrackHeaderPanel::rebuildHeaders()
         // Group name
         auto* nameLabel = new QLabel(group->name(), groupBar);
         nameLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #dde; font-size: 11px; font-weight: bold; }"));
+            "QLabel { color: #1a1a1a; font-size: 11px; font-weight: bold; }"));
         layout->addWidget(nameLabel, 1);
 
         // Mute button
@@ -233,7 +265,7 @@ void TrackHeaderPanel::rebuildHeaders()
         auto* countLabel = new QLabel(
             QStringLiteral("(%1)").arg(group->trackCount()), groupBar);
         countLabel->setStyleSheet(QStringLiteral(
-            "QLabel { color: #889; font-size: 9px; }"));
+            "QLabel { color: #555; font-size: 9px; }"));
         layout->addWidget(countLabel);
 
         return groupBar;
@@ -271,6 +303,24 @@ void TrackHeaderPanel::rebuildHeaders()
         connect(hdr, &TrackHeaderWidget::deleteRequested,
                 this, &TrackHeaderPanel::deleteTrackRequested);
 
+        // Per-track transport — bubble up to MainWindow
+        connect(hdr, &TrackHeaderWidget::trackPlayClicked,
+                this, &TrackHeaderPanel::trackPlayClicked);
+        connect(hdr, &TrackHeaderWidget::trackStopClicked,
+                this, &TrackHeaderPanel::trackStopClicked);
+        connect(hdr, &TrackHeaderWidget::trackRewindClicked,
+                this, &TrackHeaderPanel::trackRewindClicked);
+        connect(hdr, &TrackHeaderWidget::trackFastForwardClicked,
+                this, &TrackHeaderPanel::trackFastForwardClicked);
+        connect(hdr, &TrackHeaderWidget::trackPauseClicked,
+                this, &TrackHeaderPanel::trackPauseClicked);
+        connect(hdr, &TrackHeaderWidget::trackRecordClicked,
+                this, &TrackHeaderPanel::trackRecordClicked);
+
+        // File drop on a specific track header → forward with track index
+        connect(hdr, &TrackHeaderWidget::filesDroppedOnTrack,
+                this, &TrackHeaderPanel::filesDroppedOnTrack);
+
         m_stackLayout->addWidget(hdr);
         m_headers.append(hdr);
     };
@@ -290,8 +340,8 @@ void TrackHeaderPanel::rebuildHeaders()
             collapsedRow->setFixedWidth(TrackHeaderWidget::kHeaderWidth);
             collapsedRow->setFixedHeight(16);
             collapsedRow->setStyleSheet(
-                QStringLiteral("background-color: %1; border-bottom: 1px solid #2a2e3e;")
-                    .arg(group->color().darker(200).name()));
+                QStringLiteral("background-color: %1; border-bottom: 1px solid #c8c8d0;")
+                    .arg(group->color().lighter(170).name()));
             auto* cLayout = new QHBoxLayout(collapsedRow);
             cLayout->setContentsMargins(24, 0, 6, 0);
             auto* cLabel = new QLabel(
