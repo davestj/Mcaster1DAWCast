@@ -20,6 +20,13 @@
 #include <QDesktopServices>
 #include <QUrl>
 
+// Stringize helper — turns the numeric _MSC_VER (e.g. 1937) into "1937" so it
+// can be concatenated with another string literal inside QStringLiteral().
+// Without this, the MSVC branch below tries to do runtime + on a non-literal,
+// which is a parse error inside a constexpr-only context.
+#define DAWCAST_STRINGIZE_(x) #x
+#define DAWCAST_STRINGIZE(x)  DAWCAST_STRINGIZE_(x)
+
 extern "C" {
 #include <libavformat/version.h>
 #include <libavutil/version.h>
@@ -155,20 +162,23 @@ AboutDialog::AboutDialog(QWidget* parent)
     layout->addSpacing(4);
 
     // -- Build info --
-    QString buildInfo = QStringLiteral(
-        "Qt %1  |  %2  |  %3\nBuilt: %4")
-        .arg(QString::fromUtf8(qVersion()),
-             QStringLiteral(
+    // Hoisted out of QStringLiteral() because nesting #if directives inside
+    // a function-like macro argument list is undefined behavior per the C++
+    // spec — Apple Clang tolerates it, MSVC under /permissive- rejects it.
+    static constexpr const char* kCompilerStr =
 #if defined(__clang__)
-                 "Clang " __clang_version__
+        "Clang " __clang_version__;
 #elif defined(__GNUC__)
-                 "GCC " __VERSION__
+        "GCC " __VERSION__;
 #elif defined(_MSC_VER)
-                 "MSVC " + QString::number(_MSC_VER)
+        "MSVC " DAWCAST_STRINGIZE(_MSC_VER);
 #else
-                 "Unknown compiler"
+        "Unknown compiler";
 #endif
-             ),
+
+    QString buildInfo = QStringLiteral("Qt %1  |  %2  |  %3\nBuilt: %4")
+        .arg(QString::fromUtf8(qVersion()),
+             QString::fromUtf8(kCompilerStr),
              QSysInfo::currentCpuArchitecture(),
              QStringLiteral(__DATE__ " " __TIME__));
 
