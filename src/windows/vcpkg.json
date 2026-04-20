@@ -1,0 +1,87 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "mcaster1dawcast",
+  "version-string": "1.0.0-alpha",
+  "description": "Mcaster1DAWCast — Multi-Channel DAW for Broadcasting (Windows port)",
+  "homepage": "https://mcaster1.com/dawcast",
+  "license": "GPL-2.0-or-later",
+  "builtin-baseline": "c3867e714dd3a51c272826eea77267876517ed99",
+  "dependencies": [
+    {
+      "name": "qtbase",
+      "default-features": false,
+      "features": [
+        "concurrent",
+        "gui",
+        "network",
+        "sql",
+        "sql-sqlite",
+        "widgets"
+      ]
+    },
+    "qtsvg",
+    "qtmultimedia",
+    "qtcharts",
+    "qtimageformats",
+    "qttools",
+
+    "portaudio",
+
+    {
+      "name": "ffmpeg",
+      "default-features": false,
+      "features": [
+        "avcodec",
+        "avdevice",
+        "avfilter",
+        "avformat",
+        "swresample",
+        "swscale",
+        "gpl",
+        "aom",
+        "dav1d",
+        "mp3lame",
+        "openh264",
+        "opus",
+        "theora",
+        "vorbis",
+        "vpx",
+        "webp",
+        "x264",
+        "openssl"
+      ]
+    },
+
+    "taglib",
+    "sqlite3",
+    "libyaml",
+
+    "soxr",
+    "libsndfile",
+    "mpg123",
+    "libflac",
+    "libvorbis",
+    "opus",
+    "fdk-aac",
+    "wavpack",
+    "speex",
+
+    "libass",
+    "freetype",
+    "fribidi",
+    "libwebp",
+
+    "openssl",
+    "zlib"
+  ],
+  "features": {
+    "asio": {
+      "description": "Enable ASIO backend (requires Steinberg ASIO SDK — license-gated, off by default)",
+      "dependencies": []
+    },
+    "vst3": {
+      "description": "Enable VST3 plugin host (requires Steinberg VST3 SDK)",
+      "dependencies": []
+    }
+  }
+}

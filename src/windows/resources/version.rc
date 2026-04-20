@@ -1,0 +1,54 @@
+// Mcaster1DAWCast — Win32 resource script (version info + icon + manifest)
+// Copyright (C) 2026 David St. John <davestj@gmail.com>
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#include <windows.h>
+#include <winver.h>
+
+// Matches VERSION.txt at repo root; bump both together on release.
+#define DAWCAST_VER_MAJOR  1
+#define DAWCAST_VER_MINOR  0
+#define DAWCAST_VER_PATCH  0
+#define DAWCAST_VER_BUILD  0
+#define DAWCAST_VER_STR    "1.0.0-alpha\0"
+
+// ── Application icon ──────────────────────────────────────────────────────
+// IDI_APPICON = 1 so Windows uses it as the default exe icon.
+IDI_APPLICATION ICON "../../image_resources/app-icon.ico"
+
+// ── Side-by-side manifest embedded as RT_MANIFEST (ID 1) ──────────────────
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+
+// ── VS_VERSION_INFO block (Explorer > Properties > Details) ───────────────
+VS_VERSION_INFO VERSIONINFO
+    FILEVERSION    DAWCAST_VER_MAJOR, DAWCAST_VER_MINOR, DAWCAST_VER_PATCH, DAWCAST_VER_BUILD
+    PRODUCTVERSION DAWCAST_VER_MAJOR, DAWCAST_VER_MINOR, DAWCAST_VER_PATCH, DAWCAST_VER_BUILD
+    FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+    FILEFLAGS      VS_FF_DEBUG
+#else
+    FILEFLAGS      0x0L
+#endif
+    FILEOS         VOS_NT_WINDOWS32
+    FILETYPE       VFT_APP
+    FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"   // U.S. English, Unicode
+        BEGIN
+            VALUE "CompanyName",      "Mcaster1 / David St. John\0"
+            VALUE "FileDescription",  "Mcaster1DAWCast — Multi-Channel DAW for Broadcasting\0"
+            VALUE "FileVersion",      DAWCAST_VER_STR
+            VALUE "InternalName",     "Mcaster1DAWCast\0"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 David St. John. GPL-2.0-or-later.\0"
+            VALUE "OriginalFilename", "Mcaster1DAWCast.exe\0"
+            VALUE "ProductName",      "Mcaster1DAWCast\0"
+            VALUE "ProductVersion",   DAWCAST_VER_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END

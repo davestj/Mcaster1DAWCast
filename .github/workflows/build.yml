@@ -100,3 +100,65 @@ jobs:
         run: |
           file src/DAWCast/mcaster1dawcast
           ls -lh src/DAWCast/mcaster1dawcast
+
+  build-windows:
+    name: Windows (MSVC 2022 x64)
+    runs-on: windows-2022
+    env:
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_DEFAULT_TRIPLET: x64-windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export GitHub Actions cache env for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL',   process.env.ACTIONS_CACHE_URL   || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Set up CMake + Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Bootstrap vcpkg (pinned to 2026.03.18)
+        working-directory: src/windows
+        shell: pwsh
+        run: ./scripts/bootstrap-vcpkg.ps1
+
+      - name: Configure (vcpkg installs ~60 deps — primed via gha cache)
+        working-directory: src/windows
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/src/windows/vcpkg
+        run: cmake --preset vs2022-x64-release
+
+      - name: Build
+        working-directory: src/windows
+        run: cmake --build --preset vs2022-x64-release --parallel
+
+      - name: Verify binary
+        working-directory: src/windows
+        shell: pwsh
+        run: |
+          $exe = "build/vs2022-x64-release/Release/Mcaster1DAWCast.exe"
+          if (-not (Test-Path $exe)) { $exe = "build/vs2022-x64-release/Mcaster1DAWCast.exe" }
+          Get-Item $exe | Format-List Name, Length, LastWriteTime
+          & $exe --version 2>&1 | Select-Object -First 5
+
+      - name: Stage + package installer
+        working-directory: src/windows/installer
+        shell: cmd
+        run: call build-installer.bat
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcaster1dawcast-windows-x64-setup
+          path: src/windows/installer/staging/Mcaster1DAWCast-Setup.exe
+          if-no-files-found: warn
+
+      - name: Upload portable build (exe + DLLs + resources)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcaster1dawcast-windows-x64-portable
+          path: src/windows/installer/staging/
+          if-no-files-found: warn

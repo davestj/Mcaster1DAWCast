@@ -1,0 +1,23 @@
+# vcpkg checkout lives here but is not tracked
+vcpkg/
+vcpkg_installed/
+
+# CMake / MSBuild output
+build/
+out/
+.vs/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+*.sln.DotSettings.user
+*.vcxproj.user
+
+# Generated Qt moc/uic/rcc
+*_autogen/
+qrc_*.cpp
+moc_*.cpp
+ui_*.h
+
+# Staging
+installer/staging/
+installer/*-Setup.exe
