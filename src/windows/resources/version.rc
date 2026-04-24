@@ -13,11 +13,14 @@
 #define DAWCAST_VER_STR    "1.0.0-alpha\0"
 
 // ── Application icon ──────────────────────────────────────────────────────
-// IDI_APPICON = 1 so Windows uses it as the default exe icon.
-IDI_APPLICATION ICON "../../image_resources/app-icon.ico"
+// IDI_APPICON = 1 so Windows uses it as the default exe icon. Path is
+// resolved relative to this .rc file: resources/ -> windows/ -> src/ -> root.
+IDI_APPLICATION ICON "../../../image_resources/app-icon.ico"
 
-// ── Side-by-side manifest embedded as RT_MANIFEST (ID 1) ──────────────────
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+// NOTE: the side-by-side manifest is NOT embedded here. CMake passes
+// resources/app.manifest to mt.exe via target_sources, and MSBuild embeds it
+// as RT_MANIFEST id 1 automatically. Declaring it here too produced
+// CVT1100 (duplicate resource) → LNK1123.
 
 // ── VS_VERSION_INFO block (Explorer > Properties > Details) ───────────────
 VS_VERSION_INFO VERSIONINFO

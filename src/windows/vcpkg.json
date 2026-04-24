@@ -20,8 +20,6 @@
       ]
     },
     "qtsvg",
-    "qtmultimedia",
-    "qtcharts",
     "qtimageformats",
     "qttools",
 
@@ -55,6 +53,7 @@
     "taglib",
     "sqlite3",
     "libyaml",
+    "yaml-cpp",
 
     "soxr",
     "libsndfile",
@@ -62,6 +61,7 @@
     "libflac",
     "libvorbis",
     "opus",
+    "libopusenc",
     "fdk-aac",
     "wavpack",
     "speex",

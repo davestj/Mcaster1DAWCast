@@ -66,17 +66,12 @@ message(STATUS "Repo root:           ${DAWCAST_REPO_ROOT}")
 
 # ── Dependencies (vcpkg manifest mode) ───────────────────────────────────────
 find_package(Qt6 6.5 REQUIRED COMPONENTS
-    Core Gui Widgets Network Concurrent Multimedia Svg Sql
+    Core Gui Widgets Network Concurrent Svg Sql
 )
-# Charts is a separate purchase in Qt commercial but available in vcpkg OSS.
-find_package(Qt6 QUIET COMPONENTS Charts)
-if(Qt6Charts_FOUND)
-    set(DAWCAST_HAVE_QT_CHARTS TRUE)
-    message(STATUS "Qt6::Charts found — spectrum analyzer enabled")
-else()
-    set(DAWCAST_HAVE_QT_CHARTS FALSE)
-    message(STATUS "Qt6::Charts not found — spectrum analyzer will fall back to QPainter")
-endif()
+# QtMultimedia / QtCharts are intentionally NOT dependencies — DAWCast routes
+# all audio/video through PortAudio + FFmpeg directly, and the spectrum
+# analyzer paints through QPainter. Pulling them in would drag qtdeclarative
+# into the build, which overflows Windows MAX_PATH from deep repo paths.
 
 qt_standard_project_setup()
 
@@ -100,6 +95,10 @@ find_package(FLAC     CONFIG QUIET)
 find_package(Ogg      CONFIG QUIET)
 find_package(Vorbis   CONFIG QUIET)
 find_package(Opus     CONFIG QUIET)
+find_package(OpusEnc       QUIET)        # libopusenc — separate from libopus
+find_package(yaml-cpp CONFIG QUIET)      # used by dsp/mc1/patchbay preset_manager
+find_path(OPUSENC_INCLUDE_DIR NAMES opusenc.h PATH_SUFFIXES opus)
+find_library(OPUSENC_LIBRARY  NAMES opusenc)
 find_package(mpg123   CONFIG QUIET)
 find_package(WebP     CONFIG QUIET)
 find_package(OpenSSL        QUIET)
@@ -132,6 +131,10 @@ endif()
 if(Opus_FOUND)
     target_compile_definitions(dawcast_compile_config INTERFACE HAVE_OPUS)
 endif()
+if(OPUSENC_LIBRARY)
+    target_compile_definitions(dawcast_compile_config INTERFACE HAVE_OPUSENC)
+    message(STATUS "libopusenc found at ${OPUSENC_LIBRARY}")
+endif()
 if(mpg123_FOUND)
     target_compile_definitions(dawcast_compile_config INTERFACE HAVE_MPG123)
 endif()
@@ -148,6 +151,7 @@ target_include_directories(dawcast_includes INTERFACE
     ${DAWCAST_CORE_ROOT}/video_engine
     ${DAWCAST_CORE_ROOT}/timeline
     ${DAWCAST_CORE_ROOT}/dsp
+    ${DAWCAST_CORE_ROOT}/dsp/mc1
     ${DAWCAST_CORE_ROOT}/vfx
     ${DAWCAST_CORE_ROOT}/podcast
     ${DAWCAST_CORE_ROOT}/broadcast
@@ -163,11 +167,22 @@ target_include_directories(dawcast_includes INTERFACE
     ${LIBYAML_INCLUDE_DIR}
 )
 
+# OpusCodec.cpp includes <opusenc.h>, but vcpkg installs it under
+# include/opus/opusenc.h. Brew on macOS exposes /usr/local/include/opus via
+# pkg-config; replicate that here.
+if(OPUSENC_INCLUDE_DIR)
+    target_include_directories(dawcast_includes INTERFACE ${OPUSENC_INCLUDE_DIR})
+endif()
+
 # ── Helper: glob sources from a cross-platform module directory ──────────────
-# Exclude .mm files (Objective-C++, macOS-only) on Windows.
+# Recursive so nested trees (e.g. dsp/mc1/fx_ui/) get picked up. Headers must
+# be in the source list for AUTOMOC to scan them — Q_OBJECT classes that live
+# only in headers (~50 dialog widgets under dsp/mc1/fx_ui/) silently produce
+# no MOC output otherwise, leading to LNK2001 on metaObject/qt_metacast.
+# Excludes .mm files (Objective-C++, macOS-only).
 function(dawcast_module_sources out_var dir)
-    file(GLOB _cpp CONFIGURE_DEPENDS "${DAWCAST_CORE_ROOT}/${dir}/*.cpp")
-    file(GLOB _hdr CONFIGURE_DEPENDS "${DAWCAST_CORE_ROOT}/${dir}/*.h")
+    file(GLOB_RECURSE _cpp CONFIGURE_DEPENDS "${DAWCAST_CORE_ROOT}/${dir}/*.cpp")
+    file(GLOB_RECURSE _hdr CONFIGURE_DEPENDS "${DAWCAST_CORE_ROOT}/${dir}/*.h")
     set(${out_var} ${_cpp} ${_hdr} PARENT_SCOPE)
 endfunction()
 
@@ -179,7 +194,11 @@ function(dawcast_add_module name subdir)
         PUBLIC
             dawcast_includes
             dawcast_compile_config
+            # Link the full Qt6 module set every module is allowed to use.
+            # Static-lib targets carry zero runtime cost for unused modules
+            # — only the exe link decides what actually ships.
             Qt6::Core Qt6::Gui Qt6::Widgets
+            Qt6::Network Qt6::Sql Qt6::Concurrent Qt6::Svg
     )
     set_target_properties(${name} PROPERTIES FOLDER "DAWCast/Modules")
 endfunction()
@@ -247,7 +266,7 @@ target_link_libraries(mcaster1dawcast PRIVATE
     dawcast_platform_windows
 
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network
-    Qt6::Concurrent Qt6::Multimedia Qt6::Svg Qt6::Sql
+    Qt6::Concurrent Qt6::Svg Qt6::Sql
 
     portaudio
     unofficial::sqlite3::sqlite3
@@ -256,8 +275,32 @@ target_link_libraries(mcaster1dawcast PRIVATE
     ${LIBYAML_LIBRARY}
 )
 
-if(Qt6Charts_FOUND)
-    target_link_libraries(mcaster1dawcast PRIVATE Qt6::Charts)
+if(OPUSENC_LIBRARY)
+    target_link_libraries(mcaster1dawcast PRIVATE ${OPUSENC_LIBRARY})
+endif()
+if(yaml-cpp_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE yaml-cpp::yaml-cpp)
+endif()
+
+# Optional codec libs — when found, linked directly because the corresponding
+# HAVE_* defines compile-in calls into them (Mp3Codec, FlacCodec, etc.).
+if(mpg123_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE MPG123::libmpg123)
+endif()
+if(FLAC_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE FLAC::FLAC)
+endif()
+if(Vorbis_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE Vorbis::vorbis Vorbis::vorbisenc Vorbis::vorbisfile)
+endif()
+if(Opus_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE Opus::opus)
+endif()
+if(SndFile_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE SndFile::sndfile)
+endif()
+if(soxr_FOUND)
+    target_link_libraries(mcaster1dawcast PRIVATE soxr)
 endif()
 
 set_target_properties(mcaster1dawcast PROPERTIES
