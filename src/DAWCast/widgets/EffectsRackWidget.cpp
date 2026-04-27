@@ -18,6 +18,10 @@
 #include "mc1/Mc1EffectRegistry.h"
 #include "mc1/Mc1EffectAdapter.h"
 #include "mc1/Mc1DialogFactory.h"
+#include "../plugins/Vst3EffectAdapter.h"
+#ifdef __APPLE__
+#include "../plugins/AuEffectAdapter.h"
+#endif
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -60,22 +64,19 @@ struct EffectDef {
     const char* category;
 };
 
+// Legacy built-in effects — only entries with a concrete IEffectUnit
+// implementation ship in the Add Effect menu. Stubs removed so clicks
+// always do something (equivalent EQ/modulation options live in the
+// MC1 plugin pack just below this list).
 static const EffectDef kBuiltinEffects[] = {
     {"Parametric EQ",       "EQ"},
     {"Graphic EQ",          "EQ"},
-    {"High-Pass Filter",    "EQ"},
-    {"Low-Pass Filter",     "EQ"},
     {"Compressor",          "Dynamics"},
     {"Limiter",             "Dynamics"},
     {"Gate",                "Dynamics"},
     {"De-Esser",            "Dynamics"},
     {"Reverb",              "Spatial"},
-    {"Delay",               "Spatial"},
-    {"Chorus",              "Modulation"},
-    {"Phaser",              "Modulation"},
-    {"Flanger",             "Modulation"},
     {"Noise Reduction",     "Restoration"},
-    {"Loudness Meter",      "Metering"},
 };
 constexpr int kBuiltinEffectCount = sizeof(kBuiltinEffects) / sizeof(kBuiltinEffects[0]);
 } // anonymous namespace
@@ -245,6 +246,32 @@ void EffectsRackWidget::addEffect(IEffectUnit* effect)
             }
         }
 
+        // Third-party VST3 plugin — reopen its native IPlugView editor
+        // (or the generic fallback from Vst3PluginInstance).
+        if (auto* v3 = dynamic_cast<dawcast::plugins::Vst3EffectAdapter*>(fx)) {
+            if (auto* inst = v3->instance()) {
+                if (auto* dlg = inst->openEditor(this)) {
+                    dlg->setAttribute(Qt::WA_DeleteOnClose);
+                    dlg->show();
+                    return;
+                }
+            }
+        }
+
+#ifdef __APPLE__
+        // Third-party Audio Unit — reopen its Cocoa UI (or generic
+        // fallback from AuPluginInstance).
+        if (auto* au = dynamic_cast<dawcast::plugins::AuEffectAdapter*>(fx)) {
+            if (auto* inst = au->instance()) {
+                if (auto* dlg = inst->openEditor(this)) {
+                    dlg->setAttribute(Qt::WA_DeleteOnClose);
+                    dlg->show();
+                    return;
+                }
+            }
+        }
+#endif
+
         // Legacy ParametricEQ gets its bespoke visual editor
         if (auto* peq = dynamic_cast<ParametricEQ*>(fx)) {
             auto* dialog = new ParametricEQDialog(peq, this);
@@ -349,9 +376,6 @@ void EffectsRackWidget::showAddEffectMenu()
             else if (name == QLatin1String("De-Esser"))         effect = new DeEsser();
             else if (name == QLatin1String("Reverb"))           effect = new Reverb();
             else if (name == QLatin1String("Noise Reduction"))  effect = new NoiseReduction();
-            // Remaining slots ("High/Low-Pass Filter", "Delay", "Chorus",
-            // "Phaser", "Flanger", "Loudness Meter") have no dedicated DSP
-            // class yet — skip them until implementation lands.
 
             if (!effect) return;
 

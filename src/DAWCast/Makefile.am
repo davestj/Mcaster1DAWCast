@@ -7,6 +7,8 @@
 bin_PROGRAMS = mcaster1dawcast
 
 # ── Common flags ─────────────────────────────────────────────────────────────
+VST3SDK = $(srcdir)/../../plugins/Mcaster1Tuner/build/_deps/vst3sdk-src
+
 AM_CPPFLAGS = \
     -Wno-implicit-function-declaration \
     -I$(srcdir) \
@@ -26,6 +28,9 @@ AM_CPPFLAGS = \
     -I$(srcdir)/platform \
     -I$(srcdir)/config \
     -I$(srcdir)/ai \
+    -I$(VST3SDK) \
+    -DHAVE_VST3 \
+    -DRELEASE \
     -std=c++17 \
     -DHAVE_PORTAUDIO \
     -DHAVE_TAGLIB \
@@ -821,6 +826,11 @@ mcaster1dawcast_SOURCES = \
     plugins/PluginScanner.cpp \
     plugins/PluginHost.h \
     plugins/PluginHost.cpp \
+    plugins/Vst3Host.h \
+    plugins/Vst3Host.cpp \
+    plugins/Vst3EffectAdapter.h \
+    plugins/AuHost.h \
+    plugins/AuEffectAdapter.h \
     widgets/MainWindow.h \
     widgets/MainWindow.cpp \
     widgets/TimelineWidget.h \
@@ -940,7 +950,30 @@ mcaster1dawcast_SOURCES += \
     platform/macos_video.mm \
     platform/device_discovery.h \
     platform/device_discovery.mm \
-    plugins/PluginScannerAU.mm
+    plugins/PluginScannerAU.mm \
+    plugins/AuHost.mm \
+    plugins/Vst3HostMac.mm \
+    $(VST3SDK)/public.sdk/source/vst/hosting/module.cpp \
+    $(VST3SDK)/public.sdk/source/vst/hosting/module_mac.mm \
+    $(VST3SDK)/public.sdk/source/vst/hosting/hostclasses.cpp \
+    $(VST3SDK)/public.sdk/source/vst/hosting/parameterchanges.cpp \
+    $(VST3SDK)/public.sdk/source/vst/hosting/pluginterfacesupport.cpp \
+    $(VST3SDK)/public.sdk/source/vst/vstinitiids.cpp \
+    $(VST3SDK)/public.sdk/source/common/memorystream.cpp \
+    $(VST3SDK)/public.sdk/source/common/commoniids.cpp \
+    $(VST3SDK)/public.sdk/source/common/commonstringconvert.cpp \
+    $(VST3SDK)/public.sdk/source/vst/utility/stringconvert.cpp \
+    $(VST3SDK)/base/source/baseiids.cpp \
+    $(VST3SDK)/base/source/fobject.cpp \
+    $(VST3SDK)/base/source/fbuffer.cpp \
+    $(VST3SDK)/base/source/fstring.cpp \
+    $(VST3SDK)/base/source/fdebug.cpp \
+    $(VST3SDK)/base/source/updatehandler.cpp \
+    $(VST3SDK)/base/thread/source/flock.cpp \
+    $(VST3SDK)/pluginterfaces/base/coreiids.cpp \
+    $(VST3SDK)/pluginterfaces/base/conststringtable.cpp \
+    $(VST3SDK)/pluginterfaces/base/funknown.cpp \
+    $(VST3SDK)/pluginterfaces/base/ustring.cpp
 endif
 
 # ── MOC-generated sources ────────────────────────────────────────────────────
