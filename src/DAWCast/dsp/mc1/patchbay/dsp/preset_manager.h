@@ -76,6 +76,13 @@ private:
     /* Internal: create factory presets for a specific effect */
     static void createFactoryPresetsForEffect(const QString& effectId);
 
+    /* Internal: top-up any plugin below 10 factory presets with
+     * category-aware generated variants. Called from the end of
+     * createFactoryPresetsForEffect. */
+    static void fillThematicPresetsTo10(const QString& effectId,
+                                         DspEffect* defaultsFx,
+                                         const QString& version);
+
     /* Internal: helper to build a preset from an effect with given param map */
     static Preset buildPreset(const QString& name,
                               const QString& effectId,

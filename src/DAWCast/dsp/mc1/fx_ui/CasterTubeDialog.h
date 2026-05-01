@@ -49,7 +49,7 @@ public:
     explicit BlueTubeGlowWidget(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setFixedSize(36, 52);
+        setMinimumSize(300, 200); resize(27, 39);
         setAttribute(Qt::WA_TranslucentBackground, true);
     }
 
@@ -146,7 +146,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("CasterTube Vocal Tone Shaper");
-        setFixedSize(850, 550);
+        setMinimumSize(319, 206); resize(638, 412);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kCasterTubeStyle);
         buildUi();
@@ -215,7 +215,7 @@ private:
             "QComboBox QAbstractItemView { background: #141e38; color: #D8E0F0;"
             "  selection-background-color: #4A9BD9; selection-color: #0e1428;"
             "  border: 1px solid #1a2848; }");
-        rangeCombo_->setFixedWidth(200);
+        rangeCombo_->setFixedWidth(150);
         connect(rangeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
                 this, [this](int index) {
             if (fx_ && index >= 0 && index <= 4)
@@ -240,16 +240,16 @@ private:
         headerRow->addWidget(presetLabel, 0, Qt::AlignVCenter);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(160);
+        presetCombo_->setFixedWidth(120);
         headerRow->addWidget(presetCombo_, 0, Qt::AlignVCenter);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(50);
+        loadBtn->setFixedWidth(38);
         connect(loadBtn, &QPushButton::clicked, this, &CasterTubeDialog::applyPreset);
         headerRow->addWidget(loadBtn, 0, Qt::AlignVCenter);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         connect(saveBtn, &QPushButton::clicked, this, &CasterTubeDialog::savePreset);
         headerRow->addWidget(saveBtn, 0, Qt::AlignVCenter);
 
@@ -370,19 +370,20 @@ private:
         sustainMeter_ = new RackMeter(RackMeter::GR_METER);
         outputMeter_  = new RackMeter(RackMeter::OUTPUT_METER);
 
-        inputMeter_->setFixedWidth(28);
-        sustainMeter_->setFixedWidth(28);
-        outputMeter_->setFixedWidth(28);
+        inputMeter_->setFixedWidth(21);
+        sustainMeter_->setFixedWidth(21);
+        outputMeter_->setFixedWidth(21);
 
         addMeterCol(inputMeter_,   "IN",      kElectricBlue);
         addMeterCol(sustainMeter_, "SUSTAIN",  kGold);
         addMeterCol(outputMeter_,  "OUT",      kElectricBlue);
 
         static_cast<QVBoxLayout*>(meterGroup->layout())->addLayout(meterLayout);
-        meterGroup->setFixedWidth(140);
+        meterGroup->setFixedWidth(105);
         mainRow->addWidget(meterGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         /* ── Bottom bar ───────────────────────────────────────────── */
 
@@ -444,9 +445,10 @@ private:
     /* ── Knob factory ─────────────────────────────────────────────── */
 
     RackKnob* createKnob(const QString& title, const QColor& accent,
-                          int w = 80, int h = 110)
+                          int w = 48, int h = 62)
     {
         auto* knob = new RackKnob;
+        knob->setStyle(RackKnob::Chicken);
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);

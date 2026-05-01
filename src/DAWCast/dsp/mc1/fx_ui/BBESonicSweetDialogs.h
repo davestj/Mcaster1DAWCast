@@ -55,7 +55,7 @@ public:
     explicit BBEHeroWidget(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setMinimumSize(740, 120);
+        setMinimumSize(555, 90);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     }
 
@@ -123,8 +123,8 @@ public:
         : QDialog(parent), m_fx(fx), m_hero(hero), m_paramCount(paramCount)
     {
         setWindowTitle(title);
-        resize(880, 440);
-        setMinimumSize(640, 340);
+        resize(660, 330);
+        setMinimumSize(480, 255);
         setStyleSheet(
             "QDialog { background: #0a0a0a; color: #e0e0e0; }"
             "QGroupBox {"
@@ -176,12 +176,12 @@ public:
         header->addWidget(m_presetCombo);
 
         auto* saveBtn = new QPushButton("SAVE");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         connect(saveBtn, &QPushButton::clicked, this, &BBEPluginDialog::onSavePreset);
         header->addWidget(saveBtn);
 
         auto* delBtn = new QPushButton("DEL");
-        delBtn->setFixedWidth(40);
+        delBtn->setFixedWidth(30);
         connect(delBtn, &QPushButton::clicked, this, &BBEPluginDialog::onDeletePreset);
         header->addWidget(delBtn);
 
@@ -190,26 +190,43 @@ public:
         // Hero widget
         root->addWidget(m_hero, 1);
 
-        // Knob bank
+        // Knob bank — grid layout so extra horizontal space becomes
+        // right-margin, not inflated knobs. Knobs are fixed-size; the
+        // bank wraps to a second row if the window is too narrow to
+        // show all of them at once.
         auto* group = new QGroupBox("CONTROLS");
-        auto* knobLayout = new QHBoxLayout(group);
-        knobLayout->setSpacing(2);
+        group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        auto* knobLayout = new QGridLayout(group);
+        knobLayout->setSpacing(4);
+        knobLayout->setContentsMargins(8, 16, 8, 8);
+        knobLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+        constexpr int kKnobW = 48;
+        constexpr int kKnobH = 64;
+        constexpr int kKnobsPerRow = 10; // wrap after 10 per row
+
+        int cell = 0;
         for (const QString& spec : knobSpecs) {
             auto parts = spec.split(':');
             if (parts.size() != 2) continue;
             int paramIdx = parts[1].toInt();
             if (paramIdx < 0 || paramIdx >= m_paramCount) continue;
             auto* k = new RackKnob;
+            k->setStyle(RackKnob::VintageBakelite);
             k->setTitle(parts[0]);
-            k->setFixedSize(78, 110);
+            k->setFixedSize(kKnobW, kKnobH);
             connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
                 if (m_fx) m_fx->setParamValue(paramIdx, v);
                 syncHero();
             });
             m_knobs.append({paramIdx, k});
-            knobLayout->addWidget(k);
+            knobLayout->addWidget(k, cell / kKnobsPerRow, cell % kKnobsPerRow,
+                                   Qt::AlignCenter);
+            ++cell;
         }
-        root->addWidget(group);
+        root->addWidget(group, 0);   // no vertical stretch — knob bank is
+                                     // intrinsic-height; hero gets all the
+                                     // leftover space as before.
 
         // Bottom row
         auto* bottom = new QHBoxLayout;

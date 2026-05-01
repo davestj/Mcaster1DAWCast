@@ -47,7 +47,7 @@ public:
     explicit TubeGlowWidget(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setFixedSize(36, 52);
+        setMinimumSize(300, 200); resize(27, 39);
         setAttribute(Qt::WA_TranslucentBackground, true);
     }
 
@@ -143,7 +143,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Tube Preamp");
-        setFixedSize(850, 480);
+        setMinimumSize(319, 200); resize(638, 360);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kVintageStyle);
         buildUi();
@@ -198,16 +198,16 @@ private:
         headerRow->addWidget(presetLabel, 0, Qt::AlignVCenter);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(160);
+        presetCombo_->setFixedWidth(120);
         headerRow->addWidget(presetCombo_, 0, Qt::AlignVCenter);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(50);
+        loadBtn->setFixedWidth(38);
         connect(loadBtn, &QPushButton::clicked, this, &TubePreampDialog::applyPreset);
         headerRow->addWidget(loadBtn, 0, Qt::AlignVCenter);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         connect(saveBtn, &QPushButton::clicked, this, &TubePreampDialog::savePreset);
         headerRow->addWidget(saveBtn, 0, Qt::AlignVCenter);
 
@@ -245,7 +245,7 @@ private:
         knobs_[7] = createKnob("Sag",        kBronze);
 
         /* Make Drive knob slightly larger to stand out */
-        knobs_[1]->setFixedSize(88, 118);
+        knobs_[1]->setFixedSize(66, 88);
         knobs_[1]->setNotches(13);
 
         inputRow->addWidget(knobs_[0], 0, Qt::AlignCenter);
@@ -301,19 +301,20 @@ private:
         grMeter_     = new RackMeter(RackMeter::GR_METER);
         outputMeter_ = new RackMeter(RackMeter::OUTPUT_METER);
 
-        inputMeter_->setFixedWidth(28);
-        grMeter_->setFixedWidth(28);
-        outputMeter_->setFixedWidth(28);
+        inputMeter_->setFixedWidth(21);
+        grMeter_->setFixedWidth(21);
+        outputMeter_->setFixedWidth(21);
 
         addMeterCol(inputMeter_,  "IN");
         addMeterCol(grMeter_,     "SAG");
         addMeterCol(outputMeter_, "OUT");
 
         static_cast<QVBoxLayout*>(meterGroup->layout())->addLayout(meterLayout);
-        meterGroup->setFixedWidth(130);
+        meterGroup->setFixedWidth(98);
         mainRow->addWidget(meterGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         /* ── Bottom bar: Apply / Reset / Close ─────────────────────── */
 
@@ -350,9 +351,10 @@ private:
     /* ── Knob factory ──────────────────────────────────────────────── */
 
     RackKnob* createKnob(const QString& title, const QColor& accent,
-                          int w = 80, int h = 110)
+                          int w = 48, int h = 62)
     {
         auto* knob = new RackKnob;
+        knob->setStyle(RackKnob::Chicken);
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);

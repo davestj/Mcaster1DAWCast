@@ -30,7 +30,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Lexicon PCM 70 Multi-FX");
-        setFixedSize(900, 360);
+        setMinimumSize(337, 200); resize(675, 270);
         applyLexiconStyle();
         buildUi();
         loadFromEffect();
@@ -89,7 +89,7 @@ private:
         headerRow->addStretch();
         algoDisplay_ = new QLabel("PLATE");
         algoDisplay_->setAlignment(Qt::AlignCenter);
-        algoDisplay_->setFixedSize(220, 32);
+        algoDisplay_->setFixedSize(165, 24);
         algoDisplay_->setStyleSheet(
             "QLabel { background: #0a1426; color: #ffb020;"
             " border: 1px solid #20406a; border-radius: 3px;"
@@ -161,8 +161,9 @@ private:
             createKnob("WET / DRY", mc1dsp::FxLexiconPcm70::ParamMix);
         mixLayout->addWidget(knobs_[mc1dsp::FxLexiconPcm70::ParamMix], 0, Qt::AlignCenter);
         mainRow->addWidget(mixGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         // Bottom row
         auto* bottomRow = new QHBoxLayout;
@@ -195,8 +196,9 @@ private:
     RackKnob* createKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 100);
+        k->setFixedSize(58, 75);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (fx_) fx_->setParamValue(paramIdx, v);
         });

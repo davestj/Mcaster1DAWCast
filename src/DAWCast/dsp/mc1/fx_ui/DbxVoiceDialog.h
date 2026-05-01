@@ -36,8 +36,8 @@ public:
         : QDialog(parent), fx_(fx)
     {
         setWindowTitle("DBX 286S Voice Processor");
-        setMinimumSize(1100, 480);
-        resize(1100, 480);
+        setMinimumSize(825, 360);
+        resize(825, 360);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kDialogStyle);
 
@@ -73,18 +73,18 @@ public:
         headerLayout->addWidget(presetLabel);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(160);
+        presetCombo_->setFixedWidth(120);
         presetCombo_->setStyleSheet(kComboStyle);
         headerLayout->addWidget(presetCombo_);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(50);
+        loadBtn->setFixedWidth(38);
         loadBtn->setStyleSheet(kButtonStyle);
         connect(loadBtn, &QPushButton::clicked, this, &DbxVoiceDialog::loadPreset);
         headerLayout->addWidget(loadBtn);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         saveBtn->setStyleSheet(kButtonStyle);
         connect(saveBtn, &QPushButton::clicked, this, &DbxVoiceDialog::savePreset);
         headerLayout->addWidget(saveBtn);
@@ -140,7 +140,7 @@ public:
         meterLayout->addWidget(grLabel);
 
         grMeter_ = new RackMeter(RackMeter::GR_METER);
-        grMeter_->setFixedWidth(28);
+        grMeter_->setFixedWidth(21);
         meterLayout->addWidget(grMeter_, 1);
         compOuterLayout->addLayout(meterLayout);
 
@@ -175,7 +175,9 @@ public:
         static_cast<QVBoxLayout*>(enhGroup->layout())->addLayout(enhLayout);
         sectionsLayout->addWidget(enhGroup);
 
-        root->addLayout(sectionsLayout, 1);
+        sectionsLayout->addStretch(1);
+        root->addLayout(sectionsLayout, 0);
+        root->addStretch(1);;
 
         /* ── Connect knobs to effect params ─────────────────────── */
 
@@ -261,10 +263,11 @@ private:
     RackKnob* createKnob(const QString& title, const QColor& accent)
     {
         auto* knob = new RackKnob;
+        knob->setStyle(RackKnob::Bellcap);
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);
-        knob->setFixedSize(80, 110);
+        knob->setFixedSize(60, 82);
         return knob;
     }
 

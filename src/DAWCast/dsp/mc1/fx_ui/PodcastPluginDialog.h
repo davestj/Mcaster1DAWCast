@@ -48,7 +48,7 @@ public:
         const int n = fx_->paramCount();
         // Sizing: title bar + one row of knobs (78 px each + spacing) + bottom
         const int width = qMax(560, 80 + n * 92);
-        setFixedSize(width, 280);
+        setFixedSize(width, 210);
 
         applyTheme();
         buildUi();
@@ -118,7 +118,7 @@ private:
         for (int i = 0; i < n; ++i) {
             auto* k = new RackKnob;
             k->setTitle(QString::fromLatin1(fx_->paramName(i)).toUpper());
-            k->setFixedSize(78, 110);
+            k->setFixedSize(58, 82);
             k->setValue(fx_->paramValue(i));
             int paramIdx = i;
             connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
@@ -128,7 +128,8 @@ private:
             knobLayout->addWidget(k);
         }
         knobLayout->addStretch();
-        root->addWidget(knobGroup, 1);
+        root->addWidget(knobGroup, 0);
+        root->addStretch(1);;
 
         // Bottom row: bypass + close
         auto* bottomRow = new QHBoxLayout;

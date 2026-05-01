@@ -46,8 +46,9 @@ public:
         : QWidget(parent)
         , style_(style)
     {
-        setMinimumSize(30, 180);
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        setMinimumSize(22, 135);
+        setMaximumSize(44, 320);
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         peakTimer_.start();
     }
 

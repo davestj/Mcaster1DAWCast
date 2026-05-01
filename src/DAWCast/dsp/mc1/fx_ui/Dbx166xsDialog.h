@@ -37,7 +37,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("DBX 166xs Compressor / Gate");
-        setFixedSize(850, 400);
+        setMinimumSize(319, 200); resize(638, 300);
         buildUi();
         loadFromEffect();
         startMetering();
@@ -188,8 +188,9 @@ private:
         addMeterCol(outputMeter_, "OUT");
 
         mainRow->addWidget(meterGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         /* ── Preset row + buttons ──────────────────────────────────── */
         auto* bottomRow = new QHBoxLayout;
@@ -223,6 +224,7 @@ private:
     RackKnob* createKnob(const QString& title, int paramIndex)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::Bellcap);
         k->setTitle(title);
 
         connect(k, &RackKnob::valueChanged, this, [this, paramIndex](float val) {

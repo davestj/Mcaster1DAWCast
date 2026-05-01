@@ -38,7 +38,7 @@ public:
         : QDialog(parent), fx_(fx)
     {
         setWindowTitle("Mackie Xenyx Preamp");
-        setFixedSize(750, 450);
+        setMinimumSize(300, 200); resize(562, 338);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kDialogStyle);
 
@@ -74,18 +74,18 @@ public:
         headerLayout->addWidget(presetLabel);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(160);
+        presetCombo_->setFixedWidth(120);
         presetCombo_->setStyleSheet(kComboStyle);
         headerLayout->addWidget(presetCombo_);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(50);
+        loadBtn->setFixedWidth(38);
         loadBtn->setStyleSheet(kButtonStyle);
         connect(loadBtn, &QPushButton::clicked, this, &XenyxPreampDialog::loadPreset);
         headerLayout->addWidget(loadBtn);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         saveBtn->setStyleSheet(kButtonStyle);
         connect(saveBtn, &QPushButton::clicked, this, &XenyxPreampDialog::savePreset);
         headerLayout->addWidget(saveBtn);
@@ -103,7 +103,7 @@ public:
         gainInner->setAlignment(Qt::AlignCenter);
         gainInner->setContentsMargins(8, 4, 8, 8);
 
-        knobInputGain_ = createKnob("Input Gain", QColor("#00d4aa"), 90, 120);
+        knobInputGain_ = createKnob("Input Gain", QColor("#00d4aa"), 52, 68);
         gainInner->addWidget(knobInputGain_, 0, Qt::AlignCenter);
 
         static_cast<QVBoxLayout*>(gainGroup->layout())->addLayout(gainInner);
@@ -152,7 +152,7 @@ public:
         /* EQ High (top) */
         auto* eqHighRow = new QHBoxLayout;
         auto* highLabel = new QLabel("HI");
-        highLabel->setFixedWidth(22);
+        highLabel->setFixedWidth(20);
         highLabel->setAlignment(Qt::AlignCenter);
         highLabel->setStyleSheet("font-size: 9px; font-weight: bold; color: #26C6DA;");
         eqHighRow->addWidget(highLabel);
@@ -164,20 +164,20 @@ public:
         auto* eqMidRow = new QHBoxLayout;
         eqMidRow->setSpacing(4);
         auto* midLabel = new QLabel("MID");
-        midLabel->setFixedWidth(22);
+        midLabel->setFixedWidth(20);
         midLabel->setAlignment(Qt::AlignCenter);
         midLabel->setStyleSheet("font-size: 9px; font-weight: bold; color: #00d4aa;");
         eqMidRow->addWidget(midLabel);
         knobEqMid_ = createKnob("Gain", QColor("#00d4aa"));
         eqMidRow->addWidget(knobEqMid_);
-        knobEqMidFreq_ = createKnob("Freq", QColor("#00d4aa"), 66, 95);
+        knobEqMidFreq_ = createKnob("Freq", QColor("#00d4aa"), 40, 52);
         eqMidRow->addWidget(knobEqMidFreq_);
         eqInner->addLayout(eqMidRow);
 
         /* EQ Low (bottom) */
         auto* eqLowRow = new QHBoxLayout;
         auto* lowLabel = new QLabel("LO");
-        lowLabel->setFixedWidth(22);
+        lowLabel->setFixedWidth(20);
         lowLabel->setAlignment(Qt::AlignCenter);
         lowLabel->setStyleSheet("font-size: 9px; font-weight: bold; color: #FFA726;");
         eqLowRow->addWidget(lowLabel);
@@ -194,7 +194,7 @@ public:
         outInner->setSpacing(6);
         outInner->setContentsMargins(8, 4, 8, 8);
 
-        knobOutputLevel_ = createKnob("Level", QColor("#e0e8f0"), 90, 120);
+        knobOutputLevel_ = createKnob("Level", QColor("#e0e8f0"), 52, 68);
         outInner->addWidget(knobOutputLevel_);
 
         auto* meterCol = new QVBoxLayout;
@@ -205,14 +205,21 @@ public:
         meterCol->addWidget(meterLabel);
 
         outputMeter_ = new RackMeter(RackMeter::OUTPUT_METER);
-        outputMeter_->setFixedWidth(28);
+        outputMeter_->setFixedWidth(21);
         meterCol->addWidget(outputMeter_, 1);
         outInner->addLayout(meterCol);
 
         static_cast<QVBoxLayout*>(outGroup->layout())->addLayout(outInner);
         stripLayout->addWidget(outGroup);
 
-        root->addLayout(stripLayout, 1);
+        // Soak up any extra horizontal space as right-side padding so
+        // the five sections don't get stretched when the window grows.
+        stripLayout->addStretch(1);
+
+        // stretch=0 keeps the strip at its intrinsic height; the
+        // trailing addStretch() below claims any extra VERTICAL space.
+        root->addLayout(stripLayout, 0);
+        root->addStretch(1);
 
         /* ── Connect knobs to effect params ─────────────────────── */
 
@@ -293,9 +300,10 @@ private:
     }
 
     RackKnob* createKnob(const QString& title, const QColor& accent,
-                          int w = 80, int h = 110)
+                          int w = 48, int h = 62)
     {
         auto* knob = new RackKnob;
+        knob->setStyle(RackKnob::Chicken);
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);

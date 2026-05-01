@@ -30,7 +30,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Lexicon 480L Random Hall");
-        setFixedSize(960, 380);
+        setMinimumSize(360, 200); resize(720, 285);
         applyLexiconStyle();
         buildUi();
         loadFromEffect();
@@ -89,7 +89,7 @@ private:
         headerRow->addStretch();
         algoDisplay_ = new QLabel("RANDOM HALL");
         algoDisplay_->setAlignment(Qt::AlignCenter);
-        algoDisplay_->setFixedSize(220, 32);
+        algoDisplay_->setFixedSize(165, 24);
         algoDisplay_->setStyleSheet(
             "QLabel { background: #0a1426; color: #ffb020;"
             " border: 1px solid #20406a; border-radius: 3px;"
@@ -167,8 +167,9 @@ private:
         modLayout->addWidget(knobs_[mc1dsp::FxLexicon480L::ParamModDepth]);
         modLayout->addWidget(knobs_[mc1dsp::FxLexicon480L::ParamMix]);
         mainRow->addWidget(modGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         auto* bottomRow = new QHBoxLayout;
         auto* presetLabel = new QLabel("PRESET:");
@@ -200,8 +201,9 @@ private:
     RackKnob* createKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 100);
+        k->setFixedSize(58, 75);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (fx_) fx_->setParamValue(paramIdx, v);
         });

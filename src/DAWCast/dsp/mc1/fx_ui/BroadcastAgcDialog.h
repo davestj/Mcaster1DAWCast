@@ -38,7 +38,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Broadcast AGC");
-        setFixedSize(800, 380);
+        setMinimumSize(300, 200); resize(600, 285);
         buildUi();
         loadFromEffect();
         startMetering();
@@ -184,8 +184,9 @@ private:
         addMeterCol(outputMeter_, "OUT");
 
         mainRow->addWidget(meterGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         /* ── Preset row + buttons ──────────────────────────────────── */
         auto* bottomRow = new QHBoxLayout;
@@ -219,6 +220,7 @@ private:
     RackKnob* createKnob(const QString& title, int paramIndex)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::Bellcap);
         k->setTitle(title);
 
         connect(k, &RackKnob::valueChanged, this, [this, paramIndex](float val) {

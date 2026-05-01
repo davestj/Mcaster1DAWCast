@@ -30,7 +30,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Lexicon MPX 1 Pitch + Delay");
-        setFixedSize(940, 380);
+        setMinimumSize(352, 200); resize(705, 285);
         applyLexiconStyle();
         buildUi();
         loadFromEffect();
@@ -89,7 +89,7 @@ private:
         headerRow->addStretch();
         statusDisplay_ = new QLabel("PITCH + 4-TAP + DUCK");
         statusDisplay_->setAlignment(Qt::AlignCenter);
-        statusDisplay_->setFixedSize(220, 32);
+        statusDisplay_->setFixedSize(165, 24);
         statusDisplay_->setStyleSheet(
             "QLabel { background: #0a1426; color: #ffb020;"
             " border: 1px solid #20406a; border-radius: 3px;"
@@ -154,8 +154,9 @@ private:
         duckLayout->addWidget(knobs_[mc1dsp::FxLexiconMpx1::ParamDuckRatio]);
         duckLayout->addWidget(knobs_[mc1dsp::FxLexiconMpx1::ParamMix]);
         mainRow->addWidget(duckGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         auto* bottomRow = new QHBoxLayout;
         auto* presetLabel = new QLabel("PRESET:");
@@ -179,8 +180,9 @@ private:
     RackKnob* createKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 100);
+        k->setFixedSize(58, 75);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (fx_) fx_->setParamValue(paramIdx, v);
         });

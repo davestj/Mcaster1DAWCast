@@ -43,6 +43,11 @@ PKG_CHECK_MODULES([LIBYAML], [yaml-0.1],
             [AC_MSG_ERROR([libyaml not found. Install: brew install libyaml])])],
         [AC_MSG_ERROR([yaml.h not found. Install: brew install libyaml])])])
 
+dnl ── yaml-cpp (required — MC1 plugin preset I/O) ────────────────────────────
+PKG_CHECK_MODULES([YAMLCPP], [yaml-cpp],
+    [AC_DEFINE([HAVE_YAMLCPP], [1], [yaml-cpp available for MC1 presets])],
+    [AC_MSG_ERROR([yaml-cpp not found. Install: brew install yaml-cpp])])
+
 dnl ── SQLite3 (required — project and media database) ────────────────────────
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.24.0],
     [AC_DEFINE([HAVE_SQLITE3], [1], [SQLite3 available])],

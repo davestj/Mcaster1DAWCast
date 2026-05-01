@@ -48,7 +48,7 @@ public:
     explicit SignalHillRoomView(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setMinimumSize(680, 180);
+        setMinimumSize(510, 135);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     }
 
@@ -315,7 +315,7 @@ public:
         , m_fx(fx)
     {
         setWindowTitle("MC1 Signal Hill Broadcasting A");
-        setFixedSize(960, 540);
+        setMinimumSize(360, 202); resize(720, 405);
         applyTheme();
         buildUi();
         loadFromEffect();
@@ -449,8 +449,9 @@ private:
     RackKnob* makeKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 110);
+        k->setFixedSize(58, 82);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (m_fx) m_fx->setParamValue(paramIdx, v);
             updateRoomView();

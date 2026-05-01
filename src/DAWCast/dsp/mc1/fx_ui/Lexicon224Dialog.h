@@ -39,7 +39,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Lexicon 224 Digital Reverb");
-        setFixedSize(880, 360);
+        setMinimumSize(330, 200); resize(660, 270);
         buildUi();
         loadFromEffect();
     }
@@ -108,7 +108,7 @@ private:
 
         programDisplay_ = new QLabel("HALL A");
         programDisplay_->setAlignment(Qt::AlignCenter);
-        programDisplay_->setFixedSize(180, 32);
+        programDisplay_->setFixedSize(135, 24);
         programDisplay_->setStyleSheet(
             "QLabel {"
             "  background: #0a1426; color: #ffb020;"
@@ -129,7 +129,7 @@ private:
         progLayout->setSpacing(6);
         progCombo_ = new QComboBox;
         progCombo_->addItems({ "Concert Hall A", "Concert Hall B", "Plate", "Room" });
-        progCombo_->setMinimumWidth(140);
+        progCombo_->setMinimumWidth(105);
         progLayout->addWidget(progCombo_);
         progLayout->addSpacing(6);
         knobs_[mc1dsp::FxLexicon224::ParamSize] =
@@ -181,8 +181,9 @@ private:
             createKnob("WET / DRY", mc1dsp::FxLexicon224::ParamMix);
         mixLayout->addWidget(knobs_[mc1dsp::FxLexicon224::ParamMix], 0, Qt::AlignCenter);
         mainRow->addWidget(mixGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         // Preset row
         auto* bottomRow = new QHBoxLayout;
@@ -216,8 +217,9 @@ private:
     RackKnob* createKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 100);
+        k->setFixedSize(58, 75);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (!fx_) return;
             fx_->setParamValue(paramIdx, v);

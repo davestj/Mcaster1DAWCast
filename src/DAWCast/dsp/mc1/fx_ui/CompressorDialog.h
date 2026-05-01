@@ -37,7 +37,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Compressor / Gate / Limiter");
-        setFixedSize(800, 400);
+        setMinimumSize(300, 200); resize(600, 300);
         buildUi();
         loadFromEffect();
         startMetering();
@@ -172,8 +172,9 @@ private:
         addMeterCol(outputMeter_, "OUT");
 
         mainRow->addWidget(meterGroup);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         /* ── Preset row + buttons ──────────────────────────────────── */
         auto* bottomRow = new QHBoxLayout;

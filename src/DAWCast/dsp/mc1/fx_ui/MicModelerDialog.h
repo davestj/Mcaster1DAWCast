@@ -58,7 +58,7 @@ public:
     explicit MicGraphic(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setMinimumSize(220, 360);
+        setMinimumSize(165, 270);
         setAttribute(Qt::WA_OpaquePaintEvent, false);
     }
 
@@ -1012,8 +1012,8 @@ public:
         : QWidget(parent), modelIndex_(modelIndex),
           name_(name), subtitle_(subtitle)
     {
-        setFixedHeight(48);
-        setMinimumWidth(200);
+        setFixedHeight(36);
+        setMinimumWidth(150);
         setCursor(Qt::PointingHandCursor);
         setAttribute(Qt::WA_Hover, true);
     }
@@ -1158,8 +1158,8 @@ public:
         : QDialog(parent), fx_(fx)
     {
         setWindowTitle("Mic Modeler");
-        setMinimumSize(1100, 650);
-        resize(1100, 650);
+        setMinimumSize(825, 488);
+        resize(825, 488);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kDialogStyle);
 
@@ -1178,7 +1178,8 @@ public:
         bodyLayout->addWidget(buildCenterPanel(), 3);
         bodyLayout->addWidget(buildSettingsPanel(), 3);
 
-        root->addLayout(bodyLayout, 1);
+        root->addLayout(bodyLayout, 0);
+        root->addStretch(1);;
 
         /* ── Footer buttons ───────────────────────────────────── */
         root->addLayout(buildFooter());
@@ -1306,18 +1307,18 @@ private:
         headerLayout->addWidget(presetLabel);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(180);
+        presetCombo_->setFixedWidth(135);
         presetCombo_->setStyleSheet(kComboStyle);
         headerLayout->addWidget(presetCombo_);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(56);
+        loadBtn->setFixedWidth(42);
         loadBtn->setStyleSheet(kButtonStyle);
         connect(loadBtn, &QPushButton::clicked, this, &MicModelerDialog::loadPreset);
         headerLayout->addWidget(loadBtn);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(56);
+        saveBtn->setFixedWidth(42);
         saveBtn->setStyleSheet(kButtonStyle);
         connect(saveBtn, &QPushButton::clicked, this, &MicModelerDialog::savePreset);
         headerLayout->addWidget(saveBtn);
@@ -1403,11 +1404,11 @@ private:
         lowerRow->setSpacing(8);
 
         polarWidget_ = new PolarPatternWidget;
-        polarWidget_->setFixedSize(140, 140);
+        polarWidget_->setFixedSize(105, 105);
         lowerRow->addWidget(polarWidget_);
 
         responseCurve_ = new MicResponseCurve;
-        responseCurve_->setMinimumHeight(140);
+        responseCurve_->setMinimumHeight(105);
         lowerRow->addWidget(responseCurve_, 1);
 
         col->addLayout(lowerRow);
@@ -1472,7 +1473,7 @@ private:
 
         fatSwitch_ = new QPushButton("FAT");
         fatSwitch_->setCheckable(true);
-        fatSwitch_->setFixedSize(60, 40);
+        fatSwitch_->setFixedSize(45, 30);
         fatSwitch_->setStyleSheet(kToggleStyle);
         swLay->addWidget(fatSwitch_);
 
@@ -1488,7 +1489,7 @@ private:
         hfContourCombo_->addItem("Flat");
         hfContourCombo_->addItem("Boost 10kHz");
         hfContourCombo_->setStyleSheet(kComboStyle);
-        hfContourCombo_->setFixedWidth(120);
+        hfContourCombo_->setFixedWidth(90);
         hfBox->addWidget(hfContourCombo_);
         swLay->addLayout(hfBox);
         swLay->addStretch();
@@ -1518,22 +1519,22 @@ private:
         footer->addStretch();
 
         auto* applyBtn = new QPushButton("Apply");
-        applyBtn->setFixedWidth(90);
-        applyBtn->setFixedHeight(28);
+        applyBtn->setFixedWidth(68);
+        applyBtn->setFixedHeight(21);
         applyBtn->setStyleSheet(kPrimaryButtonStyle);
         connect(applyBtn, &QPushButton::clicked, this, &MicModelerDialog::onApply);
         footer->addWidget(applyBtn);
 
         auto* resetBtn = new QPushButton("Reset");
-        resetBtn->setFixedWidth(90);
-        resetBtn->setFixedHeight(28);
+        resetBtn->setFixedWidth(68);
+        resetBtn->setFixedHeight(21);
         resetBtn->setStyleSheet(kButtonStyle);
         connect(resetBtn, &QPushButton::clicked, this, &MicModelerDialog::onReset);
         footer->addWidget(resetBtn);
 
         auto* closeBtn = new QPushButton("Close");
-        closeBtn->setFixedWidth(90);
-        closeBtn->setFixedHeight(28);
+        closeBtn->setFixedWidth(68);
+        closeBtn->setFixedHeight(21);
         closeBtn->setStyleSheet(kButtonStyle);
         connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
         footer->addWidget(closeBtn);
@@ -1568,7 +1569,7 @@ private:
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);
-        knob->setFixedSize(80, 110);
+        knob->setFixedSize(60, 82);
         return knob;
     }
 

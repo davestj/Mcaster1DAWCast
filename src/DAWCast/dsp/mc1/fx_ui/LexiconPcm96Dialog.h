@@ -30,7 +30,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Lexicon PCM 96 Stereo Reverb");
-        setFixedSize(940, 380);
+        setMinimumSize(352, 200); resize(705, 285);
         applyLexiconStyle();
         buildUi();
         loadFromEffect();
@@ -89,7 +89,7 @@ private:
         headerRow->addStretch();
         algoDisplay_ = new QLabel("CONCERT HALL");
         algoDisplay_->setAlignment(Qt::AlignCenter);
-        algoDisplay_->setFixedSize(220, 32);
+        algoDisplay_->setFixedSize(165, 24);
         algoDisplay_->setStyleSheet(
             "QLabel { background: #0a1426; color: #ffb020;"
             " border: 1px solid #20406a; border-radius: 3px;"
@@ -164,8 +164,9 @@ private:
         toneLayout->addWidget(knobs_[mc1dsp::FxLexiconPcm96::ParamStereoWidth]);
         toneLayout->addWidget(knobs_[mc1dsp::FxLexiconPcm96::ParamMix]);
         mainRow->addWidget(toneGroup, 1);
+        root->addLayout(mainRow, 0);
 
-        root->addLayout(mainRow, 1);
+        root->addStretch(1);
 
         auto* bottomRow = new QHBoxLayout;
         auto* presetLabel = new QLabel("PRESET:");
@@ -197,8 +198,9 @@ private:
     RackKnob* createKnob(const QString& label, int paramIdx)
     {
         auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
         k->setTitle(label);
-        k->setFixedSize(78, 100);
+        k->setFixedSize(58, 75);
         connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
             if (fx_) fx_->setParamValue(paramIdx, v);
         });

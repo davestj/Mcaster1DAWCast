@@ -55,7 +55,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("Dual 15-Band Graphic EQ (L/R)");
-        setFixedSize(900, 550);
+        setMinimumSize(337, 206); resize(675, 412);
         setStyleSheet(kDialogQss);
 
         auto* root = new QVBoxLayout(this);
@@ -69,7 +69,7 @@ public:
         auto* presetLabel = new QLabel("Preset:");
         presetLabel->setStyleSheet("color: #8090a8; font-size: 12px;");
         presetCombo_ = new QComboBox;
-        presetCombo_->setMinimumWidth(200);
+        presetCombo_->setMinimumWidth(150);
         populatePresets();
         presetRow->addWidget(presetLabel);
         presetRow->addWidget(presetCombo_);
@@ -92,7 +92,7 @@ public:
 
         curve_ = new EqCurveWidget;
         curve_->setDbRange(12.0f);
-        curve_->setFixedHeight(200);
+        curve_->setFixedHeight(150);
         curveLayout->addWidget(curve_);
         root->addWidget(curveGroup);
 
@@ -262,8 +262,8 @@ private:
             sliders[i]->setSingleStep(5);
             sliders[i]->setPageStep(30);
             sliders[i]->setTickPosition(QSlider::NoTicks);
-            sliders[i]->setMinimumHeight(80);
-            sliders[i]->setMaximumWidth(28);
+            sliders[i]->setMinimumHeight(60);
+            sliders[i]->setMaximumWidth(21);
             sliders[i]->setStyleSheet(
                 buildSliderQss(accent));
             grid->addWidget(sliders[i], 1, i, Qt::AlignCenter);

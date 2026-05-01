@@ -53,7 +53,7 @@ public:
         , fx_(fx)
     {
         setWindowTitle("31-Band Graphic EQ (ISO 1/3-Octave)");
-        setFixedSize(1000, 500);
+        setMinimumSize(375, 200); resize(750, 375);
         setStyleSheet(kDialogQss);
 
         auto* root = new QVBoxLayout(this);
@@ -67,7 +67,7 @@ public:
         auto* presetLabel = new QLabel("Preset:");
         presetLabel->setStyleSheet("color: #8090a8; font-size: 12px;");
         presetCombo_ = new QComboBox;
-        presetCombo_->setMinimumWidth(200);
+        presetCombo_->setMinimumWidth(150);
         populatePresets();
         presetRow->addWidget(presetLabel);
         presetRow->addWidget(presetCombo_);
@@ -90,7 +90,7 @@ public:
 
         curve_ = new EqCurveWidget;
         curve_->setDbRange(12.0f);
-        curve_->setFixedHeight(180);
+        curve_->setFixedHeight(135);
         curveLayout->addWidget(curve_);
         root->addWidget(curveGroup);
 
@@ -117,8 +117,8 @@ public:
             sliders_[i]->setSingleStep(5);
             sliders_[i]->setPageStep(30);
             sliders_[i]->setTickPosition(QSlider::NoTicks);
-            sliders_[i]->setMinimumHeight(80);
-            sliders_[i]->setMaximumWidth(24);
+            sliders_[i]->setMinimumHeight(60);
+            sliders_[i]->setMaximumWidth(20);
             sliders_[i]->setStyleSheet(kSliderQss);
             bandGrid->addWidget(sliders_[i], 1, i, Qt::AlignCenter);
 

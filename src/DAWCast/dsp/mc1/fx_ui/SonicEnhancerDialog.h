@@ -36,7 +36,7 @@ public:
         : QDialog(parent), fx_(fx)
     {
         setWindowTitle("BBE 882I Sonic Maximizer");
-        setFixedSize(500, 350);
+        setMinimumSize(300, 200); resize(375, 262);
         setAttribute(Qt::WA_DeleteOnClose, false);
         setStyleSheet(kDialogStyle);
 
@@ -75,18 +75,18 @@ public:
         presetRow->addWidget(presetLabel);
 
         presetCombo_ = new QComboBox;
-        presetCombo_->setFixedWidth(140);
+        presetCombo_->setFixedWidth(105);
         presetCombo_->setStyleSheet(kComboStyle);
         presetRow->addWidget(presetCombo_);
 
         auto* loadBtn = new QPushButton("Load");
-        loadBtn->setFixedWidth(46);
+        loadBtn->setFixedWidth(34);
         loadBtn->setStyleSheet(kButtonStyle);
         connect(loadBtn, &QPushButton::clicked, this, &SonicEnhancerDialog::loadPreset);
         presetRow->addWidget(loadBtn);
 
         auto* saveBtn = new QPushButton("Save");
-        saveBtn->setFixedWidth(46);
+        saveBtn->setFixedWidth(34);
         saveBtn->setStyleSheet(kButtonStyle);
         connect(saveBtn, &QPushButton::clicked, this, &SonicEnhancerDialog::savePreset);
         presetRow->addWidget(saveBtn);
@@ -114,7 +114,8 @@ public:
         panelLayout->addWidget(knobProcess_);
         panelLayout->addWidget(knobOutput_);
 
-        root->addWidget(panelGroup, 1);
+        root->addWidget(panelGroup, 0);
+        root->addStretch(1);;
 
         /* ── Description text ───────────────────────────────────── */
 
@@ -197,7 +198,7 @@ private:
         knob->setTitle(title);
         knob->setAccentColor(accent);
         knob->setNotches(11);
-        knob->setFixedSize(100, 130);
+        knob->setFixedSize(75, 98);
         return knob;
     }
 

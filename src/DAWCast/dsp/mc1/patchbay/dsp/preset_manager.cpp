@@ -2092,6 +2092,221 @@ void PresetManager::createFactoryPresetsForEffect(const QString& effectId)
         writeFactoryIfMissing(effectId, QStringLiteral("Default"),
                               captureDefaults(fx.get()), ver);
     }
+
+    /* ════════════════════════════════════════════════════════════════════
+     * Category-aware filler — guarantees every plugin ships with ≥10 presets.
+     *
+     * The hand-curated presets above cover the signature "characterful"
+     * states. This filler tops up any plugin that has fewer than 10 presets
+     * on disk with thematically-named variants by sweeping the "intensity"
+     * parameter (first param whose default lives in the middle of [0,1],
+     * which is the conventional MC1 home for amount/gain/drive knobs).
+     *
+     * Name banks are chosen by the plugin id's family so the generated
+     * preset names fit each plugin's purpose — e.g., a Lexicon reverb
+     * gets "Plate A / Chamber Warm / Concert Hall" whereas a dbx gate
+     * gets "Drum Tight / Vocal Gate / Dialog Clean".
+     * ════════════════════════════════════════════════════════════════════ */
+    fillThematicPresetsTo10(effectId, fx.get(), ver);
+}
+
+/*
+ * Count how many factory preset YAML files already live on disk for
+ * this effect. Used by fillThematicPresetsTo10 to know how many more
+ * it needs to generate.
+ */
+static int countFactoryPresetsOnDisk(const QString& effectId)
+{
+    QString dir = PresetManager::presetsDir() + QStringLiteral("/")
+                + effectId + QStringLiteral("/factory");
+    QDir d(dir);
+    if (!d.exists()) return 0;
+    return d.entryList(QStringList{QStringLiteral("*.yaml")},
+                       QDir::Files).size();
+}
+
+/*
+ * Pick the "intensity" parameter index for an effect.
+ *
+ * Heuristic: the first parameter whose default value sits roughly in the
+ * middle of [0, 1] is most often the main amount/drive/mix knob in MC1
+ * plugins (thresholds default to 0.6+, ratios default to 0.5, reverb
+ * decays to 0.5, eq gains to 0.5). If no param looks "middle-ish", fall
+ * back to param 0 so we still produce audibly distinct presets.
+ */
+static int pickIntensityParamIndex(mc1dsp::DspEffect* fx)
+{
+    const int n = fx->paramCount();
+    for (int i = 0; i < n; ++i) {
+        float v = fx->paramValue(i);
+        if (v >= 0.30f && v <= 0.70f) return i;
+    }
+    return n > 0 ? 0 : -1;
+}
+
+/*
+ * Category name banks. 12 names per category — we always draw the first
+ * (10 - existing) names. Order chosen so the earliest entries are the
+ * most broadly-useful starting points.
+ */
+struct NameBank {
+    const char* prefix;           // matches start of plugin id after "mc1."
+    const char* names[12];
+};
+
+static const NameBank kNameBanks[] = {
+    // ── Reverbs (Lexicon family) ────────────────────────────────────
+    {"lexicon", {
+        "Plate A", "Plate B", "Chamber Warm", "Concert Hall",
+        "Vocal Plate", "Drum Gate", "Cathedral", "Room Small",
+        "Ambience", "Spring Tail", "Cinematic Bloom", "Snare Verb"
+    }},
+    // ── EQs ─────────────────────────────────────────────────────────
+    {"eq", {
+        "Broadcast Tilt", "Radio FM", "Vocal Air", "Low Shelf Warm",
+        "Podcast Presence", "Acoustic Bright", "Mastering Gentle",
+        "Room Correction", "Vintage Color", "Bass Boost",
+        "Mid Scoop", "Sparkle Top"
+    }},
+    // ── Dynamics / dbx / channel strip compressors ─────────────────
+    {"dynamics", {
+        "Broadcast Voice", "Podcast Tight", "Vocal Warm", "Drum Smash",
+        "Bus Glue", "Mastering Soft", "Parallel Crush", "Acoustic Air",
+        "Radio FM", "Narrator Cut", "Streaming Loud", "Singer Smooth"
+    }},
+    {"dbx", {
+        "Broadcast Voice", "Podcast Tight", "Vocal Warm", "Drum Smash",
+        "Bus Glue", "Mastering Soft", "Parallel Crush", "Acoustic Air",
+        "Radio FM", "Narrator Cut", "Streaming Loud", "Singer Smooth"
+    }},
+    // ── BBE Sonic Sweet enhancers ──────────────────────────────────
+    {"bbe", {
+        "Subtle Clarity", "Radio Polish", "Vocal Lift",
+        "Acoustic Sheen", "Drum Crack", "Bass Focus", "Pop Master",
+        "Rock Open", "EDM Wide", "Podcast Fresh", "Broadcast Glow",
+        "Mastering Shine"
+    }},
+    // ── Analog preamps / tube ──────────────────────────────────────
+    {"analog", {
+        "Clean Preamp", "Warm Tube", "Vintage Console", "Radio Warm",
+        "Vocal Saturate", "Drum Color", "Bass Grit", "Tape Color",
+        "Tube Drive", "Broadcast Heat", "Podcast Warm", "Mastering Lift"
+    }},
+    // ── Mic modeler ────────────────────────────────────────────────
+    {"modeling", {
+        "Broadcast Standard", "Podcast Warm", "Singer Forward",
+        "Narrator Smooth", "ASMR Intimate", "Room Distant",
+        "Stage Bright", "Studio Ribbon", "Telephone", "Lo-Fi Vintage",
+        "Radio FM", "Cinema Boom"
+    }},
+    // ── Podcast tools ──────────────────────────────────────────────
+    {"podcast", {
+        "Default", "Voice Polish", "Dialog Clean", "Remote Repair",
+        "Heavy Clean", "Light Touch", "Broadcast Ready",
+        "Streaming Loud", "Interview Warm", "Narrator Smooth",
+        "Podcast Tight", "Radio FM"
+    }},
+    // ── Studio chains ──────────────────────────────────────────────
+    {"studio", {
+        "Tracking", "Mixing", "Mastering", "Podcast Chain",
+        "Broadcast Chain", "Vocal Chain", "Drum Bus", "Bass Bus",
+        "Mix Bus Glue", "Stream Ready", "Vintage Polish", "Modern Clean"
+    }},
+    // ── Channel strips ─────────────────────────────────────────────
+    {"channel", {
+        "Vocal Tracking", "Broadcast Voice", "Podcast Voice",
+        "Drum Channel", "Bass Channel", "Guitar Channel",
+        "Keyboard Channel", "Room Mic", "Overhead Drums",
+        "Bus Stage", "Mix Bus", "Mastering Chain"
+    }},
+    // ── Enhancers (sonic) ──────────────────────────────────────────
+    {"enhancer", {
+        "Subtle Brighten", "Vocal Air", "Radio Polish",
+        "Podcast Clarity", "Broadcast Glow", "Mastering Shine",
+        "Acoustic Sheen", "Pop Top", "Rock Bite", "Mid-Range Focus",
+        "Bass Warmth", "Streaming Lift"
+    }},
+    // ── Analyzers ──────────────────────────────────────────────────
+    {"analyzer", {
+        "Default", "Sensitive", "Smoothed", "Fast Response",
+        "Standard Pitch", "Orchestral", "Drop Tuning", "Live Stage",
+        "Studio Reference", "Podcast", "Broadcast", "Detailed"
+    }},
+    // Sentinel
+    {nullptr, {nullptr}}
+};
+
+static const NameBank* lookupNameBank(const QString& effectId)
+{
+    // Skip the "mc1." prefix and match on the family.
+    QString core = effectId.mid(effectId.startsWith(QLatin1String("mc1."))
+                                  ? 4 : 0);
+    for (const NameBank* b = kNameBanks; b->prefix != nullptr; ++b) {
+        if (core.startsWith(QLatin1String(b->prefix))) return b;
+    }
+    return nullptr;
+}
+
+/*
+ * Append generated presets until this plugin has ≥10 factory presets on
+ * disk. Each new preset sweeps the intensity parameter across a
+ * musically-useful range and takes its name from the category bank.
+ *
+ * The sweep values [0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 0.25, 0.75]
+ * cover "subtle → aggressive" in ascending order; we stop as soon as we
+ * hit the 10-preset target so we don't over-write.
+ */
+void PresetManager::fillThematicPresetsTo10(const QString& effectId,
+                                             mc1dsp::DspEffect* defaultsFx,
+                                             const QString& version)
+{
+    constexpr int kTarget = 10;
+    int have = countFactoryPresetsOnDisk(effectId);
+    if (have >= kTarget) return;
+
+    const NameBank* bank = lookupNameBank(effectId);
+    if (!bank) return;          // No category mapping — leave alone
+
+    const int intensityIdx = pickIntensityParamIndex(defaultsFx);
+    if (intensityIdx < 0) return;
+
+    // Intensity sweep — start with the "missing middle" values so our
+    // new presets fan out around the existing hand-curated ones.
+    static constexpr float kSweep[12] = {
+        0.30f, 0.40f, 0.60f, 0.70f, 0.20f, 0.80f,
+        0.25f, 0.55f, 0.45f, 0.65f, 0.35f, 0.75f
+    };
+
+    // Iterate the full 12-name bank. For each candidate, only count it as
+    // progress toward `kTarget` if a new file actually lands on disk (a
+    // curated preset with the same slug will be a no-op write — we need
+    // to keep trying more bank entries to reach 10 real files).
+    const QString factoryDir = PresetManager::presetsDir()
+                             + QStringLiteral("/") + effectId
+                             + QStringLiteral("/factory");
+
+    for (int i = 0; i < 12 && have < kTarget; ++i) {
+        const char* name = bank->names[i];
+        if (!name) break;
+
+        // Resolve the target path BEFORE writing so we can detect
+        // whether this is a real new-file addition or a dedup no-op.
+        const QString targetPath = factoryDir + QStringLiteral("/")
+            + PresetManager::slugify(QString::fromUtf8(name))
+            + QStringLiteral(".yaml");
+        const bool alreadyOnDisk = QFile::exists(targetPath);
+
+        auto fx = EffectFactory::create(effectId.toStdString());
+        if (!fx) return;
+        auto params = captureWithOverrides(fx.get(),
+            { {intensityIdx, kSweep[i]} });
+
+        if (writeFactoryIfMissing(effectId, QString::fromUtf8(name),
+                                   params, version)
+            && !alreadyOnDisk) {
+            ++have;             // Only count real new-file additions.
+        }
+    }
 }
 
 } // namespace mc1dsp

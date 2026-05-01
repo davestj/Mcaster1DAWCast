@@ -63,7 +63,7 @@ public:
     explicit StudioRoomView(QWidget* parent = nullptr)
         : QWidget(parent)
     {
-        setMinimumSize(720, 200);
+        setMinimumSize(540, 150);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     }
 
@@ -320,8 +320,8 @@ public:
         , m_paramCount(paramCount)
     {
         setWindowTitle(profile.studioName);
-        resize(1000, 580);
-        setMinimumSize(700, 420);
+        resize(750, 435);
+        setMinimumSize(525, 315);
         applyTheme();
         buildUi(profile, bank1, bank2, bank3);
         loadFromEffect();
@@ -395,13 +395,13 @@ private:
         header->addWidget(m_presetCombo);
 
         auto* saveBtn = new QPushButton("SAVE");
-        saveBtn->setFixedWidth(50);
+        saveBtn->setFixedWidth(38);
         saveBtn->setToolTip("Save current settings as a preset");
         connect(saveBtn, &QPushButton::clicked, this, &MusicStudioDialog::onSavePreset);
         header->addWidget(saveBtn);
 
         auto* deleteBtn = new QPushButton("DEL");
-        deleteBtn->setFixedWidth(40);
+        deleteBtn->setFixedWidth(30);
         deleteBtn->setToolTip("Delete selected custom preset");
         connect(deleteBtn, &QPushButton::clicked, this, &MusicStudioDialog::onDeletePreset);
         header->addWidget(deleteBtn);
@@ -471,8 +471,9 @@ private:
             int paramIdx = parts[1].toInt();
             if (paramIdx < 0 || paramIdx >= m_paramCount) continue;
             auto* k = new RackKnob;
+        k->setStyle(RackKnob::SoftLED);
             k->setTitle(parts[0]);
-            k->setFixedSize(78, 110);
+            k->setFixedSize(58, 82);
             connect(k, &RackKnob::valueChanged, this, [this, paramIdx](float v) {
                 if (m_fx) m_fx->setParamValue(paramIdx, v);
                 updateRoomView();
