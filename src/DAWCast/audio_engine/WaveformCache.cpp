@@ -7,6 +7,7 @@
 #include "../core/AudioBuffer.h"
 
 #include <QDebug>
+#include <QFileInfo>
 #include <QMetaObject>
 #include <QRunnable>
 #include <QMutexLocker>
@@ -59,6 +60,12 @@ bool WaveformCache::hasWaveform(const QString& filePath) const
 
 void WaveformCache::requestWaveform(const QString& filePath)
 {
+    if (filePath.isEmpty()) return;
+    if (!QFileInfo::exists(filePath)) {
+        qWarning() << "[Waveform] skipping missing file" << filePath;
+        return;
+    }
+
     QMutexLocker lock(&m_mutex);
 
     // Already cached or already being decoded

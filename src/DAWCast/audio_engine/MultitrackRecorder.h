@@ -65,6 +65,21 @@ public:
     /// Called from the audio thread (PlaybackEngine::processBlock).
     void setCurrentPosition(int64_t samples) { m_currentPosition = samples; }
 
+    /// Number of active recording targets (meter rows).
+    [[nodiscard]] int targetCount() const { return m_targets.size(); }
+
+    /// Lock-free read of the last-seen peak for target `i`. Safe to call
+    /// from the GUI thread every frame — values decay naturally as the
+    /// audio thread overwrites them each block.
+    [[nodiscard]] float peakL(int i) const {
+        return (i >= 0 && i < m_peaks.size())
+            ? m_peaks[i]->peakL.load(std::memory_order_acquire) : 0.0f;
+    }
+    [[nodiscard]] float peakR(int i) const {
+        return (i >= 0 && i < m_peaks.size())
+            ? m_peaks[i]->peakR.load(std::memory_order_acquire) : 0.0f;
+    }
+
 signals:
     void recordingStarted();
     void recordingStopped();

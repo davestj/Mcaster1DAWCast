@@ -66,7 +66,7 @@ BatchEncoderDialog::BatchEncoderDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Batch Encoder"));
-    setMinimumSize(900, 640);
+    setMinimumSize(675, 480);
     setAcceptDrops(true);
 
     m_encoder = new dawcast::BatchEncoder(this);
@@ -388,7 +388,7 @@ void BatchEncoderDialog::setupBottomBar()
 
     m_btnEncode = new QPushButton(tr("Encode All"), this);
     m_btnEncode->setDefault(true);
-    m_btnEncode->setMinimumWidth(100);
+    m_btnEncode->setMinimumWidth(75);
     // Make the Encode button visually prominent
     m_btnEncode->setStyleSheet(
         QStringLiteral("QPushButton { font-weight: bold; padding: 6px 16px; }"));

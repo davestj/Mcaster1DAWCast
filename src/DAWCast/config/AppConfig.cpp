@@ -5,10 +5,12 @@
 #include "AppConfig.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QCoreApplication>
+#include <QDebug>
 
 namespace dawcast::config {
 
@@ -25,6 +27,15 @@ AppConfig* AppConfig::instance()
 {
     if (!s_instance) {
         s_instance = new AppConfig(qApp);
+        // Auto-bind to ~/.mcaster1/Mcaster1DAWCast/config.json and load
+        // whatever's there. Without this, save() silently no-ops because
+        // m_path is empty — which is why dock-visibility persistence
+        // appeared broken for the entire session.
+        const QString cfgPath = appDataDir() + QStringLiteral("/config.json");
+        s_instance->m_path = cfgPath;
+        if (QFile::exists(cfgPath)) {
+            s_instance->load(cfgPath);
+        }
     }
     return s_instance;
 }
@@ -50,10 +61,18 @@ bool AppConfig::load(const QString& path)
 
 bool AppConfig::save()
 {
-    if (m_path.isEmpty()) return false;
+    if (m_path.isEmpty()) {
+        // Fallback: instance() may not have been used before save is
+        // called directly; bind now.
+        m_path = appDataDir() + QStringLiteral("/config.json");
+    }
+
+    // Ensure the parent directory exists.
+    QDir().mkpath(QFileInfo(m_path).absolutePath());
 
     QFile file(m_path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "AppConfig::save: failed to open" << m_path;
         return false;
     }
 

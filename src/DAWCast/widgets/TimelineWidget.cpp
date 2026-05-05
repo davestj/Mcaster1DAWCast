@@ -1896,21 +1896,42 @@ void TimelineWidget::drawWaveform(QPainter& p, Clip* clip, const QColor& baseCol
         // Request async decode (no-op if already pending)
         cache->requestWaveform(clip->sourcePath());
 
-        // Draw a simple "Loading..." placeholder
-        p.setPen(QColor(80, 80, 80));
+        // Visible decoding placeholder: diagonal stripes + "Decoding..." text
+        p.setBrush(QBrush(QColor(255, 255, 255, 40), Qt::FDiagPattern));
+        p.setPen(Qt::NoPen);
+        p.drawRect(clipX + 2, clipY + 2, clipW - 4, clipH - 4);
+
+        p.setPen(QColor(240, 240, 240));
         QFont loadFont = font();
-        loadFont.setPointSize(8);
+        loadFont.setPointSize(9);
+        loadFont.setBold(true);
         p.setFont(loadFont);
-        p.drawText(clipX + clipW / 2 - 25, clipY + clipH / 2 + 4,
-                   tr("Loading..."));
+        QFontMetrics fm(loadFont);
+        QString msg = tr("Decoding…");
+        int tx = clipX + (clipW - fm.horizontalAdvance(msg)) / 2;
+        int ty = clipY + clipH / 2 + fm.ascent() / 2;
+        p.drawText(tx, ty, msg);
         return;
     }
 
     const WaveformData* waveform = cache->getWaveform(clip->sourcePath());
     if (!waveform) return;  // race condition guard
 
-    if (waveform->peaks.empty() || waveform->sampleRate <= 0)
+    if (waveform->peaks.empty() || waveform->sampleRate <= 0) {
+        static QSet<QString> s_warnedPaths;
+        if (!s_warnedPaths.contains(clip->sourcePath())) {
+            s_warnedPaths.insert(clip->sourcePath());
+            qWarning() << "[drawWaveform] waveform has no peaks for"
+                       << clip->sourcePath()
+                       << "peaks=" << waveform->peaks.size()
+                       << "sampleRate=" << waveform->sampleRate;
+        }
+        // Visible diagnostic: red hatch pattern so the user sees decode failed.
+        p.setBrush(QBrush(QColor(220, 50, 50, 60), Qt::BDiagPattern));
+        p.setPen(Qt::NoPen);
+        p.drawRect(clipX + 2, clipY + 2, clipW - 4, clipH - 4);
         return;
+    }
 
     // Drawing area (leave 2px padding inside the clip rect)
     int drawX = clipX + 2;

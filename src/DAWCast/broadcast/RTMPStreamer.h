@@ -59,7 +59,7 @@ public:
 
         /// Platform presets -- selecting a platform auto-fills URL template
         /// and recommended encoding settings.
-        enum Platform { Custom, YouTube, Twitch, Facebook, Icecast };
+        enum Platform { Custom, YouTube, Twitch, Facebook, Icecast, Mcaster1DNAS };
         Platform platform = Custom;
     };
 

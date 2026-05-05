@@ -26,8 +26,8 @@ ImportAudioDialog::ImportAudioDialog(const QStringList& filePaths,
     , m_filePaths(filePaths)
 {
     setWindowTitle(tr("Import Audio"));
-    setMinimumSize(680, 520);
-    resize(740, 580);
+    setMinimumSize(510, 390);
+    resize(555, 435);
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(10);
@@ -131,7 +131,7 @@ void ImportAudioDialog::buildOptionsSection()
     });
     m_targetSampleRateCombo->setCurrentIndex(1);  // 48000 default
     m_targetSampleRateCombo->setEnabled(false);
-    m_targetSampleRateCombo->setFixedWidth(80);
+    m_targetSampleRateCombo->setFixedWidth(60);
     srRow->addWidget(m_targetSampleRateCombo);
     srRow->addStretch();
     fileLayout->addLayout(srRow);
@@ -151,7 +151,7 @@ void ImportAudioDialog::buildOptionsSection()
     });
     m_targetBitDepthCombo->setCurrentIndex(2);  // 32-bit float default
     m_targetBitDepthCombo->setEnabled(false);
-    m_targetBitDepthCombo->setFixedWidth(100);
+    m_targetBitDepthCombo->setFixedWidth(75);
     bdRow->addWidget(m_targetBitDepthCombo);
     bdRow->addStretch();
     fileLayout->addLayout(bdRow);

@@ -41,7 +41,7 @@ TrackColorDialog::TrackColorDialog(const QColor& initialColor, QWidget* parent)
     , m_selectedColor(initialColor)
 {
     setWindowTitle(tr("Track Color"));
-    setFixedSize(280, 220);
+    setFixedSize(210, 165);
     buildUI();
 }
 
@@ -113,7 +113,7 @@ void TrackColorDialog::buildUI()
     customRow->addWidget(previewLabel);
 
     m_previewWidget = new QWidget(this);
-    m_previewWidget->setFixedSize(40, 24);
+    m_previewWidget->setFixedSize(30, 20);
     updatePreview();
     customRow->addWidget(m_previewWidget);
 

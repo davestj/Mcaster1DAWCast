@@ -44,7 +44,7 @@ protected:
     void leaveEvent(QEvent* event) override;
 
 private:
-    int    m_bevelDepth       = 3;
+    int    m_bevelDepth       = 1;
     QColor m_highlightColor   = QColor(255, 255, 255, 120);
     QColor m_shadowColor      = QColor(0, 0, 0, 120);
     QColor m_faceColor;              // empty = use palette

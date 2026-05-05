@@ -24,7 +24,7 @@ TagToFilenameDialog::TagToFilenameDialog(const QStringList& filePaths,
     , m_tagMap(tagMap)
 {
     setWindowTitle(tr("Filename from Tags"));
-    setMinimumSize(700, 500);
+    setMinimumSize(525, 375);
     setupUi();
     updatePreview();
 }

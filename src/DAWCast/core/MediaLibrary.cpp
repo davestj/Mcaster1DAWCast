@@ -271,16 +271,29 @@ LibraryItem MediaLibrary::probeFile(const QString& path)
     item.path = path;
 
     QFileInfo fi(path);
+    if (!fi.exists() || !fi.isFile() || !fi.isReadable()) {
+        qWarning() << "MediaLibrary::probeFile skipping unreadable" << path;
+        item.title = fi.fileName();
+        return item;
+    }
+
     item.fileSize     = fi.size();
     item.dateModified = fi.lastModified();
     item.format       = formatFromExtension(path);
     item.category     = suggestCategory(path);
 
-    // Read metadata via TagTransfer
-    AudioTags tags = TagTransfer::readTags(path);
-    item.title  = tags.title;
-    item.artist = tags.artist;
-    item.album  = tags.album;
+    // Read metadata via TagTransfer — TagLib can throw on malformed files;
+    // catch all so a bad ID3 frame doesn't take down import.
+    try {
+        AudioTags tags = TagTransfer::readTags(path);
+        item.title  = tags.title;
+        item.artist = tags.artist;
+        item.album  = tags.album;
+    } catch (const std::exception& e) {
+        qWarning() << "MediaLibrary::probeFile tag read failed for" << path << e.what();
+    } catch (...) {
+        qWarning() << "MediaLibrary::probeFile tag read crashed for" << path;
+    }
 
     // Fallback title: use the filename without extension
     if (item.title.isEmpty())
@@ -289,21 +302,27 @@ LibraryItem MediaLibrary::probeFile(const QString& path)
     // Probe duration and audio properties via FFmpeg (avformat)
 #ifdef HAVE_AVFORMAT
     AVFormatContext* ctx = nullptr;
-    if (avformat_open_input(&ctx, path.toUtf8().constData(), nullptr, nullptr) == 0) {
+    if (avformat_open_input(&ctx, path.toUtf8().constData(), nullptr, nullptr) == 0
+        && ctx != nullptr) {
         if (avformat_find_stream_info(ctx, nullptr) >= 0) {
             // Duration in microseconds
             if (ctx->duration > 0) {
                 item.durationMs = static_cast<int>(ctx->duration / 1000);
             }
 
-            // Find the first audio stream for sample rate and channels
+            // Find the first audio stream for sample rate and channels.
+            // Guard every dereference — malformed containers can have null
+            // streams or null codecpar, which would crash this loop.
             for (unsigned i = 0; i < ctx->nb_streams; ++i) {
-                AVCodecParameters* cp = ctx->streams[i]->codecpar;
-                if (cp->codec_type == AVMEDIA_TYPE_AUDIO) {
-                    item.sampleRate = cp->sample_rate;
-                    item.channels   = cp->ch_layout.nb_channels;
-                    break;
-                }
+                AVStream* st = ctx->streams[i];
+                if (!st) continue;
+                AVCodecParameters* cp = st->codecpar;
+                if (!cp) continue;
+                if (cp->codec_type != AVMEDIA_TYPE_AUDIO) continue;
+                item.sampleRate = cp->sample_rate > 0 ? cp->sample_rate : 44100;
+                int ch = cp->ch_layout.nb_channels;
+                item.channels = ch > 0 ? ch : 2;
+                break;
             }
         }
         avformat_close_input(&ctx);

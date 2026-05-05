@@ -24,7 +24,7 @@ ExportDialog::ExportDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Export"));
-    setMinimumSize(480, 520);
+    setMinimumSize(360, 390);
     auto* mainLayout = new QVBoxLayout(this);
 
     // --- Preset selector ---

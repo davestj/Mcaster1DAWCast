@@ -146,6 +146,14 @@ private slots:
 
 private:
     void setupMenus();
+    void buildPluginsMenu(class QMenu* parent);
+    void openPluginPreview(const QString& displayName);
+    /// Add files as clips on an audio track. If forceNewTrack, always create
+    /// a new track; otherwise append to the last existing audio track (or
+    /// create one if none exist). Drops unreadable files with a status msg.
+    void addAudioFilesToTimeline(const QStringList& filePaths,
+                                 bool forceNewTrack = false);
+    void installDockPersistence();
     void setupToolbars();
     void setupSidebar();
     void setupCentralWidget();
@@ -213,6 +221,13 @@ private:
     QDockWidget* m_pedalboardDock    = nullptr;
     QDockWidget* m_streamMonitorDock = nullptr;
     QDockWidget* m_markerListDock   = nullptr;
+
+    // Floating recording VU meter (created on startRecording, destroyed on stop)
+    class QDialog* m_recordingMeterDialog = nullptr;
+
+    // Applied-once gate for the dock-layout arrangement block in applyViewMode;
+    // re-applying tabifyDockWidget after the initial layout crashes on macOS 26.
+    bool m_viewModeLayoutInitialized = false;
 
     // Mode-specific widget contents
     ChapterWidget*       m_chapterWidget     = nullptr;

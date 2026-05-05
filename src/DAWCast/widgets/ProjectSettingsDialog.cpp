@@ -19,7 +19,7 @@ ProjectSettingsDialog::ProjectSettingsDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Project Settings"));
-    setMinimumWidth(400);
+    setMinimumWidth(300);
 
     auto* mainLayout = new QVBoxLayout(this);
 

@@ -214,7 +214,7 @@ void CrossfadeEditorDialog::setupUi()
             this, [this](int) { update(); });
 
     setMinimumSize(kWaveformWidth + kDialogMargin * 2,
-                   kWaveformHeight + kCurveHeight + 300);
+                   kWaveformHeight + kCurveHeight + 225);
 }
 
 // ── Slots ───────────────────────────────────────────────────────────────────

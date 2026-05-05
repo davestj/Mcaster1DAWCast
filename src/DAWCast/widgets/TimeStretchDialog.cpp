@@ -54,7 +54,7 @@ TimeStretchDialog::TimeStretchDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Time Stretch / Pitch Shift"));
-    setMinimumSize(420, 380);
+    setMinimumSize(315, 285);
     setStyleSheet(kDialogStyle);
     buildUI();
 }
@@ -109,7 +109,7 @@ void TimeStretchDialog::buildUI()
     m_stretchSpin->setSuffix(QStringLiteral("%"));
     m_stretchSpin->setDecimals(1);
     m_stretchSpin->setSingleStep(1.0);
-    m_stretchSpin->setFixedWidth(90);
+    m_stretchSpin->setFixedWidth(68);
     stretchGrid->addWidget(m_stretchSpin, 0, 2);
 
     m_durationLabel = new QLabel(tr("Duration: 1.00x"), stretchGroup);
@@ -136,7 +136,7 @@ void TimeStretchDialog::buildUI()
     m_pitchSpin->setSuffix(QStringLiteral(" st"));
     m_pitchSpin->setDecimals(2);
     m_pitchSpin->setSingleStep(0.01);
-    m_pitchSpin->setFixedWidth(90);
+    m_pitchSpin->setFixedWidth(68);
     pitchGrid->addWidget(m_pitchSpin, 0, 2);
 
     m_pitchLabel = new QLabel(tr("0 cents"), pitchGroup);

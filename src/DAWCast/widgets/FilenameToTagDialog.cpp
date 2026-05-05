@@ -37,7 +37,7 @@ FilenameToTagDialog::FilenameToTagDialog(const QStringList& filePaths,
     , m_filePaths(filePaths)
 {
     setWindowTitle(tr("Auto-Tag from Filename"));
-    setMinimumSize(700, 500);
+    setMinimumSize(525, 375);
     setupUi();
     updatePreview();
 }

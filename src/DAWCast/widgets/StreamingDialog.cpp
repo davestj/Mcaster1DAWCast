@@ -34,8 +34,8 @@ StreamingDialog::StreamingDialog(dawcast::RTMPStreamer* streamer, QWidget* paren
     , m_streamer(streamer)
 {
     setWindowTitle(tr("Stream Live"));
-    setMinimumSize(520, 600);
-    resize(560, 720);
+    setMinimumSize(390, 450);
+    resize(420, 540);
 
     setupUi();
 
@@ -124,6 +124,8 @@ void StreamingDialog::setupPlatformSection()
         static_cast<int>(RTMPStreamer::StreamConfig::Facebook));
     m_platformCombo->addItem(tr("Icecast"),
         static_cast<int>(RTMPStreamer::StreamConfig::Icecast));
+    m_platformCombo->addItem(tr("Mcaster1 DNAS"),
+        static_cast<int>(RTMPStreamer::StreamConfig::Mcaster1DNAS));
 
     form->addWidget(new QLabel(tr("Destination:"), group));
     form->addWidget(m_platformCombo, 1);
@@ -153,7 +155,7 @@ void StreamingDialog::setupConnectionSection()
     keyLayout->addWidget(m_streamKeyEdit, 1);
 
     m_toggleKeyBtn = new QPushButton(tr("Show"), group);
-    m_toggleKeyBtn->setFixedWidth(60);
+    m_toggleKeyBtn->setFixedWidth(45);
     connect(m_toggleKeyBtn, &QPushButton::clicked,
             this, &StreamingDialog::onToggleKeyVisibility);
     keyLayout->addWidget(m_toggleKeyBtn);
@@ -292,8 +294,8 @@ void StreamingDialog::setupMonitorSection()
     vuLayout->addWidget(new QLabel(QStringLiteral("L"), m_monitorGroup));
     m_vuMeterL = new VUMeterWidget(m_monitorGroup);
     m_vuMeterL->setOrientation(Qt::Horizontal);
-    m_vuMeterL->setMinimumSize(120, 20);
-    m_vuMeterL->setMaximumHeight(24);
+    m_vuMeterL->setMinimumSize(90, 20);
+    m_vuMeterL->setMaximumHeight(20);
     vuLayout->addWidget(m_vuMeterL, 1);
 
     vuLayout->addSpacing(8);
@@ -301,8 +303,8 @@ void StreamingDialog::setupMonitorSection()
     vuLayout->addWidget(new QLabel(QStringLiteral("R"), m_monitorGroup));
     m_vuMeterR = new VUMeterWidget(m_monitorGroup);
     m_vuMeterR->setOrientation(Qt::Horizontal);
-    m_vuMeterR->setMinimumSize(120, 20);
-    m_vuMeterR->setMaximumHeight(24);
+    m_vuMeterR->setMinimumSize(90, 20);
+    m_vuMeterR->setMaximumHeight(20);
     vuLayout->addWidget(m_vuMeterR, 1);
 
     monitorLayout->addLayout(vuLayout, 6, 0, 1, 2);
@@ -319,7 +321,7 @@ void StreamingDialog::setupBottomButtons()
     auto* btnLayout = new QHBoxLayout;
 
     m_goLiveBtn = new QPushButton(tr("Go Live"), this);
-    m_goLiveBtn->setMinimumHeight(40);
+    m_goLiveBtn->setMinimumHeight(30);
     m_goLiveBtn->setStyleSheet(
         QStringLiteral("QPushButton { background-color: #cc2020; color: white; "
                         "font-size: 16px; font-weight: bold; border-radius: 6px; "
@@ -330,7 +332,7 @@ void StreamingDialog::setupBottomButtons()
     btnLayout->addWidget(m_goLiveBtn);
 
     m_stopBtn = new QPushButton(tr("Stop"), this);
-    m_stopBtn->setMinimumHeight(40);
+    m_stopBtn->setMinimumHeight(30);
     m_stopBtn->setEnabled(false);
     m_stopBtn->setStyleSheet(
         QStringLiteral("QPushButton { font-size: 14px; padding: 8px 16px; }"
@@ -339,7 +341,7 @@ void StreamingDialog::setupBottomButtons()
     btnLayout->addWidget(m_stopBtn);
 
     m_closeBtn = new QPushButton(tr("Close"), this);
-    m_closeBtn->setMinimumHeight(40);
+    m_closeBtn->setMinimumHeight(30);
     connect(m_closeBtn, &QPushButton::clicked, this, &QDialog::close);
     btnLayout->addWidget(m_closeBtn);
 
@@ -385,6 +387,16 @@ void StreamingDialog::applyPlatformPreset(RTMPStreamer::StreamConfig::Platform p
         m_urlEdit->setText(QString());
         m_urlEdit->setPlaceholderText(tr("http://server:8000/mount"));
         m_audioBitrateSpin->setValue(128);
+        break;
+
+    case RTMPStreamer::StreamConfig::Mcaster1DNAS:
+        // Mcaster1 DNAS streaming server — SHOUTcast/Icecast compatible ingest.
+        // Default to official server; user can override with their own DNAS host.
+        m_urlEdit->setText(QStringLiteral("http://stream.mcaster1.com:8000/live"));
+        m_urlEdit->setPlaceholderText(tr("http://<dnas-host>:8000/<mount>"));
+        m_audioBitrateSpin->setValue(192);
+        m_audioSampleRateCombo->setCurrentIndex(1); // 48000
+        m_audioChannelsCombo->setCurrentIndex(1);    // Stereo
         break;
 
     case RTMPStreamer::StreamConfig::Custom:

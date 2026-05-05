@@ -15,6 +15,7 @@
 #include "widgets/SplashScreen.h"
 #include "config/DebugLogger.h"
 #include "widgets/ThemeEngine.h"
+#include "dsp/mc1/patchbay/dsp/preset_manager.h"
 
 int main(int argc, char* argv[])
 {
@@ -60,6 +61,32 @@ int main(int argc, char* argv[])
     dawcast::config::DebugLogger::instance()->info(
         QStringLiteral("Mcaster1DAWCast 1.0.0-alpha starting"));
 
+    // Qt message handler — routes every qDebug/qInfo/qWarning/qCritical/
+    // qFatal call through DebugLogger, so warnings from deep inside
+    // AuHost.mm / Vst3Host.cpp / widgets all land in the same log file
+    // with timestamps and (on WARN/CRIT/FATAL) a backtrace captured via
+    // backtrace_symbols. Without this, qWarning() goes to stderr and
+    // disappears if the app is launched from Finder.
+    qInstallMessageHandler(
+        [](QtMsgType type, const QMessageLogContext& ctx, const QString& msg) {
+            auto* logger = dawcast::config::DebugLogger::instance();
+            if (!logger) return;
+            QString location;
+            if (ctx.file && ctx.line) {
+                location = QStringLiteral(" [%1:%2]")
+                               .arg(QString::fromUtf8(ctx.file))
+                               .arg(ctx.line);
+            }
+            const QString full = msg + location;
+            switch (type) {
+            case QtDebugMsg:    logger->debug(full); break;
+            case QtInfoMsg:     logger->info(full);  break;
+            case QtWarningMsg:  logger->warn(full);  break;
+            case QtCriticalMsg:
+            case QtFatalMsg:    logger->error(full); break;
+            }
+        });
+
     // Load theme — honour user preference, default to system Default theme
     splash->showMessage(QStringLiteral("Loading theme..."));
     app.processEvents();
@@ -84,6 +111,13 @@ int main(int argc, char* argv[])
                 .arg(available.join(QStringLiteral(", ")),
                      themeEngine->currentTheme()));
     }
+
+    // Generate factory presets for every MC1 plugin (≥10 per plugin via
+    // the category-aware filler). Cheap: only writes files that are
+    // missing from ~/.mcaster1/Mcaster1DAWCast/presets/<id>/factory/.
+    splash->showMessage(QStringLiteral("Building plugin presets..."));
+    app.processEvents();
+    mc1dsp::PresetManager::ensureFactoryPresets();
 
     // Create the main window (this initializes audio engine, timeline, etc.)
     splash->showMessage(QStringLiteral("Loading audio engine..."));

@@ -11,8 +11,31 @@
 #include <QFont>
 #include <QFrame>
 #include <QTimer>
+#include <QIcon>
+#include <QPixmap>
 
 namespace dawcast::widgets {
+
+// Helper: BevelButton hosting an SVG icon. The BevelButton provides the
+// button surface; the SVG only draws the symbol. Used for both transport
+// hero icons and utility glyphs.
+static BevelButton* makeIconCapButton(const QString& svgPath, QSize btnSize,
+                                      QSize iconPx, QWidget* parent)
+{
+    auto* btn = new BevelButton(QIcon(svgPath), QString(), parent);
+    btn->setFixedSize(btnSize);
+    btn->setIconSize(iconPx);
+    return btn;
+}
+
+static BevelButton* makeIconGlyphButton(const QString& svgPath, QSize btnSize,
+                                        QSize iconPx, QWidget* parent)
+{
+    auto* btn = new BevelButton(QIcon(svgPath), QString(), parent);
+    btn->setFixedSize(btnSize);
+    btn->setIconSize(iconPx);
+    return btn;
+}
 
 // Helper to format sample position as timecode
 static QString formatTimecode(int64_t samples, int sampleRate)
@@ -61,21 +84,23 @@ TransportBar::TransportBar(QWidget* parent)
 
     // ── Transport Buttons ───────────────────────────────────────────────
 
-    m_rewindBtn = new BevelButton(QStringLiteral("\u23EA"), this);
-    m_rewindBtn->setFixedSize(btnSize);
+    const QSize heroIconPx(20, 20);
+
+    m_rewindBtn = makeIconCapButton(QStringLiteral(":/icons/rewind.svg"),
+                                     btnSize, heroIconPx, this);
     m_rewindBtn->setToolTip(tr("Rewind to start (Home) - Returns playhead to position 0:00"));
 
-    m_playBtn = new BevelButton(QStringLiteral("\u25B6"), this);
-    m_playBtn->setFixedSize(btnSize);
+    m_playBtn = makeIconCapButton(QStringLiteral(":/icons/play.svg"),
+                                   btnSize, heroIconPx, this);
     m_playBtn->setCheckable(true);
     m_playBtn->setToolTip(tr("Play (Space) - Start playback from the current playhead position"));
 
-    m_stopBtn = new BevelButton(QStringLiteral("\u23F9"), this);
-    m_stopBtn->setFixedSize(btnSize);
+    m_stopBtn = makeIconCapButton(QStringLiteral(":/icons/stop.svg"),
+                                   btnSize, heroIconPx, this);
     m_stopBtn->setToolTip(tr("Stop (Space) - Stop playback and reset playhead to start"));
 
-    m_recordBtn = new BevelButton(QStringLiteral("\u23FA"), this);
-    m_recordBtn->setFixedSize(btnSize);
+    m_recordBtn = makeIconCapButton(QStringLiteral(":/icons/record.svg"),
+                                     btnSize, heroIconPx, this);
     m_recordBtn->setCheckable(true);
     m_recordBtn->setToolTip(tr("Record (R) - Start recording on armed tracks"));
 
@@ -125,7 +150,9 @@ TransportBar::TransportBar(QWidget* parent)
 
     // ── Zoom Slider ─────────────────────────────────────────────────────
 
-    auto* zoomIcon = new QLabel(QStringLiteral("\U0001F50D"), this);  // magnifying glass
+    auto* zoomIcon = new QLabel(this);
+    zoomIcon->setPixmap(QIcon(QStringLiteral(":/icons/magnifier.svg"))
+                           .pixmap(16, 16));
     zoomIcon->setFixedWidth(18);
     zoomIcon->setAlignment(Qt::AlignCenter);
     row1->addWidget(zoomIcon);
@@ -148,8 +175,8 @@ TransportBar::TransportBar(QWidget* parent)
 
     // ── BPM / Metronome / TAP ───────────────────────────────────────────
 
-    m_metronomeBtn = new BevelButton(QStringLiteral("\u266A"), this);  // musical note
-    m_metronomeBtn->setFixedSize(smallBtnSize);
+    m_metronomeBtn = makeIconGlyphButton(QStringLiteral(":/icons/metronome.svg"),
+                                          smallBtnSize, QSize(16, 16), this);
     m_metronomeBtn->setCheckable(true);
     m_metronomeBtn->setToolTip(tr("Metronome - Toggle click track on/off during playback and recording"));
     row1->addWidget(m_metronomeBtn);
@@ -173,12 +200,12 @@ TransportBar::TransportBar(QWidget* parent)
     m_tapBtn->setToolTip(tr("Tap tempo — click repeatedly to set BPM"));
     row1->addWidget(m_tapBtn);
 
-    // Beat indicator (small dot that flashes on each beat)
-    m_beatIndicator = new QLabel(QStringLiteral("\u25CF"), this);  // filled circle
-    m_beatIndicator->setFixedSize(18, 18);
-    m_beatIndicator->setAlignment(Qt::AlignCenter);
+    // Beat indicator — geometric dot (no Unicode, no text) that tints on beat
+    m_beatIndicator = new QLabel(this);
+    m_beatIndicator->setFixedSize(14, 14);
     m_beatIndicator->setStyleSheet(
-        QStringLiteral("QLabel { color: #555555; font-size: 14px; }"));
+        QStringLiteral("QLabel { background-color: #555555; "
+                        "border-radius: 7px; margin: 2px; }"));
     m_beatIndicator->setToolTip(tr("Beat indicator"));
     row1->addWidget(m_beatIndicator);
 
@@ -238,30 +265,30 @@ TransportBar::TransportBar(QWidget* parent)
         QStringLiteral("QPushButton { font-size: 11px; font-weight: bold; }"));
     row2->addWidget(m_rippleBtn);
 
-    m_flagBtn = new BevelButton(QStringLiteral("\u2691"), this);  // flag
-    m_flagBtn->setFixedSize(QSize(30, 24));
+    m_flagBtn = makeIconGlyphButton(QStringLiteral(":/icons/flag.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_flagBtn->setCheckable(true);
     m_flagBtn->setToolTip(tr("Marker view"));
     row2->addWidget(m_flagBtn);
 
-    m_prevBtn = new BevelButton(QStringLiteral("\u25C0"), this);  // left triangle
-    m_prevBtn->setFixedSize(QSize(30, 24));
+    m_prevBtn = makeIconGlyphButton(QStringLiteral(":/icons/prev.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_prevBtn->setToolTip(tr("Previous marker / clip boundary"));
     row2->addWidget(m_prevBtn);
 
-    m_nextBtn = new BevelButton(QStringLiteral("\u25B6"), this);  // right triangle
-    m_nextBtn->setFixedSize(QSize(30, 24));
+    m_nextBtn = makeIconGlyphButton(QStringLiteral(":/icons/next.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_nextBtn->setToolTip(tr("Next marker / clip boundary"));
     row2->addWidget(m_nextBtn);
 
-    m_listBtn = new BevelButton(QStringLiteral("\u2630"), this);  // trigram (hamburger)
-    m_listBtn->setFixedSize(QSize(30, 24));
+    m_listBtn = makeIconGlyphButton(QStringLiteral(":/icons/list.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_listBtn->setCheckable(true);
     m_listBtn->setToolTip(tr("List view"));
     row2->addWidget(m_listBtn);
 
-    m_gridBtn = new BevelButton(QStringLiteral("\u2588\u2588"), this);  // grid
-    m_gridBtn->setFixedSize(QSize(30, 24));
+    m_gridBtn = makeIconGlyphButton(QStringLiteral(":/icons/grid.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_gridBtn->setCheckable(true);
     m_gridBtn->setToolTip(tr("Grid view"));
     row2->addWidget(m_gridBtn);
@@ -269,21 +296,21 @@ TransportBar::TransportBar(QWidget* parent)
     row2->addWidget(makeSeparator(this));
 
     // Loop button (moved to row 2 for layout balance)
-    m_loopBtn = new BevelButton(QStringLiteral("\u21BB"), this);
-    m_loopBtn->setFixedSize(QSize(30, 24));
+    m_loopBtn = makeIconGlyphButton(QStringLiteral(":/icons/loop.svg"),
+                                     QSize(30, 24), QSize(14, 14), this);
     m_loopBtn->setCheckable(true);
     m_loopBtn->setToolTip(tr("Loop (L) - Repeat playback within the loop region"));
     row2->addWidget(m_loopBtn);
 
     // Pause button (compact, row 2)
-    m_pauseBtn = new BevelButton(QStringLiteral("\u23F8"), this);
-    m_pauseBtn->setFixedSize(QSize(30, 24));
+    m_pauseBtn = makeIconCapButton(QStringLiteral(":/icons/pause.svg"),
+                                    QSize(30, 24), QSize(14, 14), this);
     m_pauseBtn->setToolTip(tr("Pause - Pause playback and keep the playhead at its current position"));
     row2->addWidget(m_pauseBtn);
 
     // Fast-forward button
-    m_ffBtn = new BevelButton(QStringLiteral("\u23E9"), this);
-    m_ffBtn->setFixedSize(QSize(30, 24));
+    m_ffBtn = makeIconCapButton(QStringLiteral(":/icons/forward.svg"),
+                                 QSize(30, 24), QSize(14, 14), this);
     m_ffBtn->setToolTip(tr("Fast Forward (End) - Jump playhead to the end of the timeline"));
     row2->addWidget(m_ffBtn);
 
@@ -461,16 +488,19 @@ void TransportBar::flashBeat(int /*beatNumber*/, bool isDownbeat)
     // Flash the beat indicator: bright color for 80ms, then dim
     if (isDownbeat) {
         m_beatIndicator->setStyleSheet(
-            QStringLiteral("QLabel { color: #ff6600; font-size: 14px; }"));
+            QStringLiteral("QLabel { background-color: #ff6600; "
+                            "border-radius: 7px; margin: 2px; }"));
     } else {
         m_beatIndicator->setStyleSheet(
-            QStringLiteral("QLabel { color: #ffcc00; font-size: 14px; }"));
+            QStringLiteral("QLabel { background-color: #ffcc00; "
+                            "border-radius: 7px; margin: 2px; }"));
     }
 
     // Reset after 80ms
     QTimer::singleShot(80, this, [this]() {
         m_beatIndicator->setStyleSheet(
-            QStringLiteral("QLabel { color: #555555; font-size: 14px; }"));
+            QStringLiteral("QLabel { background-color: #555555; "
+                            "border-radius: 7px; margin: 2px; }"));
     });
 }
 

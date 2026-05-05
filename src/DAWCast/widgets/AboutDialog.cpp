@@ -88,7 +88,7 @@ AboutDialog::AboutDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("About Mcaster1DAWCast"));
-    setFixedSize(480, 540);
+    setFixedSize(360, 405);
 
     // Dark background
     QPalette dlgPal = palette();
@@ -107,7 +107,7 @@ AboutDialog::AboutDialog(QWidget* parent)
     // -- App icon (128x128, rendered from SVG) --
     auto* iconLabel = new QLabel(this);
     iconLabel->setAlignment(Qt::AlignCenter);
-    iconLabel->setFixedHeight(140);
+    iconLabel->setFixedHeight(105);
 
     QPixmap iconPix(128, 128);
     iconPix.fill(Qt::transparent);

@@ -39,7 +39,7 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Preferences"));
-    resize(640, 480);
+    resize(480, 360);
 
     auto* mainLayout = new QVBoxLayout(this);
 
@@ -143,7 +143,7 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     m_soloDimSpin->setValue(-20);
     m_soloDimSpin->setSuffix(tr(" dB"));
     m_soloDimSpin->setEnabled(false);
-    m_soloDimSpin->setFixedWidth(80);
+    m_soloDimSpin->setFixedWidth(60);
     sifRow->addWidget(m_soloDimSpin);
     sifRow->addStretch();
     soloLayout->addLayout(sifRow);
@@ -218,7 +218,7 @@ PreferencesDialog::PreferencesDialog(QWidget* parent)
     // Theme preview area
     m_themePreview = new QFrame(themeTab);
     m_themePreview->setFrameShape(QFrame::Box);
-    m_themePreview->setMinimumHeight(120);
+    m_themePreview->setMinimumHeight(90);
     m_themePreview->setStyleSheet(QStringLiteral(
         "QFrame { background: #f0f0f4; border: 1px solid #c8c8d0; border-radius: 4px; }"));
 

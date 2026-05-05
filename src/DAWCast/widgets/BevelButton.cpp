@@ -49,7 +49,8 @@ QColor BevelButton::checkedFaceColor() const { return m_checkedFaceColor; }
 QSize BevelButton::sizeHint() const
 {
     QSize base = QPushButton::sizeHint();
-    return QSize(qMax(base.width(), 36), qMax(base.height(), 28));
+    // Global 25% downsize: was 36x28 minimum, now 27x21.
+    return QSize(qMax(base.width(), 27), qMax(base.height(), 21));
 }
 
 void BevelButton::enterEvent(QEnterEvent* event)
@@ -118,16 +119,16 @@ void BevelButton::paintEvent(QPaintEvent* /*event*/)
         faceGrad.setColorAt(1.0, face.darker(120));
     }
 
-    // Outer border
-    p.setPen(QPen(QColor(25, 25, 25), 1));
+    // Outer border — 1px flat, 1px radius
+    p.setPen(QPen(QColor(160, 160, 168), 1));
     p.setBrush(Qt::NoBrush);
-    p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 3, 3);
+    p.drawRoundedRect(r.adjusted(0, 0, -1, -1), 1, 1);
 
     // Face fill inside the border
     QRect inner = r.adjusted(1, 1, -1, -1);
     p.setPen(Qt::NoPen);
     p.setBrush(QBrush(faceGrad));
-    p.drawRoundedRect(inner, 2, 2);
+    p.drawRoundedRect(inner, 1, 1);
 
     // ── Bevel edges ─────────────────────────────────────────────────────
     QColor topLeftC     = pressed ? m_shadowColor : m_highlightColor;
@@ -179,23 +180,22 @@ void BevelButton::paintEvent(QPaintEvent* /*event*/)
 
     // Draw icon if present
     if (!icon().isNull()) {
-        QSize iconSz = iconSize();
-        QPixmap pm = icon().pixmap(iconSz, isEnabled() ? QIcon::Normal : QIcon::Disabled);
+        const QIcon::Mode mode = isEnabled() ? QIcon::Normal : QIcon::Disabled;
 
         if (text().isEmpty()) {
-            // Center the icon
-            QPoint iconPos(
-                contentRect.left() + (contentRect.width() - pm.width()) / 2,
-                contentRect.top() + (contentRect.height() - pm.height()) / 2);
-            p.drawPixmap(iconPos, pm);
+            // Auto-fit: shrink to a square that fits contentRect, centered.
+            // QIcon::paint handles Retina DPR correctly and keeps aspect ratio.
+            const int side = qMax(8, qMin(contentRect.width(), contentRect.height()));
+            QRect iconRect(0, 0, side, side);
+            iconRect.moveCenter(contentRect.center());
+            icon().paint(&p, iconRect, Qt::AlignCenter, mode);
         } else {
             // Icon on the left, text on the right
-            int spacing = 4;
-            QPoint iconPos(
-                contentRect.left(),
-                contentRect.top() + (contentRect.height() - pm.height()) / 2);
-            p.drawPixmap(iconPos, pm);
-            contentRect.setLeft(contentRect.left() + pm.width() + spacing);
+            const int side = qMax(8, contentRect.height());
+            QRect iconRect(contentRect.left(), contentRect.top(), side, contentRect.height());
+            icon().paint(&p, iconRect, Qt::AlignLeft | Qt::AlignVCenter, mode);
+            const int spacing = 4;
+            contentRect.setLeft(contentRect.left() + side + spacing);
         }
     }
 

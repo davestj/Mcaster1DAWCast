@@ -13,6 +13,7 @@ class QScrollBar;
 
 namespace dawcast { class Timeline; }
 namespace dawcast { class TrackGroup; }
+namespace dawcast { class AudioMixer; }
 
 namespace dawcast::widgets {
 
@@ -34,6 +35,11 @@ public:
     /// Binds the panel to a Timeline model.  Rebuilds the header stack
     /// whenever tracks are added or removed.
     void setTimeline(dawcast::Timeline* timeline);
+
+    /// Optional: bind the live audio mixer so per-track volume/pan/mute/solo
+    /// updates propagate to the running DSP path, not just the stored
+    /// AudioTrack field.
+    void setAudioMixer(dawcast::AudioMixer* mixer) { m_audioMixer = mixer; }
 
     /// Returns the vertical scroll bar so the caller can synchronise it
     /// with the TimelineWidget's scroll position.
@@ -84,7 +90,8 @@ public slots:
 private:
     int headerIndexAtPos(const QPoint& pos) const;
 
-    dawcast::Timeline* m_timeline = nullptr;
+    dawcast::Timeline*   m_timeline   = nullptr;
+    dawcast::AudioMixer* m_audioMixer = nullptr;
     QScrollArea*   m_scrollArea   = nullptr;
     QWidget*       m_headerStack  = nullptr;
     QVBoxLayout*   m_stackLayout  = nullptr;

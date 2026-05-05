@@ -22,6 +22,21 @@
 #include "ImportAudioDialog.h"
 #include "ChapterWidget.h"
 #include "MetadataPanel.h"
+#include "../podcast/RSSGenerator.h"
+#include "VUMeterWidget.h"
+#include <cmath>
+#include "../dsp/mc1/Mc1EffectRegistry.h"
+#include "../dsp/mc1/Mc1DialogFactory.h"
+#include "../plugins/PluginScanner.h"
+#include "../plugins/Vst3Host.h"
+#include "../plugins/Vst3EffectAdapter.h"
+#ifdef __APPLE__
+#include "../plugins/AuHost.h"
+#include "../plugins/AuEffectAdapter.h"
+#include <AudioToolbox/AudioToolbox.h>
+#endif
+#include "../dsp/DspChain.h"
+#include "EffectsRackWidget.h"
 #include "SpectrumWidget.h"
 #include "PianoRollWidget.h"
 #include "ScriptReaderPanel.h"
@@ -104,6 +119,18 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Restore window geometry, dock layout, and splitter state from last session
     restoreWindowState();
+
+    // Hook per-dock visibilityChanged -> AppConfig persistence AFTER restore.
+    // Doing this earlier would capture the startup setVisible() storm from
+    // applyViewMode() and overwrite the just-restored values.
+    installDockPersistence();
+
+    // Save on app quit / system shutdown / power loss / ⌘Q / window X —
+    // aboutToQuit fires on every graceful exit path, and we also save in
+    // closeEvent. Together they cover "user clicks X", "⌘Q", "user logs out",
+    // "macOS shutdown", "SIGTERM" (Qt translates to aboutToQuit).
+    connect(qApp, &QCoreApplication::aboutToQuit,
+            this, &MainWindow::saveWindowState);
 }
 
 MainWindow::~MainWindow() = default;
@@ -187,23 +214,23 @@ void MainWindow::setupMenus()
                "All Files (*)"));
         if (files.isEmpty()) return;
 
-        // Check preference for showing import dialog
         bool showDialog = true;
         auto* cfg = dawcast::config::AppConfig::instance();
         if (cfg)
             showDialog = cfg->value(QStringLiteral("audio/showImportDialog"), true).toBool();
 
+        bool forceNewTrack = true;   // default matches ImportOptions::createNewTrack
         if (showDialog) {
-            auto* dlg = new ImportAudioDialog(files, this);
-            dlg->setAttribute(Qt::WA_DeleteOnClose);
-            if (dlg->exec() != QDialog::Accepted)
+            // Stack-allocated: modal exec() without WA_DeleteOnClose avoids
+            // the double-free that can occur when the dialog closes itself
+            // AFTER exec() returns.
+            ImportAudioDialog dlg(files, this);
+            if (dlg.exec() != QDialog::Accepted)
                 return;
-            // Import options are available via dlg->options()
-            // Actual import logic to be wired to the timeline engine
+            forceNewTrack = dlg.options().createNewTrack;
         }
 
-        statusBar()->showMessage(
-            tr("Imported %n file(s)", "", files.size()), 5000);
+        addAudioFilesToTimeline(files, forceNewTrack);
     });
 
     fileMenu->addSeparator();
@@ -211,10 +238,6 @@ void MainWindow::setupMenus()
     auto* actExport = fileMenu->addAction(tr("&Export..."));
     actExport->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_E));
     connect(actExport, &QAction::triggered, this, &MainWindow::exportProject);
-
-    auto* actBatchEncode = fileMenu->addAction(tr("&Batch Encoder..."));
-    actBatchEncode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
-    connect(actBatchEncode, &QAction::triggered, this, &MainWindow::openBatchEncoder);
 
     fileMenu->addSeparator();
 
@@ -556,6 +579,16 @@ void MainWindow::setupMenus()
     actMassTag->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_T));
     connect(actMassTag, &QAction::triggered, this, &MainWindow::openMassTagEditor);
 
+    auto* actBatchEncode = toolsMenu->addAction(tr("&Batch Encoder..."));
+    actBatchEncode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    connect(actBatchEncode, &QAction::triggered, this, &MainWindow::openBatchEncoder);
+
+    // ── Plugins ─────────────────────────────────────────────────────────
+    // Top-level menu of the bundled MC1 plugin catalog, grouped by category.
+    // Selecting a plugin opens its editor dialog in preview mode.
+    auto* pluginsMenu = m_menuBar->addMenu(tr("&Plugins"));
+    buildPluginsMenu(pluginsMenu);
+
     // ── Help ────────────────────────────────────────────────────────────
     auto* helpMenu = m_menuBar->addMenu(tr("&Help"));
 
@@ -616,6 +649,14 @@ void MainWindow::setupCentralWidget()
     // Horizontal splitter: track headers (left) + timeline waveform area (right)
     m_timelineSplitter = new QSplitter(Qt::Horizontal, m_centralSplitter);
     m_timelineSplitter->setChildrenCollapsible(false);
+    m_timelineSplitter->setHandleWidth(6);
+    m_timelineSplitter->setStyleSheet(QStringLiteral(
+        "QSplitter::handle:horizontal { background: #c8c8d0; "
+        "border-left: 1px solid #a0a0a8; border-right: 1px solid #a0a0a8; } "
+        "QSplitter::handle:horizontal:hover { background: #a0a8b4; } "
+        "QSplitter::handle:vertical { background: #c8c8d0; "
+        "border-top: 1px solid #a0a0a8; border-bottom: 1px solid #a0a0a8; } "
+        "QSplitter::handle:vertical:hover { background: #a0a8b4; }"));
 
     m_trackHeaders = new TrackHeaderPanel(m_timelineSplitter);
 
@@ -904,6 +945,68 @@ void MainWindow::setupDockWidgets()
     addDockWidget(Qt::BottomDockWidgetArea, m_markerListDock);
     tabifyDockWidget(m_mixerDock, m_markerListDock);
     m_mixerDock->raise();   // Keep mixer as the default visible bottom tab
+
+    // ── Uniform dock configuration (features only — visibilityChanged
+    // persistence is hooked up in installDockPersistence() AFTER the
+    // startup view-mode + restore sequence, to avoid startup
+    // setVisible() calls clobbering the saved state).
+    struct DockEntry { QDockWidget* dock; const char* key; };
+    const DockEntry docks[] = {
+        { m_mixerDock,         "window/visible/mixer"         },
+        { m_videoDock,         "window/visible/video"         },
+        { m_mediaBrowserDock,  "window/visible/mediaBrowser"  },
+        { m_effectsDock,       "window/visible/effects"       },
+        { m_lufsDock,          "window/visible/lufs"          },
+        { m_aiDock,            "window/visible/ai"            },
+        { m_chapterDock,       "window/visible/chapter"       },
+        { m_metadataDock,      "window/visible/metadata"      },
+        { m_spectrumDock,      "window/visible/spectrum"      },
+        { m_pianoRollDock,     "window/visible/pianoRoll"     },
+        { m_scriptReaderDock,  "window/visible/scriptReader"  },
+        { m_pedalboardDock,    "window/visible/pedalboard"    },
+        { m_streamMonitorDock, "window/visible/streamMonitor" },
+        { m_markerListDock,    "window/visible/markerList"    },
+    };
+    for (const auto& e : docks) {
+        if (!e.dock) continue;
+        e.dock->setFeatures(QDockWidget::DockWidgetClosable
+                          | QDockWidget::DockWidgetMovable
+                          | QDockWidget::DockWidgetFloatable);
+        e.dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    }
+}
+
+void MainWindow::installDockPersistence()
+{
+    struct DockEntry { QDockWidget* dock; const char* key; };
+    const DockEntry docks[] = {
+        { m_mixerDock,         "window/visible/mixer"         },
+        { m_videoDock,         "window/visible/video"         },
+        { m_mediaBrowserDock,  "window/visible/mediaBrowser"  },
+        { m_effectsDock,       "window/visible/effects"       },
+        { m_lufsDock,          "window/visible/lufs"          },
+        { m_aiDock,            "window/visible/ai"            },
+        { m_chapterDock,       "window/visible/chapter"       },
+        { m_metadataDock,      "window/visible/metadata"      },
+        { m_spectrumDock,      "window/visible/spectrum"      },
+        { m_pianoRollDock,     "window/visible/pianoRoll"     },
+        { m_scriptReaderDock,  "window/visible/scriptReader"  },
+        { m_pedalboardDock,    "window/visible/pedalboard"    },
+        { m_streamMonitorDock, "window/visible/streamMonitor" },
+        { m_markerListDock,    "window/visible/markerList"    },
+    };
+    for (const auto& e : docks) {
+        if (!e.dock) continue;
+        const QString cfgKey = QString::fromLatin1(e.key);
+        connect(e.dock, &QDockWidget::visibilityChanged,
+                this, [cfgKey](bool visible) {
+            auto* cfg = dawcast::config::AppConfig::instance();
+            if (cfg) {
+                cfg->setValue(cfgKey, visible);
+                cfg->save();
+            }
+        });
+    }
 }
 
 // ── Status Bar ──────────────────────────────────────────────────────────────
@@ -924,6 +1027,7 @@ void MainWindow::setupAudioPipeline()
     // Give the TimelineWidget and TrackHeaderPanel their data model
     m_timeline->setTimeline(m_timelineModel);
     m_trackHeaders->setTimeline(m_timelineModel);
+    m_trackHeaders->setAudioMixer(m_audioMixer);
 
     // Give the MarkerListWidget its data model
     m_markerList->setTimeline(m_timelineModel);
@@ -1026,12 +1130,35 @@ void MainWindow::setupAudioPipeline()
     });
     connect(m_trackHeaders, &TrackHeaderPanel::trackRecordClicked,
             this, [this](int trackIndex) {
-        // Open the live recorder for this track. The captured clip will
-        // be inserted at the playhead on the target track when recording
-        // finishes (full hookup is staged for the next round).
-        statusBar()->showMessage(
-            tr("Recording into track %1 — opening recorder...")
-                .arg(trackIndex + 1), 3000);
+        // Toggle recording driven by the per-track REC button. If already
+        // recording, stop. Otherwise arm THIS track (disarming others) and
+        // call the main startRecording() pipeline so behavior matches the
+        // transport / Broadcast menu path exactly.
+        if (!m_recorder || !m_timelineModel) {
+            statusBar()->showMessage(tr("Recorder unavailable"), 3000);
+            return;
+        }
+        if (m_recorder->isRecording()) {
+            stopRecording();
+            return;
+        }
+        auto* target = qobject_cast<dawcast::AudioTrack*>(
+            m_timelineModel->track(trackIndex));
+        if (!target) {
+            statusBar()->showMessage(
+                tr("Track %1 is not an audio track — cannot record")
+                    .arg(trackIndex + 1), 3000);
+            return;
+        }
+        // Disarm every other audio track so MultitrackRecorder records
+        // ONLY into the track the user clicked.
+        for (int t = 0; t < m_timelineModel->trackCount(); ++t) {
+            if (auto* at = qobject_cast<dawcast::AudioTrack*>(
+                    m_timelineModel->track(t))) {
+                at->setRecordArmed(at == target);
+            }
+        }
+        startRecording();
     });
 
     // Project manager — handles save/load serialization to/from JSON
@@ -1103,6 +1230,16 @@ void MainWindow::setupAudioPipeline()
     // Tell the audio engine about the playback engine so the callback
     // calls processBlock() before mixer->process().
     m_audioEngine->setPlaybackEngine(m_playbackEngine);
+
+    // When a recording finishes, MultitrackRecorder creates a new Clip on
+    // the armed track pointing at the temp WAV. PlaybackEngine has cached
+    // readers that don't know about that new source, so the clip would be
+    // silent on playback. Invalidate so readers rebuild on the next play().
+    connect(m_recorder, &dawcast::MultitrackRecorder::recordingStopped,
+            this, [this]() {
+        if (m_playbackEngine) m_playbackEngine->invalidateReaders();
+        if (m_timeline) m_timeline->update();
+    });
 
     // Start the audio engine so PortAudio is ready when the user hits Play
     m_audioEngine->start();
@@ -1258,6 +1395,31 @@ void MainWindow::setupConnections()
         if (m_playbackEngine) m_playbackEngine->seekTo(pos);
     });
 
+    // ── Punch In/Out toggle (transport "I/O" button) ───────────────────
+    connect(m_transportBar, &TransportBar::punchToggled, this, [this](bool enabled) {
+        if (!m_timelineModel) return;
+        m_timelineModel->setPunchInEnabled(enabled);
+        m_timelineModel->setPunchOutEnabled(enabled);
+        statusBar()->showMessage(enabled ? tr("Punch I/O enabled") : tr("Punch I/O disabled"), 2000);
+    });
+
+    // ── Marker / List / Grid view-mode toggles (row-2 chrome buttons) ──
+    // These used to be dead. Forward as exclusive view-mode requests to
+    // the MarkerList dock + TimelineWidget (list-mode re-uses the Marker
+    // List dock; grid-mode is reserved for future UI work).
+    connect(m_transportBar, &TransportBar::markerViewToggled, this, [this](bool on) {
+        if (m_markerListDock) m_markerListDock->setVisible(on);
+    });
+    connect(m_transportBar, &TransportBar::listViewToggled, this, [this](bool on) {
+        if (m_mediaBrowserDock) m_mediaBrowserDock->setVisible(on);
+    });
+    connect(m_transportBar, &TransportBar::gridViewToggled, this, [this](bool on) {
+        // Grid-view stub: show the media library in grid mode (same dock
+        // toggle as list for now — MediaLibraryWidget will get a real
+        // icon-grid view later).
+        if (m_mediaBrowserDock) m_mediaBrowserDock->setVisible(on);
+    });
+
     // Metronome toggle and tempo from TransportBar -> PlaybackEngine::Metronome
     connect(m_transportBar, &TransportBar::metronomeToggled, this, [this](bool on) {
         if (m_playbackEngine && m_playbackEngine->metronome()) {
@@ -1335,22 +1497,37 @@ void MainWindow::setupConnections()
     connect(m_markerListDock, &QDockWidget::visibilityChanged,
             m_actToggleMarkerList, &QAction::setChecked);
 
-    // LUFS metering — feed from audio engine buffer-processed signal
-    if (m_audioEngine && m_lufsMeter) {
-        connect(m_audioEngine, &dawcast::AudioEngine::bufferProcessed,
-                m_lufsMeter, [this]() {
-            // In a full implementation, LUFS measurements would be computed
-            // from the master output buffer in the audio callback and
-            // posted to the GUI thread via atomic variables. For now, the
-            // LUFSMeterWidget receives values via its public setters.
+    // LUFS metering — full BS.1770 integration is future work; until then
+    // feed the mixer's master peak (readable lock-free) as the momentary
+    // LUFS approximation + true-peak, so the dock reflects real activity
+    // instead of sitting at -60 dB. 10 Hz poll is enough for visual feedback.
+    if (m_audioMixer && m_lufsMeter) {
+        auto* lufsTimer = new QTimer(this);
+        lufsTimer->setInterval(100);
+        connect(lufsTimer, &QTimer::timeout, m_lufsMeter, [this]() {
+            if (!m_audioMixer || !m_lufsMeter) return;
+            const float pL = m_audioMixer->masterPeakL();
+            const float pR = m_audioMixer->masterPeakR();
+            const float peakLin = qMax(pL, pR);
+            auto toDb = [](float lin) {
+                if (lin <= 0.0f) return -70.0f;
+                const float db = 20.0f * std::log10(lin);
+                return db < -70.0f ? -70.0f : db;
+            };
+            const float peakDb = toDb(peakLin);
+            // Momentary ≈ peakDb - 3dB crest approximation; TP = peakDb.
+            m_lufsMeter->setMomentaryLUFS(peakDb - 3.0f);
+            m_lufsMeter->setTruePeak(peakDb);
         });
+        lufsTimer->start();
     }
 
-    // Reset LUFS meter when playback starts/stops
+    // Reset LUFS meter when playback starts
     if (m_playbackEngine && m_lufsMeter) {
         connect(m_playbackEngine, &dawcast::PlaybackEngine::playbackStarted,
                 m_lufsMeter, &LUFSMeterWidget::reset);
     }
+
 
     // ── Action Bar signals ───────────────────────────────────────────────
     connect(m_actionBar, &ActionBar::addTrackClicked,
@@ -1376,17 +1553,16 @@ void MainWindow::setupConnections()
         }
     });
 
-    // Pre-cache waveforms when files are double-clicked in Media Library
+    // Double-click in Media Library adds the file as a clip on an audio
+    // track (last existing audio track or a new one) at the playhead.
     connect(m_mediaLibrary, &MediaLibraryWidget::fileDoubleClicked,
-            this, [](const QString& path) {
-        dawcast::WaveformCache::instance()->requestWaveform(path);
+            this, [this](const QString& path) {
+        addAudioFilesToTimeline(QStringList{path}, false);
     });
 
     connect(m_mediaLibrary, &MediaLibraryWidget::importRequested,
-            this, [](const QStringList& paths) {
-        for (const QString& path : paths) {
-            dawcast::WaveformCache::instance()->requestWaveform(path);
-        }
+            this, [this](const QStringList& paths) {
+        addAudioFilesToTimeline(paths, false);
     });
 }
 
@@ -1748,34 +1924,201 @@ void MainWindow::duplicateTrack(int trackIndex)
 
 void MainWindow::openChapterEditor()
 {
-    statusBar()->showMessage(tr("Chapter Editor opened"), 3000);
+    if (m_chapterDock) {
+        m_chapterDock->show();
+        m_chapterDock->raise();
+        m_chapterDock->setFocus();
+        if (m_chapterWidget && m_timelineModel)
+            m_chapterWidget->setTimeline(m_timelineModel);
+        statusBar()->showMessage(tr("Chapter Editor opened"), 2000);
+    } else {
+        statusBar()->showMessage(tr("Chapter Editor unavailable"), 3000);
+    }
 }
 
 void MainWindow::openMetadata()
 {
-    statusBar()->showMessage(tr("Metadata editor opened"), 3000);
+    if (m_metadataDock) {
+        m_metadataDock->show();
+        m_metadataDock->raise();
+        m_metadataDock->setFocus();
+        statusBar()->showMessage(tr("Metadata editor opened"), 2000);
+    } else {
+        statusBar()->showMessage(tr("Metadata editor unavailable"), 3000);
+    }
 }
 
 void MainWindow::exportEpisode()
 {
-    statusBar()->showMessage(tr("Episode export not yet implemented"), 3000);
+    // Episode export uses the standard export pipeline (dialog picks codec/path).
+    runExportPipeline();
 }
 
 void MainWindow::generateRSS()
 {
-    statusBar()->showMessage(tr("RSS generation not yet implemented"), 3000);
+    auto* config = dawcast::config::AppConfig::instance();
+    QString lastDir = config->value(QStringLiteral("file/lastExportDir")).toString();
+    QString path = QFileDialog::getSaveFileName(
+        this, tr("Generate RSS Feed"),
+        (lastDir.isEmpty() ? QDir::homePath() : lastDir) + QStringLiteral("/feed.xml"),
+        tr("RSS Feed (*.xml *.rss)"));
+    if (path.isEmpty()) return;
+
+    dawcast::RSSGenerator gen;
+    gen.setFeedTitle(m_projectName.isEmpty() ? tr("My Podcast") : m_projectName);
+    gen.setFeedURL(QStringLiteral("https://example.com"));
+    gen.setFeedDescription(tr("Generated by Mcaster1DAWCast"));
+    bool ok = gen.saveToFile(path);
+    if (ok) {
+        config->setValue(QStringLiteral("file/lastExportDir"), QFileInfo(path).absolutePath());
+        config->save();
+        statusBar()->showMessage(tr("RSS feed written to %1").arg(path), 4000);
+    } else {
+        statusBar()->showMessage(tr("Failed to write RSS feed"), 4000);
+    }
 }
 
 // ── Broadcast Slots ─────────────────────────────────────────────────────────
 
 void MainWindow::startRecording()
 {
-    statusBar()->showMessage(tr("Recording started"), 3000);
+    if (!m_recorder) {
+        statusBar()->showMessage(tr("Recorder unavailable"), 3000);
+        return;
+    }
+    if (m_recorder->isRecording()) {
+        statusBar()->showMessage(tr("Already recording"), 2000);
+        return;
+    }
+
+    // Require at least one armed AudioTrack. If none, prompt the user and
+    // auto-arm the first audio track so recording can proceed on a brand
+    // new project without extra clicks.
+    int armedCount = 0;
+    dawcast::AudioTrack* firstAudio = nullptr;
+    if (m_timelineModel) {
+        for (int t = 0; t < m_timelineModel->trackCount(); ++t) {
+            if (auto* at = qobject_cast<dawcast::AudioTrack*>(
+                    m_timelineModel->track(t))) {
+                if (!firstAudio) firstAudio = at;
+                if (at->isRecordArmed()) ++armedCount;
+            }
+        }
+    }
+    if (armedCount == 0) {
+        if (!firstAudio && m_timelineModel) {
+            firstAudio = m_timelineModel->addAudioTrack();
+            if (firstAudio) firstAudio->setName(tr("Recording"));
+        }
+        if (!firstAudio) {
+            statusBar()->showMessage(
+                tr("Recording: no audio track available"), 4000);
+            return;
+        }
+        firstAudio->setRecordArmed(true);
+        statusBar()->showMessage(
+            tr("Auto-armed track '%1' for recording").arg(firstAudio->name()),
+            3000);
+    }
+
+    // Audio input only exists when the engine's stream is duplex. By default
+    // it's output-only, so input frames never reach processInputBlock and
+    // every recording would be silent. Flip duplex on before starting.
+    if (m_audioEngine && !m_audioEngine->isDuplexEnabled()) {
+        m_audioEngine->setDuplexEnabled(true);
+    }
+
+    m_recorder->clearTargets();
+    m_recorder->startRecording();
+    if (m_recorder->isRecording()) {
+        if (m_transportBar) m_transportBar->setRecording(true);
+        statusBar()->showMessage(tr("Recording..."), 0);
+
+        // Floating VU popup: one meter per recording target, polled off a
+        // 30 Hz GUI timer against the recorder's lock-free peak atomics.
+        if (!m_recordingMeterDialog) {
+            auto* dlg = new QDialog(this, Qt::Tool | Qt::WindowStaysOnTopHint);
+            dlg->setWindowTitle(tr("Recording"));
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            auto* v = new QVBoxLayout(dlg);
+            v->setContentsMargins(8, 8, 8, 8);
+            v->setSpacing(6);
+
+            auto* title = new QLabel(tr("REC"), dlg);
+            title->setStyleSheet(QStringLiteral(
+                "QLabel { color: #ffffff; background: #c03030; "
+                "padding: 2px 8px; border-radius: 2px; font-weight: bold; }"));
+            title->setAlignment(Qt::AlignCenter);
+            v->addWidget(title);
+
+            QList<VUMeterWidget*> meters;
+            const int tc = m_recorder->targetCount();
+            for (int i = 0; i < tc; ++i) {
+                auto* row = new QHBoxLayout;
+                auto* mL = new VUMeterWidget(dlg);
+                auto* mR = new VUMeterWidget(dlg);
+                mL->setOrientation(Qt::Vertical);
+                mR->setOrientation(Qt::Vertical);
+                mL->setFixedSize(24, 160);
+                mR->setFixedSize(24, 160);
+                row->addWidget(mL);
+                row->addWidget(mR);
+                v->addLayout(row);
+                meters.append(mL);
+                meters.append(mR);
+            }
+
+            auto* timer = new QTimer(dlg);
+            timer->setInterval(30);
+            connect(timer, &QTimer::timeout, dlg,
+                    [this, meters]() {
+                if (!m_recorder) return;
+                for (int i = 0; i < m_recorder->targetCount()
+                              && (i * 2 + 1) < meters.size(); ++i) {
+                    // Linear peak [0..1] → dBFS; RMS ≈ peak * 0.707.
+                    auto toDb = [](float lin) {
+                        if (lin <= 0.0f) return -60.0f;
+                        const float db = 20.0f * std::log10(lin);
+                        return db < -60.0f ? -60.0f : db;
+                    };
+                    const float pL = m_recorder->peakL(i);
+                    const float pR = m_recorder->peakR(i);
+                    meters[i * 2    ]->setLevel(toDb(pL), toDb(pL * 0.707f));
+                    meters[i * 2 + 1]->setLevel(toDb(pR), toDb(pR * 0.707f));
+                }
+            });
+            timer->start();
+
+            dlg->resize(120, 220);
+            m_recordingMeterDialog = dlg;
+            connect(dlg, &QObject::destroyed, this, [this]() {
+                m_recordingMeterDialog = nullptr;
+            });
+            dlg->show();
+        }
+    } else {
+        statusBar()->showMessage(
+            tr("Recording failed to start — check audio input device"), 5000);
+    }
 }
 
 void MainWindow::stopRecording()
 {
-    statusBar()->showMessage(tr("Recording stopped"), 3000);
+    if (!m_recorder) {
+        statusBar()->showMessage(tr("Recorder unavailable"), 3000);
+        return;
+    }
+    if (!m_recorder->isRecording()) {
+        statusBar()->showMessage(tr("Not recording"), 2000);
+        return;
+    }
+    m_recorder->stopRecording();
+    if (m_transportBar) m_transportBar->setRecording(false);
+    if (m_recordingMeterDialog) {
+        m_recordingMeterDialog->close();
+        m_recordingMeterDialog = nullptr;
+    }
+    statusBar()->showMessage(tr("Recording stopped"), 2000);
 }
 
 void MainWindow::startStreaming()
@@ -1848,6 +2191,32 @@ void MainWindow::setupRTMPStreamer()
                         "padding: 0 8px; }"));
     m_onAirStatusLabel->hide();
     statusBar()->addPermanentWidget(m_onAirStatusLabel);
+
+    // Feed stream stats into the Stream Monitor dock panel. Without this the
+    // panel's health indicator / viewer count were static (never updated).
+    // Stream health heuristic: 1.0 when connected with zero drops; drops
+    // subtract proportional to drops-per-second.
+    if (m_streamMonitor) {
+        connect(m_rtmpStreamer, &dawcast::RTMPStreamer::statsUpdated,
+                m_streamMonitor,
+                [this](int64_t bytesSent, double bitrateKbps, int droppedFrames) {
+            Q_UNUSED(bytesSent);
+            Q_UNUSED(bitrateKbps);
+            // Map drops to a 0..1 health score. >10 drops → unhealthy.
+            float health = 1.0f - qMin(1.0f, droppedFrames / 10.0f);
+            m_streamMonitor->setStreamHealth(health);
+            // Viewer count isn't exposed by the RTMP streamer (target
+            // platform only). Leave as-is until a real feed is wired.
+        });
+        connect(m_rtmpStreamer, &dawcast::RTMPStreamer::connected,
+                m_streamMonitor, [this]() {
+            m_streamMonitor->setStreamHealth(1.0f);
+        });
+        connect(m_rtmpStreamer, &dawcast::RTMPStreamer::disconnected,
+                m_streamMonitor, [this]() {
+            m_streamMonitor->setStreamHealth(0.0f);
+        });
+    }
 }
 
 void MainWindow::updateOnAirStatus(bool live)
@@ -1930,6 +2299,13 @@ void MainWindow::applyViewMode(dawcast::ViewModeManager::Mode mode)
     }
 
     // ── Arrange docks for specific modes ───────────────────────────────
+    // IMPORTANT: these addDockWidget + tabifyDockWidget calls MUST only
+    // happen the very first time a view mode is applied. Re-tabifying a
+    // dock that's already parented into a QMainWindowLayout tab group
+    // crashes inside Qt's removeWidgetRecursively on macOS 26 / Qt 6.11.
+    // Subsequent view-mode switches only toggle visibility (done above).
+    if (!m_viewModeLayoutInitialized) {
+        m_viewModeLayoutInitialized = true;
     switch (mode) {
 
     case dawcast::ViewModeManager::Podcaster:
@@ -1986,6 +2362,7 @@ void MainWindow::applyViewMode(dawcast::ViewModeManager::Mode mode)
         }
         break;
     }
+    } // end: if (!m_viewModeLayoutInitialized)
 
     // ── Update window title to include the mode name ───────────────────
     QString modeLabel = mgr->modeName(mode);
@@ -2218,6 +2595,17 @@ void MainWindow::saveWindowState()
     saveDockVisible("window/visible/lufs",          m_lufsDock);
     saveDockVisible("window/visible/ai",            m_aiDock);
     saveDockVisible("window/visible/markerList",    m_markerListDock);
+    saveDockVisible("window/visible/chapter",       m_chapterDock);
+    saveDockVisible("window/visible/metadata",      m_metadataDock);
+    saveDockVisible("window/visible/spectrum",      m_spectrumDock);
+    saveDockVisible("window/visible/pianoRoll",     m_pianoRollDock);
+    saveDockVisible("window/visible/scriptReader",  m_scriptReaderDock);
+    saveDockVisible("window/visible/pedalboard",    m_pedalboardDock);
+    saveDockVisible("window/visible/streamMonitor", m_streamMonitorDock);
+
+    // Last-open project: so the app reopens where you left off.
+    // Stored only when a project has actually been saved to disk.
+    config->setValue(QStringLiteral("session/lastProjectPath"), m_projectPath);
 
     // Active workspace / view mode so the user comes back to where they were
     if (auto* vmm = dawcast::ViewModeManager::instance()) {
@@ -2254,6 +2642,59 @@ void MainWindow::restoreWindowState()
             config->value(QStringLiteral("window/timelineSplitter"), QString())
                 .toString().toLatin1());
         if (!ts.isEmpty()) m_timelineSplitter->restoreState(ts);
+    }
+
+    // View-mode restore is deferred to the next event-loop tick. Calling
+    // vmm->setMode() synchronously from here re-enters applyViewMode while
+    // the main window's layout is still half-constructed, which crashes
+    // QMainWindowLayout::tabifyDockWidget → removeWidgetRecursively (seen
+    // on macOS 26 Qt 6.11). The deferred call fires after setup is done.
+    if (auto* vmm = dawcast::ViewModeManager::instance()) {
+        int stored = config->value(QStringLiteral("window/viewMode"), -1).toInt();
+        if (stored >= 0) {
+            QTimer::singleShot(0, this, [vmm, stored]() {
+                vmm->setMode(static_cast<dawcast::ViewModeManager::Mode>(stored));
+            });
+        }
+    }
+
+    // Per-dock visibility (explicit — QMainWindow::restoreState alone isn't
+    // enough when the user closes a dock without saving a named state, and
+    // the view-mode layout above also overrides docks we want hidden).
+    auto restoreDockVisible = [config](const char* key, QWidget* w,
+                                       bool defaultVisible) {
+        if (!w) return;
+        bool vis = config->value(QString::fromLatin1(key), defaultVisible).toBool();
+        w->setVisible(vis);
+    };
+    restoreDockVisible("window/visible/mixer",        m_mixerDock,        true);
+    restoreDockVisible("window/visible/video",        m_videoDock,        true);
+    restoreDockVisible("window/visible/mediaBrowser", m_mediaBrowserDock, true);
+    restoreDockVisible("window/visible/effects",      m_effectsDock,      true);
+    restoreDockVisible("window/visible/lufs",         m_lufsDock,         true);
+    restoreDockVisible("window/visible/ai",           m_aiDock,           false);
+    restoreDockVisible("window/visible/markerList",   m_markerListDock,   false);
+    restoreDockVisible("window/visible/chapter",      m_chapterDock,      false);
+    restoreDockVisible("window/visible/metadata",     m_metadataDock,     false);
+    restoreDockVisible("window/visible/spectrum",     m_spectrumDock,     false);
+    restoreDockVisible("window/visible/pianoRoll",    m_pianoRollDock,    false);
+    restoreDockVisible("window/visible/scriptReader", m_scriptReaderDock, false);
+    restoreDockVisible("window/visible/pedalboard",   m_pedalboardDock,   false);
+    restoreDockVisible("window/visible/streamMonitor",m_streamMonitorDock,false);
+
+    // Reopen the last project (if it still exists on disk). Deferred to the
+    // event loop so the rest of setup finishes first — openProject pokes the
+    // timeline/transport which must be wired up before it's safe to call.
+    const QString lastProject =
+        config->value(QStringLiteral("session/lastProjectPath")).toString();
+    if (!lastProject.isEmpty() && QFileInfo::exists(lastProject)) {
+        QTimer::singleShot(0, this, [this, lastProject]() {
+            openProject(lastProject);
+        });
+    } else if (!lastProject.isEmpty()) {
+        // File moved/deleted — clear the stale entry so we don't keep trying.
+        config->setValue(QStringLiteral("session/lastProjectPath"), QString());
+        config->save();
     }
 }
 
@@ -2535,6 +2976,346 @@ void MainWindow::manageWorkspaces()
                 tr("Workspace \"%1\" deleted").arg(realName), 3000);
         }
     }
+}
+
+// ── Audio import → timeline ──────────────────────────────────────────────
+
+void MainWindow::addAudioFilesToTimeline(const QStringList& filePaths,
+                                         bool forceNewTrack)
+{
+    if (!m_timelineModel || filePaths.isEmpty()) return;
+
+    dawcast::AudioTrack* track = nullptr;
+    if (!forceNewTrack && m_timelineModel->trackCount() > 0) {
+        track = qobject_cast<dawcast::AudioTrack*>(
+            m_timelineModel->track(m_timelineModel->trackCount() - 1));
+    }
+    if (!track) {
+        track = m_timelineModel->addAudioTrack();
+        if (m_effectsRack && track) {
+            m_effectsRack->setDspChain(track->effectChain());
+        }
+    }
+    if (!track) {
+        statusBar()->showMessage(tr("Could not create or select an audio track"), 3000);
+        return;
+    }
+
+    const int sampleRate = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+    int64_t cursorPos = m_timelineModel->playhead();
+
+    int added = 0;
+    int skipped = 0;
+    for (const QString& filePath : filePaths) {
+        if (filePath.isEmpty() || !QFileInfo::exists(filePath)) {
+            qWarning() << "addAudioFilesToTimeline: skipping missing" << filePath;
+            ++skipped;
+            continue;
+        }
+        int64_t durationSamples = static_cast<int64_t>(sampleRate) * 60;
+        dawcast::WaveformCache::instance()->requestWaveform(filePath);
+
+        auto* clip = new dawcast::Clip(track);
+        clip->setSourcePath(filePath);
+        clip->setSourceIn(0);
+        clip->setSourceOut(durationSamples);
+        clip->setTimelinePosition(cursorPos);
+        track->addClip(clip);
+        cursorPos += durationSamples;
+        ++added;
+    }
+    if (m_playbackEngine) m_playbackEngine->invalidateReaders();
+    if (m_timeline) m_timeline->update();
+
+    QString msg;
+    if (added > 0 && skipped == 0)
+        msg = tr("Added %1 clip(s) to track '%2'").arg(added).arg(track->name());
+    else if (added > 0 && skipped > 0)
+        msg = tr("Added %1, skipped %2 (missing file)").arg(added).arg(skipped);
+    else if (skipped > 0)
+        msg = tr("No files imported — %1 missing").arg(skipped);
+    if (!msg.isEmpty())
+        statusBar()->showMessage(msg, 4000);
+}
+
+// ── Plugins menu ─────────────────────────────────────────────────────────
+
+void MainWindow::buildPluginsMenu(QMenu* parent)
+{
+    if (!parent) return;
+
+    int count = 0;
+    const dawcast::dsp::Mc1EffectInfo* catalog =
+        dawcast::dsp::mc1EffectCatalog(&count);
+
+    // Group MC1 built-ins by category.
+    QMap<QString, QMenu*> categoryMenus;
+    QStringList categoryOrder;
+    for (int i = 0; i < count; ++i) {
+        const QString cat = QString::fromLatin1(catalog[i].category);
+        const QString name = QString::fromLatin1(catalog[i].displayName);
+
+        QMenu* sub = categoryMenus.value(cat, nullptr);
+        if (!sub) {
+            sub = parent->addMenu(cat);
+            categoryMenus.insert(cat, sub);
+            categoryOrder.append(cat);
+        }
+        QAction* act = sub->addAction(name);
+        act->setToolTip(tr("Preview %1 (%2)").arg(name, QString::fromLatin1(catalog[i].id)));
+        connect(act, &QAction::triggered, this, [this, name]() {
+            openPluginPreview(name);
+        });
+    }
+
+    parent->addSeparator();
+    QAction* actCount = parent->addAction(
+        tr("%1 MC1 plugins in %2 categories").arg(count).arg(categoryOrder.size()));
+    actCount->setEnabled(false);
+
+    // ── Installed VST3 / AudioUnit plugins detected on this system ──────
+    // These are discovered at runtime from:
+    //   /Library/Audio/Plug-Ins/VST3
+    //   ~/Library/Audio/Plug-Ins/VST3
+    //   ~/Library/Audio/Plug-Ins/Components (AU, macOS only)
+    // Hosting the audio is still TODO; selecting one for now shows its
+    // metadata so the user can confirm the scanner sees their library.
+    parent->addSeparator();
+    auto* vst3Menu = parent->addMenu(tr("Installed VST3"));
+    auto* auMenu   = parent->addMenu(tr("Installed Audio Units"));
+    vst3Menu->addAction(tr("(scanning…)"))->setEnabled(false);
+    auMenu->addAction(tr("(scanning…)"))->setEnabled(false);
+
+    auto* scanner = dawcast::plugins::PluginScanner::instance();
+    connect(scanner, &dawcast::plugins::PluginScanner::scanComplete, this,
+            [this, vst3Menu, auMenu](int) {
+        vst3Menu->clear();
+        auMenu->clear();
+        int nVst = 0, nAu = 0;
+        auto plugins = dawcast::plugins::PluginScanner::instance()->availablePlugins();
+        std::sort(plugins.begin(), plugins.end(),
+                  [](const dawcast::plugins::PluginInfo& a,
+                     const dawcast::plugins::PluginInfo& b) {
+                      return a.name.compare(b.name, Qt::CaseInsensitive) < 0;
+                  });
+        for (const auto& p : plugins) {
+            QMenu* target = (p.format == dawcast::plugins::PluginInfo::VST3)
+                              ? vst3Menu : auMenu;
+            QString label = p.name;
+            if (!p.vendor.isEmpty()) label += QStringLiteral("  (") + p.vendor + QStringLiteral(")");
+            QAction* act = target->addAction(label);
+            const QString pluginName = p.name;
+            const QString pluginPath = p.path;
+            act->setToolTip(pluginPath);
+            const bool isVst3 =
+                (p.format == dawcast::plugins::PluginInfo::VST3);
+            connect(act, &QAction::triggered, this,
+                    [this, pluginName, pluginPath, isVst3]() {
+                if (!isVst3) {
+#ifdef __APPLE__
+                    // The scanner encodes the AU component description
+                    // as "AU:<type4cc>:<subtype4cc>:<manuf4cc>" in
+                    // PluginInfo::path.  Parse it back into an
+                    // AudioComponentDescription.
+                    const QStringList parts = pluginPath.split(QLatin1Char(':'));
+                    if (parts.size() != 4 || parts.at(0) != QLatin1String("AU")) {
+                        QMessageBox::warning(this, tr("Audio Unit Load Failed"),
+                            tr("Unrecognized AU identifier: %1").arg(pluginPath));
+                        return;
+                    }
+
+                    auto fourCcFromQString = [](const QString& s) -> uint32_t {
+                        const QByteArray b = s.toLatin1();
+                        uint32_t v = 0;
+                        for (int i = 0; i < 4; ++i) {
+                            const uint8_t c = (i < b.size())
+                                              ? static_cast<uint8_t>(b.at(i))
+                                              : 0x20;
+                            v = (v << 8) | c;
+                        }
+                        return v;
+                    };
+
+                    AudioComponentDescription desc{};
+                    desc.componentType         = fourCcFromQString(parts.at(1));
+                    desc.componentSubType      = fourCcFromQString(parts.at(2));
+                    desc.componentManufacturer = fourCcFromQString(parts.at(3));
+                    desc.componentFlags        = 0;
+                    desc.componentFlagsMask    = 0;
+
+                    const double sr = m_audioEngine ? m_audioEngine->sampleRate()
+                                                    : 48000.0;
+                    const int maxFr = 2048;
+
+                    auto inst = dawcast::plugins::AuPluginInstance::create(
+                        desc, sr, maxFr);
+                    if (!inst) {
+                        QMessageBox::warning(this, tr("Audio Unit Load Failed"),
+                            tr("Could not instantiate %1:\n%2")
+                                .arg(pluginName,
+                                     dawcast::plugins::AuPluginInstance::lastError()));
+                        return;
+                    }
+
+                    // Target chain: the last audio track (the one the effects
+                    // rack is currently bound to, or auto-create one).
+                    dawcast::AudioTrack* target = nullptr;
+                    if (m_timelineModel) {
+                        for (int t = m_timelineModel->trackCount() - 1; t >= 0; --t) {
+                            if (auto* at = qobject_cast<dawcast::AudioTrack*>(
+                                    m_timelineModel->track(t))) {
+                                target = at;
+                                break;
+                            }
+                        }
+                        if (!target) target = m_timelineModel->addAudioTrack();
+                    }
+                    if (!target) {
+                        QMessageBox::warning(this, tr("Audio Unit Load Failed"),
+                            tr("No audio track available to host %1").arg(pluginName));
+                        return;
+                    }
+
+                    auto* adapter = new dawcast::plugins::AuEffectAdapter(
+                        std::move(inst), pluginName + QStringLiteral("  [AU]"));
+
+                    if (target->effectChain()) {
+                        target->effectChain()->addEffect(adapter);
+                    }
+                    if (m_effectsRack) {
+                        m_effectsRack->setDspChain(target->effectChain());
+                        m_effectsRack->addEffect(adapter);
+                    }
+
+                    // Open the plugin's Cocoa UI (or fallback generic dialog)
+                    // non-modally so the user can start tweaking immediately.
+                    if (auto* inst2 = adapter->instance()) {
+                        if (auto* dlg = inst2->openEditor(this)) {
+                            dlg->setAttribute(Qt::WA_DeleteOnClose);
+                            dlg->show();
+                        }
+                    }
+
+                    statusBar()->showMessage(
+                        tr("Loaded %1 into track '%2'")
+                            .arg(pluginName, target->name()), 4000);
+#else
+                    QMessageBox::information(this, tr("Audio Unit Detected"),
+                        tr("Detected: %1\n\nPath: %2\n\n"
+                           "Audio Unit hosting requires macOS.")
+                        .arg(pluginName, pluginPath));
+#endif
+                    return;
+                }
+
+                // Inspect the bundle first — we need a class CID to instantiate.
+                auto info = dawcast::plugins::inspectVst3Bundle(pluginPath);
+                if (!info.error.isEmpty() || info.classes.isEmpty()) {
+                    QMessageBox::warning(this, tr("VST3 Load Failed"),
+                        tr("Could not inspect %1:\n%2")
+                            .arg(pluginName,
+                                 info.error.isEmpty()
+                                    ? tr("no audio-effect class found")
+                                    : info.error));
+                    return;
+                }
+
+                // Use the first audio-effect class.
+                const auto& cls = info.classes.first();
+
+                const double sr   = m_audioEngine ? m_audioEngine->sampleRate() : 48000.0;
+                const int maxFr   = 2048;
+                auto inst = dawcast::plugins::Vst3PluginInstance::create(
+                    pluginPath, cls.cid, sr, maxFr);
+                if (!inst) {
+                    QMessageBox::warning(this, tr("VST3 Load Failed"),
+                        tr("Could not instantiate %1:\n%2")
+                            .arg(pluginName,
+                                 dawcast::plugins::Vst3PluginInstance::lastError()));
+                    return;
+                }
+
+                // Target chain: the last audio track (the one the effects rack
+                // is currently bound to, or auto-create one).
+                dawcast::AudioTrack* target = nullptr;
+                if (m_timelineModel) {
+                    for (int t = m_timelineModel->trackCount() - 1; t >= 0; --t) {
+                        if (auto* at = qobject_cast<dawcast::AudioTrack*>(
+                                m_timelineModel->track(t))) {
+                            target = at;
+                            break;
+                        }
+                    }
+                    if (!target) target = m_timelineModel->addAudioTrack();
+                }
+                if (!target) {
+                    QMessageBox::warning(this, tr("VST3 Load Failed"),
+                        tr("No audio track available to host %1").arg(pluginName));
+                    return;
+                }
+
+                auto* adapter = new dawcast::plugins::Vst3EffectAdapter(
+                    std::move(inst), pluginName + QStringLiteral("  [VST3]"));
+
+                if (target->effectChain()) {
+                    target->effectChain()->addEffect(adapter);
+                }
+                if (m_effectsRack) {
+                    m_effectsRack->setDspChain(target->effectChain());
+                    m_effectsRack->addEffect(adapter);
+                }
+
+                // Open the plugin's native editor (or fallback generic
+                // dialog) non-modally so the user can start tweaking
+                // immediately. The dialog deletes itself on close; the
+                // adapter + plugin instance stay alive on the track's
+                // effect chain.
+                if (auto* inst2 = adapter->instance()) {
+                    if (auto* dlg = inst2->openEditor(this)) {
+                        dlg->setAttribute(Qt::WA_DeleteOnClose);
+                        dlg->show();
+                    }
+                }
+
+                statusBar()->showMessage(
+                    tr("Loaded %1 into track '%2'")
+                        .arg(pluginName, target->name()), 4000);
+            });
+            if (target == vst3Menu) ++nVst;
+            else                    ++nAu;
+        }
+        if (nVst == 0) vst3Menu->addAction(tr("(none installed)"))->setEnabled(false);
+        if (nAu  == 0) auMenu->addAction(tr("(none installed)"))->setEnabled(false);
+        statusBar()->showMessage(
+            tr("Scanned %1 VST3 + %2 Audio Unit plugins").arg(nVst).arg(nAu), 4000);
+    });
+
+    // Kick off scan asynchronously on a singleShot so the menu assembles
+    // first. Scanner singleton lives for app lifetime.
+    QTimer::singleShot(0, this, [scanner]() { scanner->scanPaths(); });
+}
+
+void MainWindow::openPluginPreview(const QString& displayName)
+{
+    const int sr = m_audioEngine ? m_audioEngine->sampleRate() : 48000;
+    auto* adapter = dawcast::dsp::createMc1EffectByName(displayName, sr);
+    if (!adapter) {
+        statusBar()->showMessage(tr("Plugin unavailable: %1").arg(displayName), 3000);
+        return;
+    }
+    QDialog* dlg = dawcast::dsp::openMc1EditorFor(adapter->mc1(), this);
+    if (!dlg) {
+        delete adapter;
+        statusBar()->showMessage(tr("No editor registered for: %1").arg(displayName), 3000);
+        return;
+    }
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    // Keep the adapter alive for the lifetime of its editor dialog.
+    connect(dlg, &QObject::destroyed, this, [adapter]() { delete adapter; });
+    dlg->setWindowTitle(displayName);
+    dlg->show();
+    dlg->raise();
+    statusBar()->showMessage(tr("Opened plugin: %1").arg(displayName), 2000);
 }
 
 } // namespace dawcast::widgets

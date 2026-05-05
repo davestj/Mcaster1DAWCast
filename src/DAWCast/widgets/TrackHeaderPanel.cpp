@@ -10,6 +10,7 @@
 #include "../timeline/VideoTrack.h"
 #include "../timeline/MidiTrack.h"
 #include "../timeline/TrackGroup.h"
+#include "../audio_engine/AudioMixer.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -45,7 +46,10 @@ constexpr int kColorCount = sizeof(kTrackColors) / sizeof(kTrackColors[0]);
 TrackHeaderPanel::TrackHeaderPanel(QWidget* parent)
     : QWidget(parent)
 {
-    setFixedWidth(TrackHeaderWidget::kHeaderWidth);
+    // Resizable via the parent QSplitter: fixed default, but bounded range.
+    setMinimumWidth(160);
+    setMaximumWidth(480);
+    resize(TrackHeaderWidget::kHeaderWidth, height());
     setStyleSheet(QStringLiteral("background-color: #ececf0;"));
     setAcceptDrops(true);
 
@@ -302,6 +306,41 @@ void TrackHeaderPanel::rebuildHeaders()
                 this, &TrackHeaderPanel::duplicateTrackRequested);
         connect(hdr, &TrackHeaderWidget::deleteRequested,
                 this, &TrackHeaderPanel::deleteTrackRequested);
+
+        // ── Wire volume / pan / mute / solo into the underlying AudioTrack.
+        // These were previously emitted but never received — the slider
+        // moved but audio gain never changed.
+        if (auto* at = qobject_cast<AudioTrack*>(trackObj)) {
+            const int stripIdx = i;  // track index == mixer strip index
+            auto* mix = m_audioMixer;
+            connect(hdr, &TrackHeaderWidget::volumeChanged, at,
+                    [at, mix, stripIdx](float db) {
+                at->setVolume(db);
+                // Live update: the stored AudioTrack::m_volumeDb is only
+                // consumed by syncMixerStrips() on reader rebuild, so also
+                // push the new dB straight into the running mixer strip.
+                if (mix) mix->setStripVolume(stripIdx, db);
+            });
+            connect(hdr, &TrackHeaderWidget::panChanged, at,
+                    [at, mix, stripIdx](float pan) {
+                at->setPan(pan);
+                if (mix) mix->setStripPan(stripIdx, pan);
+            });
+            connect(hdr, &TrackHeaderWidget::muteToggled, at,
+                    [at, mix, stripIdx](bool m) {
+                at->setMuted(m);
+                if (mix) mix->setStripMuted(stripIdx, m);
+            });
+            connect(hdr, &TrackHeaderWidget::soloToggled, at,
+                    [at, mix, stripIdx](bool s) {
+                at->setSolo(s);
+                if (mix) mix->setStripSolo(stripIdx, s);
+            });
+            // Record-arm: wire the header 'R' button to AudioTrack's arm flag
+            // so MultitrackRecorder::startRecording() can find the track.
+            connect(hdr, &TrackHeaderWidget::recordArmToggled, at,
+                    [at](bool armed) { at->setRecordArmed(armed); });
+        }
 
         // Per-track transport — bubble up to MainWindow
         connect(hdr, &TrackHeaderWidget::trackPlayClicked,

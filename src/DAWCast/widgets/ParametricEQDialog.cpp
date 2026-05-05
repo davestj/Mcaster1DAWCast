@@ -51,8 +51,8 @@ ParametricEQDialog::ParametricEQDialog(ParametricEQ* eq, QWidget* parent)
     , m_eq(eq)
 {
     setWindowTitle(tr("Parametric EQ"));
-    setMinimumSize(kCurveLeft + kCurveWidth + 50, kControlsTop + 200);
-    resize(kCurveLeft + kCurveWidth + 50, kControlsTop + 200);
+    setMinimumSize(kCurveLeft + kCurveWidth + 38, kControlsTop + 150);
+    resize(kCurveLeft + kCurveWidth + 38, kControlsTop + 150);
     setMouseTracking(true);
 
     // Read current band state from the ParametricEQ model
@@ -99,7 +99,7 @@ ParametricEQDialog::ParametricEQDialog(ParametricEQ* eq, QWidget* parent)
         for (const char* tn : typeNames)
             typeCombo->addItem(QString::fromLatin1(tn));
         typeCombo->setCurrentIndex(m_bands[b].type);
-        typeCombo->setFixedWidth(50);
+        typeCombo->setFixedWidth(38);
         QFont comboFont = typeCombo->font();
         comboFont.setPointSize(9);
         typeCombo->setFont(comboFont);
