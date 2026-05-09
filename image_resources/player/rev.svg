@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="capRim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#787888"/>
+      <stop offset="0.5" stop-color="#404048"/>
+      <stop offset="1"   stop-color="#202028"/>
+    </linearGradient>
+    <radialGradient id="capInner" cx="0.5" cy="0.35" r="0.7">
+      <stop offset="0"   stop-color="#5a5a66"/>
+      <stop offset="0.6" stop-color="#1e1e26"/>
+      <stop offset="1"   stop-color="#080810"/>
+    </radialGradient>
+    <linearGradient id="symFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#fafaff"/>
+      <stop offset="0.25" stop-color="#d0d0dc"/>
+      <stop offset="0.65" stop-color="#6c6c7c"/>
+      <stop offset="1"    stop-color="#1a1a22"/>
+    </linearGradient>
+    <linearGradient id="symGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="118" rx="44" ry="6" fill="#000" fill-opacity="0.55"/>
+  <circle cx="64" cy="64" r="58" fill="url(#capRim)"/>
+  <circle cx="64" cy="64" r="52" fill="url(#capInner)"/>
+  <ellipse cx="64" cy="30" rx="42" ry="14" fill="#ffffff" fill-opacity="0.14"/>
+
+  <!-- Two backward triangles, span x=36..92, center 64 -->
+  <polygon points="66,42 66,90 38,66" fill="#000" fill-opacity="0.7"/>
+  <polygon points="94,42 94,90 66,66" fill="#000" fill-opacity="0.7"/>
+  <polygon points="64,40 64,88 36,64" fill="#1a1a22"/>
+  <polygon points="92,40 92,88 64,64" fill="#1a1a22"/>
+  <polygon points="64,38 64,86 36,62" fill="url(#symFace)"/>
+  <polygon points="92,38 92,86 64,62" fill="url(#symFace)"/>
+  <polygon points="64,38 64,62 36,62" fill="url(#symGloss)"/>
+  <polygon points="92,38 92,62 64,62" fill="url(#symGloss)"/>
+  <line x1="64" y1="40" x2="38" y2="62" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.6"/>
+  <line x1="92" y1="40" x2="66" y2="62" stroke="#ffffff" stroke-opacity="0.7" stroke-width="1.6"/>
+</svg>

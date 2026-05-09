@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="capRim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#787888"/>
+      <stop offset="0.5" stop-color="#404048"/>
+      <stop offset="1"   stop-color="#202028"/>
+    </linearGradient>
+    <radialGradient id="capInner" cx="0.5" cy="0.35" r="0.7">
+      <stop offset="0"   stop-color="#6a1818"/>
+      <stop offset="0.6" stop-color="#2a0808"/>
+      <stop offset="1"   stop-color="#080204"/>
+    </radialGradient>
+    <radialGradient id="recFace" cx="0.5" cy="0.35" r="0.75">
+      <stop offset="0"    stop-color="#ff8080"/>
+      <stop offset="0.35" stop-color="#ee2020"/>
+      <stop offset="0.75" stop-color="#a00808"/>
+      <stop offset="1"    stop-color="#3a0404"/>
+    </radialGradient>
+    <linearGradient id="recGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Drop shadow -->
+  <ellipse cx="64" cy="118" rx="44" ry="6" fill="#000" fill-opacity="0.55"/>
+
+  <!-- Chrome rim -->
+  <circle cx="64" cy="64" r="58" fill="url(#capRim)"/>
+
+  <!-- Dark inner well tinted red -->
+  <circle cx="64" cy="64" r="52" fill="url(#capInner)"/>
+
+  <!-- Subtle top highlight on cap -->
+  <ellipse cx="64" cy="30" rx="42" ry="14" fill="#ffffff" fill-opacity="0.12"/>
+
+  <!-- Extrusion shadow under the record dot -->
+  <ellipse cx="64" cy="68" rx="26" ry="26" fill="#000" fill-opacity="0.65"/>
+
+  <!-- Record dot — bottom face / rim -->
+  <circle cx="64" cy="66" r="26" fill="#3a0404"/>
+
+  <!-- Record dot — main face -->
+  <circle cx="64" cy="64" r="26" fill="url(#recFace)"/>
+
+  <!-- Glossy top half -->
+  <ellipse cx="64" cy="54" rx="24" ry="14" fill="url(#recGloss)"/>
+
+  <!-- Specular hotspot -->
+  <ellipse cx="56" cy="50" rx="8" ry="3.5" fill="#ffffff" fill-opacity="0.75"/>
+
+  <!-- Outer red glow rim -->
+  <circle cx="64" cy="64" r="26" fill="none" stroke="#ff4040" stroke-opacity="0.35" stroke-width="2"/>
+</svg>

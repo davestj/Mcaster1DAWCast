@@ -9,21 +9,84 @@
     outline: none;
 }
 
+/* 1px dark edge on every structural widget. Border-radius 1 keeps corners
+ * crisp but not sharp. Individual rules below can still override this. */
+QGroupBox,
+QFrame,
+QDockWidget > QWidget,
+QScrollArea,
+QAbstractScrollArea,
+QToolBar,
+QStatusBar,
+QMenuBar,
+QMenu,
+QTabWidget::pane,
+QTabBar::tab,
+QLineEdit,
+QTextEdit,
+QPlainTextEdit,
+QComboBox,
+QSpinBox,
+QDoubleSpinBox,
+QDateTimeEdit,
+QProgressBar,
+QTreeView,
+QListView,
+QTableView,
+QHeaderView::section {
+    border: 1px solid ${border};
+    border-radius: 1px;
+}
+
+/* Splitter handles keep their own (thicker) styling — override. */
+QSplitter::handle {
+    border: none;
+}
+
+/* Dock widgets: 1px outer border so they're clearly distinct when docked
+ * (including Media Library on the left, Effects / Video on the right, etc.),
+ * with a visible title bar that shows close/float icons. */
+QDockWidget {
+    border: 1px solid ${border};
+    titlebar-close-icon: url(:/icons/close.svg);
+    titlebar-normal-icon: url(:/icons/undock.svg);
+}
+/* The content widget Qt hosts inside the dock body also gets a border so
+ * the inner content region is clearly bounded — this is what was missing
+ * for Media Library on the left pane. */
+QDockWidget > QWidget {
+    border: 1px solid ${border};
+}
+QDockWidget::title {
+    background-color: ${secondary};
+    border-bottom: 1px solid ${border};
+    padding: 6px 10px;
+    font-weight: 600;
+    text-align: left;
+}
+QDockWidget::close-button,
+QDockWidget::float-button {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 0;
+    icon-size: 12px;
+}
+QDockWidget::close-button:hover,
+QDockWidget::float-button:hover {
+    border-color: ${border};
+    background: palette(light);
+}
+
+/* QPushButton gets its border from BevelButton's painter; leave unstyled
+ * here so our custom buttons don't get a double frame. */
+
 QMainWindow {
     background-color: ${primary};
 }
 
-QDockWidget {
-    titlebar-close-icon: url(:/icons/close.svg);
-    titlebar-normal-icon: url(:/icons/undock.svg);
-}
-
-QDockWidget::title {
-    background-color: ${secondary};
-    padding: 8px 12px;
-    border-bottom: 1px solid ${border};
-    font-weight: 600;
-}
+/* (Unified dock widget styling lives earlier in this file.
+ *  The duplicate QDockWidget block that used to live here was
+ *  stripping the 1px border via QSS cascading. Removed.) */
 
 /* ── Transport Bar ─────────────────────────────────────────────────── */
 
@@ -325,18 +388,24 @@ QPushButton {
     border-radius: 6px;
     padding: 7px 18px;
     font-weight: 500;
+    color: #1a1a1a;
+    background-color: #f0f0f4;
 }
 
 QPushButton:hover {
     border-color: ${accent};
+    background-color: #e4e4ea;
+    color: #1a1a1a;
 }
 
 QPushButton:pressed {
-    background-color: ${accent};
+    background-color: #d0d0d8;
+    color: #1a1a1a;
 }
 
 QPushButton:disabled {
-    color: ${text_secondary};
+    color: #888;
+    background-color: #f4f4f6;
 }
 
 /* ── Tooltips ──────────────────────────────────────────────────────── */
@@ -494,14 +563,17 @@ QToolButton {
     border: 1px solid transparent;
     border-radius: 6px;
     padding: 4px 8px;
+    color: #1a1a1a;
 }
 
 QToolButton:hover {
     border-color: ${border};
+    background-color: #e4e4ea;
+    color: #1a1a1a;
 }
 
 QToolButton:pressed, QToolButton:checked {
-    background-color: ${accent};
+    background-color: #d0d0d8;
     border-color: ${accent};
-    color: white;
+    color: #1a1a1a;
 }

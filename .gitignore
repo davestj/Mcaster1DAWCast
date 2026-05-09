@@ -10,6 +10,7 @@ cmake-build/
 *.dylib
 *.dll
 *.exe
+*.dSYM/
 moc_*.cpp
 qrc_*.cpp
 ui_*.h

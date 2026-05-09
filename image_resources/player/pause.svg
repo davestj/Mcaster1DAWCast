@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="capRim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#787888"/>
+      <stop offset="0.5" stop-color="#404048"/>
+      <stop offset="1"   stop-color="#202028"/>
+    </linearGradient>
+    <radialGradient id="capInner" cx="0.5" cy="0.35" r="0.7">
+      <stop offset="0"   stop-color="#5a5a66"/>
+      <stop offset="0.6" stop-color="#1e1e26"/>
+      <stop offset="1"   stop-color="#080810"/>
+    </radialGradient>
+    <linearGradient id="symFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"    stop-color="#fafaff"/>
+      <stop offset="0.25" stop-color="#d0d0dc"/>
+      <stop offset="0.65" stop-color="#6c6c7c"/>
+      <stop offset="1"    stop-color="#1a1a22"/>
+    </linearGradient>
+    <linearGradient id="symGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="64" cy="118" rx="44" ry="6" fill="#000" fill-opacity="0.55"/>
+  <circle cx="64" cy="64" r="58" fill="url(#capRim)"/>
+  <circle cx="64" cy="64" r="52" fill="url(#capInner)"/>
+  <ellipse cx="64" cy="30" rx="42" ry="14" fill="#ffffff" fill-opacity="0.14"/>
+
+  <!-- Pause bars centered at x=64, span 38..90 -->
+  <rect x="42" y="40" width="14" height="50" rx="2" fill="#000" fill-opacity="0.7"/>
+  <rect x="72" y="40" width="14" height="50" rx="2" fill="#000" fill-opacity="0.7"/>
+  <rect x="40" y="38" width="14" height="50" rx="2" fill="#1a1a22"/>
+  <rect x="70" y="38" width="14" height="50" rx="2" fill="#1a1a22"/>
+  <rect x="40" y="36" width="14" height="50" rx="2" fill="url(#symFace)"/>
+  <rect x="70" y="36" width="14" height="50" rx="2" fill="url(#symFace)"/>
+  <rect x="40" y="36" width="14" height="22" rx="2" fill="url(#symGloss)"/>
+  <rect x="70" y="36" width="14" height="22" rx="2" fill="url(#symGloss)"/>
+  <line x1="41" y1="38" x2="41" y2="84" stroke="#ffffff" stroke-opacity="0.8" stroke-width="1.6"/>
+  <line x1="71" y1="38" x2="71" y2="84" stroke="#ffffff" stroke-opacity="0.8" stroke-width="1.6"/>
+</svg>
