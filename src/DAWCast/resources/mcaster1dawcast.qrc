@@ -19,6 +19,13 @@
     <file>icons/export.svg</file>
     <file>icons/settings.svg</file>
     <file>icons/midi.svg</file>
+    <file>icons/metronome.svg</file>
+    <file>icons/flag.svg</file>
+    <file>icons/prev.svg</file>
+    <file>icons/next.svg</file>
+    <file>icons/list.svg</file>
+    <file>icons/grid.svg</file>
+    <file>icons/magnifier.svg</file>
   </qresource>
   <qresource prefix="/presets">
   </qresource>
