@@ -6,7 +6,7 @@
 
 **Multi-Channel DAW for Broadcasting, Webcasting, Podcasting & Video Editing**
 
-[![Build & Test](https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge&logo=github)](https://github.com/davestj/Mcaster1DAWCast/actions)
+[![Status](https://img.shields.io/badge/status-alpha--preview-FF6B35?style=for-the-badge&logo=git&logoColor=white)](#beta-status)
 [![Version](https://img.shields.io/badge/version-v1.0.0--alpha-blue?style=for-the-badge)](https://github.com/davestj/Mcaster1DAWCast/releases)
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-blue?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/davestj/Mcaster1DAWCast)
@@ -22,6 +22,34 @@
 [**Quick Start**](#quick-start) · [**Features**](#features) · [**Architecture**](#architecture) · [**Documentation**](#documentation)
 
 </div>
+
+---
+
+## Beta Status
+
+> [!WARNING]
+> **Alpha Preview — Not Yet for Production Use**
+>
+> Mcaster1DAWCast is currently in **alpha preview** for early testers and contributors. The codebase builds cleanly, the app launches, and the core DAW pipeline is exercised daily — but several subsystems are still being wired up. Set expectations accordingly:
+>
+> ### ✅ Working today (95%+ complete)
+> - Multi-track audio recording & playback (PortAudio engine)
+> - 32-strip mixer with VU meters, faders, panning, bus routing
+> - **MC1 plugin library** — 52 plugins, 83 factory presets, all flagship-grade QPainter dialogs
+> - Mcaster1Tuner VST3 plugin (YIN pitch detection, 29 tuning presets)
+> - Audio export — WAV / FLAC / MP3 / AAC / Opus / Vorbis
+> - Project save/load, undo/redo, media library, theme system
+> - Podcast metadata + chapter editing, RSS 2.0 generation
+> - Whisper transcription engine (requires `whisper-cpp` on PATH)
+>
+> ### 🚧 Known incomplete (hidden or disabled in early builds)
+> - **Audio device picker** — CoreAudio enumeration is stubbed (`platform/device_discovery.mm`); use system default I/O for now
+> - **Video export pipeline** — `MuxerDemuxer` and `VideoEncoder` produce no playable file yet
+> - **RTMP live streaming** — audio stream allocation is unfinished in `broadcast/RTMPStreamer`
+> - **AudioUnit plugin processing** — AU bundles enumerate but audio doesn't flow (VST3 hosting works)
+> - **Automation lanes** — collected & persisted in projects, but `PlaybackEngine` doesn't yet read them at run time
+>
+> Report bugs / regressions at [GitHub Issues](https://github.com/davestj/Mcaster1DAWCast/issues). Beta testers welcome — see [Quick Start](#quick-start) below.
 
 ---
 
@@ -288,6 +316,95 @@ brew install autoconf automake autoconf-archive pkg-config \
     x264 libvpx theora aom svt-av1 dav1d webp \
     libass freetype fontconfig fribidi openssl yt-dlp
 ```
+
+---
+
+## Tech Stack
+
+<div align="center">
+
+#### Build & Language
+
+![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?style=flat-square&logo=cplusplus&logoColor=white)
+![Autotools](https://img.shields.io/badge/Build-Autotools-A42E2B?style=flat-square&logo=gnu&logoColor=white)
+![GNU Make](https://img.shields.io/badge/GNU%20Make-required-A42E2B?style=flat-square&logo=gnu&logoColor=white)
+![pkg-config](https://img.shields.io/badge/pkg--config-required-555?style=flat-square)
+![Clang](https://img.shields.io/badge/Clang-LLVM-262D3A?style=flat-square&logo=llvm&logoColor=white)
+![GCC](https://img.shields.io/badge/GCC-supported-F34B7D?style=flat-square&logo=gnu&logoColor=white)
+
+#### UI Framework
+
+![Qt 6.8+](https://img.shields.io/badge/Qt-6.8%2B-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtCore](https://img.shields.io/badge/QtCore-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtGui](https://img.shields.io/badge/QtGui-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtWidgets](https://img.shields.io/badge/QtWidgets-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtNetwork](https://img.shields.io/badge/QtNetwork-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtConcurrent](https://img.shields.io/badge/QtConcurrent-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtMultimedia](https://img.shields.io/badge/QtMultimedia-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+![QtSvg](https://img.shields.io/badge/QtSvg-6.8-41CD52?style=flat-square&logo=qt&logoColor=white)
+
+#### Audio Engine & Codecs
+
+![PortAudio 19.7+](https://img.shields.io/badge/PortAudio-19.7%2B-8B0000?style=flat-square)
+![LAME](https://img.shields.io/badge/LAME-MP3-2E86AB?style=flat-square)
+![FLAC](https://img.shields.io/badge/FLAC-lossless-2E86AB?style=flat-square)
+![Vorbis](https://img.shields.io/badge/Vorbis-OGG-2E86AB?style=flat-square)
+![Opus](https://img.shields.io/badge/Opus-codec-2E86AB?style=flat-square)
+![fdk-aac](https://img.shields.io/badge/fdk--aac-AAC-2E86AB?style=flat-square)
+![libsndfile](https://img.shields.io/badge/libsndfile-PCM-2E86AB?style=flat-square)
+![SoX](https://img.shields.io/badge/SoX-resample-2E86AB?style=flat-square)
+
+#### Video Engine & Codecs
+
+![FFmpeg 6.0+](https://img.shields.io/badge/FFmpeg-6.0%2B-007808?style=flat-square&logo=ffmpeg&logoColor=white)
+![x264](https://img.shields.io/badge/x264-H.264-007808?style=flat-square)
+![libvpx](https://img.shields.io/badge/libvpx-VP8%2FVP9-007808?style=flat-square)
+![Theora](https://img.shields.io/badge/Theora-OGG-007808?style=flat-square)
+![libaom](https://img.shields.io/badge/libaom-AV1-007808?style=flat-square)
+![SVT-AV1](https://img.shields.io/badge/SVT--AV1-encoder-007808?style=flat-square)
+![dav1d](https://img.shields.io/badge/dav1d-AV1%20decoder-007808?style=flat-square)
+![libwebp](https://img.shields.io/badge/libwebp-WebP-007808?style=flat-square)
+
+#### Subtitles & Text Rendering
+
+![libass](https://img.shields.io/badge/libass-ASS%2FSSA-9B59B6?style=flat-square)
+![FreeType](https://img.shields.io/badge/FreeType-fonts-9B59B6?style=flat-square)
+![Fontconfig](https://img.shields.io/badge/Fontconfig-system%20fonts-9B59B6?style=flat-square)
+![FriBidi](https://img.shields.io/badge/FriBidi-RTL-9B59B6?style=flat-square)
+![libzvbi](https://img.shields.io/badge/libzvbi-VBI%2Fteletext-9B59B6?style=flat-square)
+
+#### Plugin Hosting
+
+![VST3 SDK](https://img.shields.io/badge/VST3%20SDK-3.7.14-E1A227?style=flat-square)
+![VSTGUI](https://img.shields.io/badge/VSTGUI-editor-E1A227?style=flat-square)
+![AudioUnit](https://img.shields.io/badge/AudioUnit-macOS-000000?style=flat-square&logo=apple&logoColor=white)
+![CoreAudio](https://img.shields.io/badge/CoreAudio-macOS-000000?style=flat-square&logo=apple&logoColor=white)
+![MC1 Plugins](https://img.shields.io/badge/MC1%20Plugins-52%20bundled-6F42C1?style=flat-square)
+
+#### AI & Tooling
+
+![Whisper.cpp](https://img.shields.io/badge/whisper.cpp-transcription-412991?style=flat-square&logo=openai&logoColor=white)
+![yt-dlp](https://img.shields.io/badge/yt--dlp-media%20fetch-FF0000?style=flat-square&logo=youtube&logoColor=white)
+
+#### Data, Config & Metadata
+
+![SQLite](https://img.shields.io/badge/SQLite-3.24%2B-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![TagLib](https://img.shields.io/badge/TagLib-ID3%2FFLAC%2Ftags-555?style=flat-square)
+![libyaml](https://img.shields.io/badge/libyaml-parser-CB171E?style=flat-square&logo=yaml&logoColor=white)
+![yaml-cpp](https://img.shields.io/badge/yaml--cpp-presets-CB171E?style=flat-square&logo=yaml&logoColor=white)
+
+#### Security & Distribution
+
+![OpenSSL](https://img.shields.io/badge/OpenSSL-3.x-721412?style=flat-square&logo=openssl&logoColor=white)
+![codesign](https://img.shields.io/badge/Apple-codesign-000000?style=flat-square&logo=apple&logoColor=white)
+![DMG](https://img.shields.io/badge/macOS-DMG-000000?style=flat-square&logo=apple&logoColor=white)
+![PKG](https://img.shields.io/badge/macOS-PKG-000000?style=flat-square&logo=apple&logoColor=white)
+![NSIS](https://img.shields.io/badge/Windows-NSIS-0078D6?style=flat-square&logo=windows&logoColor=white)
+![DEB/RPM](https://img.shields.io/badge/Linux-DEB%2FRPM-FCC624?style=flat-square&logo=linux&logoColor=black)
+
+</div>
+
+---
 
 ### Build
 
