@@ -14,6 +14,10 @@ cmake-build/
 moc_*.cpp
 qrc_*.cpp
 ui_*.h
+*.o.tmp
+*.Po
+*.Tpo
+src/DAWCast/mcaster1dawcast
 
 # ── Autotools generated ─────────────────────────────────────────────
 autom4te.cache/
@@ -45,10 +49,14 @@ m4/
 
 # ── Test media (copies of audio files for testing) ──────────────────
 test_media/
+test*.dawcast
 
 # ── IDE / Editor ────────────────────────────────────────────────────
 .vscode/
 .idea/
+.cache/
+.clangd/
+compile_commands.json
 *.swp
 *.swo
 *~
@@ -68,3 +76,6 @@ logs/
 
 # ── CLAUDE.md stays local ───────────────────────────────────────────
 # CLAUDE.md is excluded from server sync but tracked in git
+
+# ── Local-only shortcuts (per-developer) ───────────────────────────
+resume.txt
